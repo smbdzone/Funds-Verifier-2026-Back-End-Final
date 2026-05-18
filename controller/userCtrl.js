@@ -36,6 +36,54 @@ const cookieOptions = {
   }),
 }
 
+/** Remove auth cookies using every scope they may have been set with (avoids empty shells in DevTools). */
+const clearAuthCookies = (res) => {
+  const names = ['refreshToken', 'accessToken', 'role']
+  const scopes = [
+    cookieOptions,
+    {
+      path: '/',
+      secure: isProd,
+      sameSite: isProd ? 'none' : 'lax',
+      httpOnly: true,
+    },
+    {
+      path: '/',
+      secure: isProd,
+      sameSite: isProd ? 'none' : 'lax',
+      httpOnly: false,
+    },
+  ]
+
+  if (isProd && cookieOptions.domain) {
+    scopes.push(
+      {
+        path: '/',
+        secure: true,
+        sameSite: 'none',
+        domain: cookieOptions.domain,
+        httpOnly: true,
+      },
+      {
+        path: '/',
+        secure: true,
+        sameSite: 'none',
+        domain: cookieOptions.domain,
+        httpOnly: false,
+      },
+    )
+  }
+
+  for (const name of names) {
+    for (const opts of scopes) {
+      res.clearCookie(name, opts)
+    }
+  }
+}
+
+const isNonEmptyCookieValue = (value) =>
+  typeof value === 'string' && value.trim().length > 0
+
 const PRIVILEGED_ROLES = [
   'Admin',
   'Evaluator',
@@ -608,13 +656,13 @@ const updateStatus = asyncHandler(async (req, res) => {
 const handleRefreshToken = asyncHandler(async (req, res) => {
   const cookies = req.cookies
 
-  if (!cookies?.refreshToken) {
+  if (!isNonEmptyCookieValue(cookies?.refreshToken)) {
     return res
       .status(401)
       .json({ success: false, message: 'Refresh token missing' })
   }
 
-  const oldRefreshToken = cookies.refreshToken
+  const oldRefreshToken = cookies.refreshToken.trim()
 
   const user = await User.findOne({
     refreshToken: oldRefreshToken,
@@ -1025,21 +1073,16 @@ const switchUser = asyncHandler(async (req, res) => {
 })
 
 const logoutUser = asyncHandler(async (req, res) => {
-  const { refreshToken } = req.cookies
+  const refreshToken = req.cookies?.refreshToken
 
-  if (refreshToken) {
+  if (isNonEmptyCookieValue(refreshToken)) {
     await User.findOneAndUpdate(
-      { refreshToken },
+      { refreshToken: refreshToken.trim() },
       { $unset: { refreshToken: 1 } },
     )
   }
 
-  res.clearCookie('refreshToken', cookieOptions)
-  res.clearCookie('refreshToken', { ...cookieOptions, httpOnly: true })
-  res.clearCookie('accessToken', { ...cookieOptions, httpOnly: true })
-  res.clearCookie('accessToken', { ...cookieOptions, httpOnly: false })
-  res.clearCookie('role', { ...cookieOptions, httpOnly: true })
-  res.clearCookie('role', { ...cookieOptions, httpOnly: false })
+  clearAuthCookies(res)
 
   res.json({ message: 'Logged out successfully' })
 })
