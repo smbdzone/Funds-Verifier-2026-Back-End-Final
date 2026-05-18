@@ -1,0 +1,47 @@
+[
+  {
+    "assetType": "Jewellery For Sale",
+    "assetId": "686d1c87a8c03413c0fb3408",
+    "bookingDate": "2025-07-21T03:12:35.193Z",
+    "bookingTime": "13:00",
+    "createdAt": "2025-07-07T14:19:38.414Z",
+    "_id": "686d1c87a8c03413c0fb340d",
+    "__v": 0
+  },
+  {
+    "assetType": "Car For Sale",
+    "assetId": "686d1c87a8c03413c0fb3409",
+    "bookingDate": "2025-08-06T23:23:01.247Z",
+    "bookingTime": "16:00",
+    "createdAt": "2025-07-07T14:21:43.884Z",
+    "_id": "686d1c87a8c03413c0fb340e",
+    "__v": 0
+  },
+  {
+    "assetType": "Boats for sale",
+    "assetId": "686d1c87a8c03413c0fb340a",
+    "bookingDate": "2025-07-21T22:05:35.167Z",
+    "bookingTime": "16:00",
+    "createdAt": "2025-07-08T07:05:25.805Z",
+    "_id": "686d1c87a8c03413c0fb340f",
+    "__v": 0
+  },
+  {
+    "assetType": "Property For Sale",
+    "assetId": "686d1c87a8c03413c0fb340b",
+    "bookingDate": "2025-07-13T12:41:28.079Z",
+    "bookingTime": "12:00",
+    "createdAt": "2025-07-08T11:44:02.390Z",
+    "_id": "686d1c87a8c03413c0fb3410",
+    "__v": 0
+  },
+  {
+    "assetType": "Car For Sale",
+    "assetId": "686d1c87a8c03413c0fb340c",
+    "bookingDate": "2025-07-16T15:19:25.133Z",
+    "bookingTime": "14:00",
+    "createdAt": "2025-07-07T23:26:49.052Z",
+    "_id": "686d1c87a8c03413c0fb3411",
+    "__v": 0
+  }
+]

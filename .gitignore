@@ -1,0 +1,7 @@
+node_modules/
+public/
+.env
+.vercel
+private_key.pem
+public_key.pem
+keys/*.pem

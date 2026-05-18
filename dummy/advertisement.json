@@ -1,0 +1,1317 @@
+[
+  {
+    "creatives": [
+      {
+        "img": {
+          "url": "https://loremflickr.com/3293/1460?lock=3330169772526145",
+          "alt": "utroque suscipit doloribus"
+        },
+        "adLink": "https://emotional-apricot.com/",
+        "format": "footer-banner",
+        "impressions": [
+          {
+            "country": "Central African Republic",
+            "cities": "Bergnaumworth",
+            "userId": "1a30b166-22de-48fc-97a9-eefedb2de092",
+            "_id": "686d1944ad89f0d87ef8ac93"
+          }
+        ],
+        "clicks": [
+          {
+            "country": "Honduras",
+            "cities": "Council Bluffs",
+            "userId": "283acdd9-db14-4470-a1d7-4b2753b1dfc6",
+            "_id": "686d1944ad89f0d87ef8ac94"
+          }
+        ],
+        "_id": "686d1944ad89f0d87ef8ac92"
+      },
+      {
+        "img": {
+          "url": "https://picsum.photos/seed/yUFik/2045/1593",
+          "alt": "somnus credo talio"
+        },
+        "adLink": "https://snappy-roundabout.info/",
+        "format": "footer-banner",
+        "impressions": [
+          {
+            "country": "Niue",
+            "cities": "Treutelcester",
+            "userId": "4c2ef382-8bd1-4c7a-8b37-4511b61c77c0",
+            "_id": "686d1944ad89f0d87ef8ac96"
+          }
+        ],
+        "clicks": [
+          {
+            "country": "Sri Lanka",
+            "cities": "Cleveland Heights",
+            "userId": "26c51931-f4c7-491a-9623-223ab1c24cfb",
+            "_id": "686d1944ad89f0d87ef8ac97"
+          }
+        ],
+        "_id": "686d1944ad89f0d87ef8ac95"
+      }
+    ],
+    "totalBudgetUsed": 28.038926591721026,
+    "budget": "1926",
+    "sessionId": "8fa90447-71f2-41ea-a551-70c2a06231dc",
+    "targetedAudience": {
+      "country": [
+        "Gabon"
+      ],
+      "city": [
+        "North Aidanstad"
+      ],
+      "startAt": [
+        "2026-06-24T23:57:12.975Z"
+      ],
+      "endAt": [
+        "2025-08-21T06:32:18.837Z"
+      ]
+    },
+    "userId": "0d169c32-de2d-419a-acc9-ef3acfcc6e9a",
+    "status": "completed",
+    "paymentStatus": 1,
+    "_id": "686d1944ad89f0d87ef8ac91",
+    "createdAt": "2025-07-08T13:12:36.136Z",
+    "__v": 0
+  },
+  {
+    "creatives": [
+      {
+        "img": {
+          "url": "https://picsum.photos/seed/5HrXPwSEqf/3163/772",
+          "alt": "iste vilitas sperno"
+        },
+        "adLink": "https://next-minister.org/",
+        "format": "footer-banner",
+        "impressions": [
+          {
+            "country": "Austria",
+            "cities": "West Garrettberg",
+            "userId": "023d62b7-2a73-4b25-be28-bc6e55bbd25f",
+            "_id": "686d1944ad89f0d87ef8ac9a"
+          }
+        ],
+        "clicks": [
+          {
+            "country": "Maldives",
+            "cities": "Port Pablo",
+            "userId": "e22a0c44-60cd-4ad3-89bd-92dd100e5c56",
+            "_id": "686d1944ad89f0d87ef8ac9b"
+          }
+        ],
+        "_id": "686d1944ad89f0d87ef8ac99"
+      }
+    ],
+    "totalBudgetUsed": 805.3751308326753,
+    "budget": "1224",
+    "sessionId": "edec4c48-d609-4a51-950d-171855c09a3f",
+    "targetedAudience": {
+      "country": [
+        "Turks and Caicos Islands"
+      ],
+      "city": [
+        "Akron"
+      ],
+      "startAt": [
+        "2025-12-07T22:54:22.173Z"
+      ],
+      "endAt": [
+        "2025-09-26T11:36:46.759Z"
+      ]
+    },
+    "userId": "0d376fd9-7e71-4a5b-b53b-a396569e3cbd",
+    "status": "completed",
+    "paymentStatus": 0,
+    "_id": "686d1944ad89f0d87ef8ac98",
+    "createdAt": "2025-07-08T13:12:36.138Z",
+    "__v": 0
+  },
+  {
+    "creatives": [
+      {
+        "img": {
+          "url": "https://loremflickr.com/3854/3124?lock=55607455936579",
+          "alt": "autus credo ara"
+        },
+        "adLink": "https://affectionate-cannon.org",
+        "format": "footer-banner",
+        "impressions": [
+          {
+            "country": "Isle of Man",
+            "cities": "Fort Idella",
+            "userId": "1a2337ee-07eb-4d3c-af7c-c8fa041e6332",
+            "_id": "686d1944ad89f0d87ef8ac9e"
+          }
+        ],
+        "clicks": [
+          {
+            "country": "French Polynesia",
+            "cities": "Stewarttown",
+            "userId": "89f1d08c-9184-49bb-a3cb-7005df4adbb7",
+            "_id": "686d1944ad89f0d87ef8ac9f"
+          }
+        ],
+        "_id": "686d1944ad89f0d87ef8ac9d"
+      },
+      {
+        "img": {
+          "url": "https://picsum.photos/seed/Kgfmo/80/3473",
+          "alt": "victus credo iure"
+        },
+        "adLink": "https://discrete-asset.name/",
+        "format": "footer-banner",
+        "impressions": [
+          {
+            "country": "Aruba",
+            "cities": "Deckowmouth",
+            "userId": "72ae5df6-7999-40d6-b858-0ac481c586bf",
+            "_id": "686d1944ad89f0d87ef8aca1"
+          }
+        ],
+        "clicks": [
+          {
+            "country": "Jamaica",
+            "cities": "West Constantin",
+            "userId": "cb495823-e5bc-423a-a0d5-139d0c2a0b9a",
+            "_id": "686d1944ad89f0d87ef8aca2"
+          }
+        ],
+        "_id": "686d1944ad89f0d87ef8aca0"
+      }
+    ],
+    "totalBudgetUsed": 614.115294543491,
+    "budget": "3049",
+    "sessionId": "2a399245-8f14-457b-a8f8-162505fa8a16",
+    "targetedAudience": {
+      "country": [
+        "Bosnia and Herzegovina"
+      ],
+      "city": [
+        "West Enolaborough"
+      ],
+      "startAt": [
+        "2025-08-01T04:39:05.559Z"
+      ],
+      "endAt": [
+        "2026-04-24T13:47:30.029Z"
+      ]
+    },
+    "userId": "d83f3f58-0661-4526-a869-64eb5a4c29ef",
+    "status": "in_progress",
+    "paymentStatus": 0,
+    "_id": "686d1944ad89f0d87ef8ac9c",
+    "createdAt": "2025-07-08T13:12:36.139Z",
+    "__v": 0
+  },
+  {
+    "creatives": [
+      {
+        "img": {
+          "url": "https://picsum.photos/seed/zklHDPB/1418/2344",
+          "alt": "chirographum ullus claro"
+        },
+        "adLink": "https://far-flung-order.biz",
+        "format": "footer-banner",
+        "impressions": [
+          {
+            "country": "Antarctica",
+            "cities": "Johnsstead",
+            "userId": "315a7c34-4af1-4b8e-9447-3da652f28b61",
+            "_id": "686d1944ad89f0d87ef8aca5"
+          }
+        ],
+        "clicks": [
+          {
+            "country": "Jersey",
+            "cities": "Kleinside",
+            "userId": "33d2b171-e310-4018-8ba6-dd071516cbed",
+            "_id": "686d1944ad89f0d87ef8aca6"
+          }
+        ],
+        "_id": "686d1944ad89f0d87ef8aca4"
+      },
+      {
+        "img": {
+          "url": "https://picsum.photos/seed/kaPBzN9E7/1713/3072",
+          "alt": "texo ambitus velociter"
+        },
+        "adLink": "https://usable-responsibility.com",
+        "format": "footer-banner",
+        "impressions": [
+          {
+            "country": "Costa Rica",
+            "cities": "Port Clydefurt",
+            "userId": "abb55592-57cf-4230-867c-bbd9e2fb1dca",
+            "_id": "686d1944ad89f0d87ef8aca8"
+          }
+        ],
+        "clicks": [
+          {
+            "country": "Western Sahara",
+            "cities": "Dearborn Heights",
+            "userId": "3e0420b3-c3ab-48e7-ac64-e2c6726bdc5d",
+            "_id": "686d1944ad89f0d87ef8aca9"
+          }
+        ],
+        "_id": "686d1944ad89f0d87ef8aca7"
+      },
+      {
+        "img": {
+          "url": "https://loremflickr.com/1489/524?lock=4165056839143565",
+          "alt": "odit vestrum defero"
+        },
+        "adLink": "https://husky-operating.org/",
+        "format": "footer-banner",
+        "impressions": [
+          {
+            "country": "Moldova",
+            "cities": "South Ryleeville",
+            "userId": "68ed2ad4-fb0f-43df-97e0-8d1f09ef9012",
+            "_id": "686d1944ad89f0d87ef8acab"
+          }
+        ],
+        "clicks": [
+          {
+            "country": "Serbia",
+            "cities": "South Isabellatown",
+            "userId": "d33f82a8-0f93-4ffe-a161-c015070c87e9",
+            "_id": "686d1944ad89f0d87ef8acac"
+          }
+        ],
+        "_id": "686d1944ad89f0d87ef8acaa"
+      }
+    ],
+    "totalBudgetUsed": 446.11919484701946,
+    "budget": "3710",
+    "sessionId": "4c24111d-7cde-4997-99a2-7d93fecd3f4b",
+    "targetedAudience": {
+      "country": [
+        "Belgium"
+      ],
+      "city": [
+        "Enolaland"
+      ],
+      "startAt": [
+        "2025-11-01T00:38:34.917Z"
+      ],
+      "endAt": [
+        "2026-07-04T11:28:42.869Z"
+      ]
+    },
+    "userId": "7fea335d-bc76-45f5-85d7-64e928a02e3e",
+    "status": "canceled",
+    "paymentStatus": 0,
+    "_id": "686d1944ad89f0d87ef8aca3",
+    "createdAt": "2025-07-08T13:12:36.141Z",
+    "__v": 0
+  },
+  {
+    "creatives": [
+      {
+        "img": {
+          "url": "https://picsum.photos/seed/pk0Quw/864/526",
+          "alt": "eveniet fugiat enim"
+        },
+        "adLink": "https://misguided-tarragon.com/",
+        "format": "footer-banner",
+        "impressions": [
+          {
+            "country": "Pitcairn Islands",
+            "cities": "New Gretchen",
+            "userId": "aad27491-4c26-40aa-8cd6-fcd185b95208",
+            "_id": "686d1944ad89f0d87ef8acaf"
+          }
+        ],
+        "clicks": [
+          {
+            "country": "Central African Republic",
+            "cities": "Austin",
+            "userId": "cee0ad1f-039a-4c22-b687-49eacb39dad9",
+            "_id": "686d1944ad89f0d87ef8acb0"
+          }
+        ],
+        "_id": "686d1944ad89f0d87ef8acae"
+      }
+    ],
+    "totalBudgetUsed": 71.0648747178283,
+    "budget": "4494",
+    "sessionId": "2ec13354-9e36-431e-a70f-76868e21c01b",
+    "targetedAudience": {
+      "country": [
+        "Gibraltar"
+      ],
+      "city": [
+        "Eastermouth"
+      ],
+      "startAt": [
+        "2025-08-17T19:19:11.405Z"
+      ],
+      "endAt": [
+        "2025-08-02T12:07:28.621Z"
+      ]
+    },
+    "userId": "b691956f-5bb5-4f9c-bb9d-9b16d2cd7243",
+    "status": "in_progress",
+    "paymentStatus": 1,
+    "_id": "686d1944ad89f0d87ef8acad",
+    "createdAt": "2025-07-08T13:12:36.142Z",
+    "__v": 0
+  },
+  {
+    "creatives": [
+      {
+        "img": {
+          "url": "https://loremflickr.com/1690/3656?lock=8377151875870434",
+          "alt": "conatus quam aegre"
+        },
+        "adLink": "https://lavish-louse.com/",
+        "format": "footer-banner",
+        "impressions": [
+          {
+            "country": "Portugal",
+            "cities": "East Dantestad",
+            "userId": "8a9f85ed-14ae-4b63-b295-f2fc72705535",
+            "_id": "686d1944ad89f0d87ef8acb3"
+          }
+        ],
+        "clicks": [
+          {
+            "country": "Niue",
+            "cities": "South Russ",
+            "userId": "be03892b-d33b-44ce-9acf-8a83a07c268f",
+            "_id": "686d1944ad89f0d87ef8acb4"
+          }
+        ],
+        "_id": "686d1944ad89f0d87ef8acb2"
+      }
+    ],
+    "totalBudgetUsed": 727.9064062063488,
+    "budget": "1283",
+    "sessionId": "1a7e5bef-da6d-4f52-bcd1-26f4f91db44c",
+    "targetedAudience": {
+      "country": [
+        "Malaysia"
+      ],
+      "city": [
+        "Port Joana"
+      ],
+      "startAt": [
+        "2026-02-18T03:30:58.081Z"
+      ],
+      "endAt": [
+        "2026-07-03T13:22:27.190Z"
+      ]
+    },
+    "userId": "14555cf6-d48c-4f0d-b001-abbd276e480f",
+    "status": "in_progress",
+    "paymentStatus": 1,
+    "_id": "686d1944ad89f0d87ef8acb1",
+    "createdAt": "2025-07-08T13:12:36.142Z",
+    "__v": 0
+  },
+  {
+    "creatives": [
+      {
+        "img": {
+          "url": "https://loremflickr.com/3189/1510?lock=4211591875598996",
+          "alt": "antiquus auctus denuncio"
+        },
+        "adLink": "https://small-hunt.net/",
+        "format": "footer-banner",
+        "impressions": [
+          {
+            "country": "Albania",
+            "cities": "Schusterboro",
+            "userId": "aae9274b-4c68-4855-b703-b767109497b1",
+            "_id": "686d1944ad89f0d87ef8acb7"
+          }
+        ],
+        "clicks": [
+          {
+            "country": "Guam",
+            "cities": "Lake Phoebeberg",
+            "userId": "820dd128-b9bd-4a20-9360-34057d69d324",
+            "_id": "686d1944ad89f0d87ef8acb8"
+          }
+        ],
+        "_id": "686d1944ad89f0d87ef8acb6"
+      },
+      {
+        "img": {
+          "url": "https://picsum.photos/seed/vh8fNgvXNQ/1999/16",
+          "alt": "nesciunt architecto strues"
+        },
+        "adLink": "https://arid-daughter.info",
+        "format": "footer-banner",
+        "impressions": [
+          {
+            "country": "Saudi Arabia",
+            "cities": "Susanfield",
+            "userId": "bd05029d-05d1-43eb-8200-a2c65a14fc04",
+            "_id": "686d1944ad89f0d87ef8acba"
+          }
+        ],
+        "clicks": [
+          {
+            "country": "Western Sahara",
+            "cities": "McLaughlinstad",
+            "userId": "ea47684e-614c-4a60-9ef9-37cbe4f394fb",
+            "_id": "686d1944ad89f0d87ef8acbb"
+          }
+        ],
+        "_id": "686d1944ad89f0d87ef8acb9"
+      }
+    ],
+    "totalBudgetUsed": 182.0609852515601,
+    "budget": "2530",
+    "sessionId": "ad2eaa6a-b46e-48a3-9d64-8e83285c45c8",
+    "targetedAudience": {
+      "country": [
+        "Cuba"
+      ],
+      "city": [
+        "Decatur"
+      ],
+      "startAt": [
+        "2025-10-22T08:57:55.804Z"
+      ],
+      "endAt": [
+        "2026-03-14T21:23:07.707Z"
+      ]
+    },
+    "userId": "3dcaf1fb-1c95-4d67-aa91-d0f4a9edf765",
+    "status": "canceled",
+    "paymentStatus": 1,
+    "_id": "686d1944ad89f0d87ef8acb5",
+    "createdAt": "2025-07-08T13:12:36.143Z",
+    "__v": 0
+  },
+  {
+    "creatives": [
+      {
+        "img": {
+          "url": "https://picsum.photos/seed/DOPgFaI/1395/422",
+          "alt": "appositus contra voluptas"
+        },
+        "adLink": "https://distinct-embarrassment.biz/",
+        "format": "footer-banner",
+        "impressions": [
+          {
+            "country": "Saint Helena",
+            "cities": "Casas Adobes",
+            "userId": "2d8b00ef-4e09-4932-bdb7-cb8a1783e2e9",
+            "_id": "686d1944ad89f0d87ef8acbe"
+          }
+        ],
+        "clicks": [
+          {
+            "country": "Iraq",
+            "cities": "Fort Mia",
+            "userId": "79ac4705-41bd-4a3b-8e0c-a6c1e47186ed",
+            "_id": "686d1944ad89f0d87ef8acbf"
+          }
+        ],
+        "_id": "686d1944ad89f0d87ef8acbd"
+      }
+    ],
+    "totalBudgetUsed": 628.1913877306176,
+    "budget": "4237",
+    "sessionId": "12da669b-f885-42dc-8678-3c1ef337ce9b",
+    "targetedAudience": {
+      "country": [
+        "Russian Federation"
+      ],
+      "city": [
+        "East Blanche"
+      ],
+      "startAt": [
+        "2025-10-24T06:24:53.284Z"
+      ],
+      "endAt": [
+        "2025-08-14T03:34:27.407Z"
+      ]
+    },
+    "userId": "b15a2ee7-f86b-4ff4-93b3-b9f9b7fec797",
+    "status": "in_progress",
+    "paymentStatus": 0,
+    "_id": "686d1944ad89f0d87ef8acbc",
+    "createdAt": "2025-07-08T13:12:36.144Z",
+    "__v": 0
+  },
+  {
+    "creatives": [
+      {
+        "img": {
+          "url": "https://loremflickr.com/1159/3370?lock=4338406911809316",
+          "alt": "adduco conservo tutamen"
+        },
+        "adLink": "https://whopping-nightlife.info",
+        "format": "footer-banner",
+        "impressions": [
+          {
+            "country": "Wallis and Futuna",
+            "cities": "North Devynbury",
+            "userId": "ab6ab127-e983-4974-9b85-3f67e53243ff",
+            "_id": "686d1944ad89f0d87ef8acc2"
+          }
+        ],
+        "clicks": [
+          {
+            "country": "Liberia",
+            "cities": "Fort Oral",
+            "userId": "d3194db3-03ca-4147-b92c-b33321e38a11",
+            "_id": "686d1944ad89f0d87ef8acc3"
+          }
+        ],
+        "_id": "686d1944ad89f0d87ef8acc1"
+      },
+      {
+        "img": {
+          "url": "https://loremflickr.com/254/1561?lock=4706838095207555",
+          "alt": "deorsum adamo vomito"
+        },
+        "adLink": "https://unruly-skean.org",
+        "format": "footer-banner",
+        "impressions": [
+          {
+            "country": "Sri Lanka",
+            "cities": "Fort Liam",
+            "userId": "094b897a-7167-4d62-9c98-7e649e2ff4fc",
+            "_id": "686d1944ad89f0d87ef8acc5"
+          }
+        ],
+        "clicks": [
+          {
+            "country": "French Southern Territories",
+            "cities": "Samstad",
+            "userId": "c95608ff-b283-4085-8c15-9f7aba3ffda5",
+            "_id": "686d1944ad89f0d87ef8acc6"
+          }
+        ],
+        "_id": "686d1944ad89f0d87ef8acc4"
+      }
+    ],
+    "totalBudgetUsed": 14.59848065273761,
+    "budget": "3109",
+    "sessionId": "e2ebf369-e718-43ac-9d91-0a46daf92bce",
+    "targetedAudience": {
+      "country": [
+        "Armenia"
+      ],
+      "city": [
+        "Rancho Palos Verdes"
+      ],
+      "startAt": [
+        "2026-01-11T02:47:16.402Z"
+      ],
+      "endAt": [
+        "2025-09-03T07:08:22.658Z"
+      ]
+    },
+    "userId": "7f0aa857-de55-489f-a83d-368986075802",
+    "status": "canceled",
+    "paymentStatus": 0,
+    "_id": "686d1944ad89f0d87ef8acc0",
+    "createdAt": "2025-07-08T13:12:36.145Z",
+    "__v": 0
+  },
+  {
+    "creatives": [
+      {
+        "img": {
+          "url": "https://loremflickr.com/803/1983?lock=5601394286451899",
+          "alt": "volubilis vel degusto"
+        },
+        "adLink": "https://triangular-reward.com",
+        "format": "footer-banner",
+        "impressions": [
+          {
+            "country": "Haiti",
+            "cities": "Port Gunner",
+            "userId": "923a2e28-e4db-444e-859f-1ab505b1577e",
+            "_id": "686d1944ad89f0d87ef8acc9"
+          }
+        ],
+        "clicks": [
+          {
+            "country": "Tonga",
+            "cities": "Port Daisymouth",
+            "userId": "c8bb3e31-5e9b-4567-8f00-9eda37211941",
+            "_id": "686d1944ad89f0d87ef8acca"
+          }
+        ],
+        "_id": "686d1944ad89f0d87ef8acc8"
+      }
+    ],
+    "totalBudgetUsed": 79.11624774451964,
+    "budget": "2185",
+    "sessionId": "3ee268bd-0df7-4e01-8062-651408501d49",
+    "targetedAudience": {
+      "country": [
+        "Luxembourg"
+      ],
+      "city": [
+        "South Venafort"
+      ],
+      "startAt": [
+        "2025-10-15T07:02:27.892Z"
+      ],
+      "endAt": [
+        "2026-03-21T13:46:01.565Z"
+      ]
+    },
+    "userId": "500e5916-bb44-43b6-a5f0-d5db75a7983e",
+    "status": "canceled",
+    "paymentStatus": 0,
+    "_id": "686d1944ad89f0d87ef8acc7",
+    "createdAt": "2025-07-08T13:12:36.145Z",
+    "__v": 0
+  },
+  {
+    "creatives": [
+      {
+        "img": {
+          "url": "https://picsum.photos/seed/4LmorfUxT/521/730",
+          "alt": "attero cetera arcesso"
+        },
+        "adLink": "https://repentant-word.biz/",
+        "format": "footer-banner",
+        "impressions": [
+          {
+            "country": "Thailand",
+            "cities": "Oxnard",
+            "userId": "401315cc-49e4-48a0-afe0-b08098036aa0",
+            "_id": "686d1944ad89f0d87ef8accd"
+          }
+        ],
+        "clicks": [
+          {
+            "country": "Rwanda",
+            "cities": "Grand Junction",
+            "userId": "30bb5e1d-b852-4f08-bd35-8144e80f537d",
+            "_id": "686d1944ad89f0d87ef8acce"
+          }
+        ],
+        "_id": "686d1944ad89f0d87ef8accc"
+      },
+      {
+        "img": {
+          "url": "https://loremflickr.com/911/2072?lock=4030312830514768",
+          "alt": "coerceo viridis temperantia"
+        },
+        "adLink": "https://far-off-comestible.net/",
+        "format": "footer-banner",
+        "impressions": [
+          {
+            "country": "Monaco",
+            "cities": "Rohnert Park",
+            "userId": "3d521c7f-4e1b-40dd-b54e-560d21522eab",
+            "_id": "686d1944ad89f0d87ef8acd0"
+          }
+        ],
+        "clicks": [
+          {
+            "country": "Hungary",
+            "cities": "Lynwood",
+            "userId": "d6e831bc-ee09-4d6d-9949-e3dc79d766f8",
+            "_id": "686d1944ad89f0d87ef8acd1"
+          }
+        ],
+        "_id": "686d1944ad89f0d87ef8accf"
+      }
+    ],
+    "totalBudgetUsed": 138.10207256299068,
+    "budget": "4800",
+    "sessionId": "b52abbd4-9f22-4400-b8c7-92e08beaca21",
+    "targetedAudience": {
+      "country": [
+        "Greenland"
+      ],
+      "city": [
+        "Pagacland"
+      ],
+      "startAt": [
+        "2026-06-13T03:46:59.649Z"
+      ],
+      "endAt": [
+        "2026-02-22T21:27:02.885Z"
+      ]
+    },
+    "userId": "58f12d4b-b2e0-4afe-9cc7-bb9b5b5276db",
+    "status": "completed",
+    "paymentStatus": 0,
+    "_id": "686d1944ad89f0d87ef8accb",
+    "createdAt": "2025-07-08T13:12:36.146Z",
+    "__v": 0
+  },
+  {
+    "creatives": [
+      {
+        "img": {
+          "url": "https://loremflickr.com/3222/2602?lock=1926178695830228",
+          "alt": "talis nisi spero"
+        },
+        "adLink": "https://front-yeast.org",
+        "format": "footer-banner",
+        "impressions": [
+          {
+            "country": "Netherlands",
+            "cities": "Willieburgh",
+            "userId": "e69d88b8-d67a-4417-9bd3-bcea7b0425fc",
+            "_id": "686d1944ad89f0d87ef8acd4"
+          }
+        ],
+        "clicks": [
+          {
+            "country": "Togo",
+            "cities": "Redwood City",
+            "userId": "9c816f4f-a75a-4750-9628-03b38ff13e7a",
+            "_id": "686d1944ad89f0d87ef8acd5"
+          }
+        ],
+        "_id": "686d1944ad89f0d87ef8acd3"
+      },
+      {
+        "img": {
+          "url": "https://picsum.photos/seed/wEeX1/3161/3844",
+          "alt": "supellex ager corpus"
+        },
+        "adLink": "https://unusual-hippodrome.info",
+        "format": "footer-banner",
+        "impressions": [
+          {
+            "country": "Bouvet Island",
+            "cities": "Fort Amirfurt",
+            "userId": "0cbd415c-bc94-4a8b-a429-5c79de80e40e",
+            "_id": "686d1944ad89f0d87ef8acd7"
+          }
+        ],
+        "clicks": [
+          {
+            "country": "Cuba",
+            "cities": "Port Edwin",
+            "userId": "1aaa4fe3-9b96-4575-b673-0fb13c25e337",
+            "_id": "686d1944ad89f0d87ef8acd8"
+          }
+        ],
+        "_id": "686d1944ad89f0d87ef8acd6"
+      }
+    ],
+    "totalBudgetUsed": 724.6788548681379,
+    "budget": "4508",
+    "sessionId": "754ffa94-4e0f-4ac3-9eae-9d2dcabf8885",
+    "targetedAudience": {
+      "country": [
+        "Saint Pierre and Miquelon"
+      ],
+      "city": [
+        "Reillychester"
+      ],
+      "startAt": [
+        "2026-03-23T13:07:51.920Z"
+      ],
+      "endAt": [
+        "2025-10-30T22:27:45.271Z"
+      ]
+    },
+    "userId": "37463f85-94d7-4331-925a-fe4c1d699360",
+    "status": "completed",
+    "paymentStatus": 1,
+    "_id": "686d1944ad89f0d87ef8acd2",
+    "createdAt": "2025-07-08T13:12:36.148Z",
+    "__v": 0
+  },
+  {
+    "creatives": [
+      {
+        "img": {
+          "url": "https://picsum.photos/seed/CTzv1/3090/2324",
+          "alt": "aestivus nulla vos"
+        },
+        "adLink": "https://each-clavicle.info",
+        "format": "footer-banner",
+        "impressions": [
+          {
+            "country": "Antarctica",
+            "cities": "Lake Preston",
+            "userId": "3ea78117-0e8b-46f7-8a50-104f747e96cb",
+            "_id": "686d1944ad89f0d87ef8acdb"
+          }
+        ],
+        "clicks": [
+          {
+            "country": "Martinique",
+            "cities": "Springfield",
+            "userId": "efc0f917-bb6d-441c-8593-891ae71b2eba",
+            "_id": "686d1944ad89f0d87ef8acdc"
+          }
+        ],
+        "_id": "686d1944ad89f0d87ef8acda"
+      }
+    ],
+    "totalBudgetUsed": 558.6813975628587,
+    "budget": "4159",
+    "sessionId": "dcd93d5d-773c-476a-81f3-ee4b4afe1a8c",
+    "targetedAudience": {
+      "country": [
+        "Lebanon"
+      ],
+      "city": [
+        "Wauwatosa"
+      ],
+      "startAt": [
+        "2026-02-05T18:54:20.325Z"
+      ],
+      "endAt": [
+        "2026-04-03T18:23:59.444Z"
+      ]
+    },
+    "userId": "bee76a3e-d8b5-497d-b909-e8046fc165b0",
+    "status": "canceled",
+    "paymentStatus": 0,
+    "_id": "686d1944ad89f0d87ef8acd9",
+    "createdAt": "2025-07-08T13:12:36.149Z",
+    "__v": 0
+  },
+  {
+    "creatives": [
+      {
+        "img": {
+          "url": "https://loremflickr.com/2487/3596?lock=1497850400017058",
+          "alt": "alter vere adimpleo"
+        },
+        "adLink": "https://untrue-cheese.biz/",
+        "format": "footer-banner",
+        "impressions": [
+          {
+            "country": "Eswatini",
+            "cities": "Lake Beatricechester",
+            "userId": "f6e61c42-0a05-4fb0-853c-55027304ea43",
+            "_id": "686d1944ad89f0d87ef8acdf"
+          }
+        ],
+        "clicks": [
+          {
+            "country": "Holy See (Vatican City State)",
+            "cities": "Jastfurt",
+            "userId": "e96a8cda-9808-4b83-b0fe-d11ad9e2f060",
+            "_id": "686d1944ad89f0d87ef8ace0"
+          }
+        ],
+        "_id": "686d1944ad89f0d87ef8acde"
+      }
+    ],
+    "totalBudgetUsed": 943.7072733667192,
+    "budget": "1110",
+    "sessionId": "60980518-0911-492d-8de8-40bbeb6a9b4b",
+    "targetedAudience": {
+      "country": [
+        "Uruguay"
+      ],
+      "city": [
+        "West Rene"
+      ],
+      "startAt": [
+        "2025-09-19T04:45:21.973Z"
+      ],
+      "endAt": [
+        "2025-07-10T03:33:42.447Z"
+      ]
+    },
+    "userId": "3dd6d353-554c-4bcb-b52c-41c25759636a",
+    "status": "canceled",
+    "paymentStatus": 0,
+    "_id": "686d1944ad89f0d87ef8acdd",
+    "createdAt": "2025-07-08T13:12:36.150Z",
+    "__v": 0
+  },
+  {
+    "creatives": [
+      {
+        "img": {
+          "url": "https://picsum.photos/seed/veAc0PDPTk/2307/3111",
+          "alt": "adnuo somniculosus defungo"
+        },
+        "adLink": "https://every-chow.org/",
+        "format": "footer-banner",
+        "impressions": [
+          {
+            "country": "Sweden",
+            "cities": "South Jerrod",
+            "userId": "f60fbfc7-6b5b-4c17-aa35-456662542328",
+            "_id": "686d1944ad89f0d87ef8ace3"
+          }
+        ],
+        "clicks": [
+          {
+            "country": "Pakistan",
+            "cities": "West Allyboro",
+            "userId": "7598a783-b605-4fc2-97a5-3494a519f457",
+            "_id": "686d1944ad89f0d87ef8ace4"
+          }
+        ],
+        "_id": "686d1944ad89f0d87ef8ace2"
+      }
+    ],
+    "totalBudgetUsed": 140.49019813661002,
+    "budget": "1516",
+    "sessionId": "280c5303-a9f6-4211-8e01-f4b9c69babac",
+    "targetedAudience": {
+      "country": [
+        "Andorra"
+      ],
+      "city": [
+        "Weissnatview"
+      ],
+      "startAt": [
+        "2026-03-14T01:48:46.751Z"
+      ],
+      "endAt": [
+        "2026-05-26T22:53:13.573Z"
+      ]
+    },
+    "userId": "513a8fa4-e964-455b-9476-ddbcd3d630b6",
+    "status": "completed",
+    "paymentStatus": 0,
+    "_id": "686d1944ad89f0d87ef8ace1",
+    "createdAt": "2025-07-08T13:12:36.151Z",
+    "__v": 0
+  },
+  {
+    "creatives": [
+      {
+        "img": {
+          "url": "https://picsum.photos/seed/09FSaY2/2382/2604",
+          "alt": "caste ventosus alter"
+        },
+        "adLink": "https://funny-outrun.name/",
+        "format": "footer-banner",
+        "impressions": [
+          {
+            "country": "Lithuania",
+            "cities": "Fort Sylvia",
+            "userId": "dac3cda6-ca68-4197-8708-d4ed368356e4",
+            "_id": "686d1944ad89f0d87ef8ace7"
+          }
+        ],
+        "clicks": [
+          {
+            "country": "Bolivia",
+            "cities": "Severn",
+            "userId": "c9c1c037-8fe8-40c2-af2e-7b1fcf933431",
+            "_id": "686d1944ad89f0d87ef8ace8"
+          }
+        ],
+        "_id": "686d1944ad89f0d87ef8ace6"
+      },
+      {
+        "img": {
+          "url": "https://loremflickr.com/3909/1657?lock=6872766742262152",
+          "alt": "dolor vergo depono"
+        },
+        "adLink": "https://shabby-corral.org/",
+        "format": "footer-banner",
+        "impressions": [
+          {
+            "country": "Democratic People's Republic of Korea",
+            "cities": "South Amaliafurt",
+            "userId": "03748091-7358-4e7e-88de-581077c4d791",
+            "_id": "686d1944ad89f0d87ef8acea"
+          }
+        ],
+        "clicks": [
+          {
+            "country": "Central African Republic",
+            "cities": "Port Rosaberg",
+            "userId": "fb4a260b-45a6-4c5b-b8d4-1c48df132e9b",
+            "_id": "686d1944ad89f0d87ef8aceb"
+          }
+        ],
+        "_id": "686d1944ad89f0d87ef8ace9"
+      }
+    ],
+    "totalBudgetUsed": 55.4087899008,
+    "budget": "1969",
+    "sessionId": "e147cf6d-38dc-4963-9802-61730e5cf84d",
+    "targetedAudience": {
+      "country": [
+        "Belize"
+      ],
+      "city": [
+        "Port Jettfurt"
+      ],
+      "startAt": [
+        "2026-05-28T17:26:02.446Z"
+      ],
+      "endAt": [
+        "2026-04-30T21:28:39.182Z"
+      ]
+    },
+    "userId": "bd6b27b6-3b02-4392-af15-c3a121ec622e",
+    "status": "in_progress",
+    "paymentStatus": 1,
+    "_id": "686d1944ad89f0d87ef8ace5",
+    "createdAt": "2025-07-08T13:12:36.152Z",
+    "__v": 0
+  },
+  {
+    "creatives": [
+      {
+        "img": {
+          "url": "https://loremflickr.com/3165/3010?lock=4848288701451794",
+          "alt": "trucido nobis aggero"
+        },
+        "adLink": "https://closed-technologist.com",
+        "format": "footer-banner",
+        "impressions": [
+          {
+            "country": "Eritrea",
+            "cities": "Robertsburgh",
+            "userId": "cf93b881-da34-474c-8ac5-9a5cedeadac6",
+            "_id": "686d1944ad89f0d87ef8acee"
+          }
+        ],
+        "clicks": [
+          {
+            "country": "Cambodia",
+            "cities": "Balistrerimouth",
+            "userId": "c4818615-32f8-448f-86d6-db6ef1863a89",
+            "_id": "686d1944ad89f0d87ef8acef"
+          }
+        ],
+        "_id": "686d1944ad89f0d87ef8aced"
+      }
+    ],
+    "totalBudgetUsed": 975.9389870970105,
+    "budget": "4454",
+    "sessionId": "7d9dd04a-1468-454b-af72-02c81f3baf29",
+    "targetedAudience": {
+      "country": [
+        "Kazakhstan"
+      ],
+      "city": [
+        "Satterfieldside"
+      ],
+      "startAt": [
+        "2026-02-27T19:57:39.304Z"
+      ],
+      "endAt": [
+        "2026-03-22T23:42:55.106Z"
+      ]
+    },
+    "userId": "39aef50f-c4e9-4f90-bd28-4e03bfa51ff3",
+    "status": "in_progress",
+    "paymentStatus": 1,
+    "_id": "686d1944ad89f0d87ef8acec",
+    "createdAt": "2025-07-08T13:12:36.153Z",
+    "__v": 0
+  },
+  {
+    "creatives": [
+      {
+        "img": {
+          "url": "https://picsum.photos/seed/SKH1QmVnep/1627/1529",
+          "alt": "tamisium numquam thesis"
+        },
+        "adLink": "https://unaware-oil.info/",
+        "format": "footer-banner",
+        "impressions": [
+          {
+            "country": "France",
+            "cities": "Port Emmalee",
+            "userId": "18d001d7-03cb-44c4-8060-7789f141b0ef",
+            "_id": "686d1944ad89f0d87ef8acf2"
+          }
+        ],
+        "clicks": [
+          {
+            "country": "United States of America",
+            "cities": "Hudsonfort",
+            "userId": "f5dd8e42-9002-4f24-9a11-818dde18c28b",
+            "_id": "686d1944ad89f0d87ef8acf3"
+          }
+        ],
+        "_id": "686d1944ad89f0d87ef8acf1"
+      },
+      {
+        "img": {
+          "url": "https://loremflickr.com/2147/3188?lock=3182576884882752",
+          "alt": "tripudio accusantium libero"
+        },
+        "adLink": "https://complete-apricot.net",
+        "format": "footer-banner",
+        "impressions": [
+          {
+            "country": "Bouvet Island",
+            "cities": "Annetteshire",
+            "userId": "2ec30d9f-0e05-4041-9bc4-c8ec1e2f3103",
+            "_id": "686d1944ad89f0d87ef8acf5"
+          }
+        ],
+        "clicks": [
+          {
+            "country": "Tuvalu",
+            "cities": "North Miami",
+            "userId": "2cd59620-01bc-4dde-8e57-dc25058dcc1d",
+            "_id": "686d1944ad89f0d87ef8acf6"
+          }
+        ],
+        "_id": "686d1944ad89f0d87ef8acf4"
+      }
+    ],
+    "totalBudgetUsed": 797.4536517559068,
+    "budget": "3880",
+    "sessionId": "377e3b9d-65c6-4d07-8ba7-af9dbfbc96af",
+    "targetedAudience": {
+      "country": [
+        "Cyprus"
+      ],
+      "city": [
+        "Jacksonton"
+      ],
+      "startAt": [
+        "2026-03-01T02:33:44.842Z"
+      ],
+      "endAt": [
+        "2026-01-27T15:57:28.482Z"
+      ]
+    },
+    "userId": "53e723f8-0fcf-4765-9d3a-8389aa239e92",
+    "status": "completed",
+    "paymentStatus": 1,
+    "_id": "686d1944ad89f0d87ef8acf0",
+    "createdAt": "2025-07-08T13:12:36.154Z",
+    "__v": 0
+  },
+  {
+    "creatives": [
+      {
+        "img": {
+          "url": "https://picsum.photos/seed/hRn03p9f/2023/2449",
+          "alt": "sperno repellendus ultra"
+        },
+        "adLink": "https://dapper-celsius.name",
+        "format": "footer-banner",
+        "impressions": [
+          {
+            "country": "Grenada",
+            "cities": "Utica",
+            "userId": "b2183966-ef56-4cf3-ae3f-fe32f641af6a",
+            "_id": "686d1944ad89f0d87ef8acf9"
+          }
+        ],
+        "clicks": [
+          {
+            "country": "Netherlands",
+            "cities": "Lake Susanna",
+            "userId": "95575925-1464-4520-824d-2bb2a03055f7",
+            "_id": "686d1944ad89f0d87ef8acfa"
+          }
+        ],
+        "_id": "686d1944ad89f0d87ef8acf8"
+      },
+      {
+        "img": {
+          "url": "https://loremflickr.com/1086/1670?lock=7689893267176990",
+          "alt": "cernuus qui perferendis"
+        },
+        "adLink": "https://failing-loyalty.org/",
+        "format": "footer-banner",
+        "impressions": [
+          {
+            "country": "Kenya",
+            "cities": "Greensboro",
+            "userId": "efd49aec-8cc0-4c44-b233-84200dd82e9a",
+            "_id": "686d1944ad89f0d87ef8acfc"
+          }
+        ],
+        "clicks": [
+          {
+            "country": "Hungary",
+            "cities": "New Sister",
+            "userId": "8a38a026-2583-4ed8-b213-25c5e6cf1075",
+            "_id": "686d1944ad89f0d87ef8acfd"
+          }
+        ],
+        "_id": "686d1944ad89f0d87ef8acfb"
+      }
+    ],
+    "totalBudgetUsed": 816.4561910181699,
+    "budget": "1990",
+    "sessionId": "21fd0782-e58e-4ed4-ad19-b24368e9e2b2",
+    "targetedAudience": {
+      "country": [
+        "Philippines"
+      ],
+      "city": [
+        "New Vitostead"
+      ],
+      "startAt": [
+        "2026-06-19T20:43:59.304Z"
+      ],
+      "endAt": [
+        "2026-02-05T19:57:45.605Z"
+      ]
+    },
+    "userId": "1895cb15-06c0-4c92-87e2-d942aff813eb",
+    "status": "in_progress",
+    "paymentStatus": 0,
+    "_id": "686d1944ad89f0d87ef8acf7",
+    "createdAt": "2025-07-08T13:12:36.155Z",
+    "__v": 0
+  },
+  {
+    "creatives": [
+      {
+        "img": {
+          "url": "https://loremflickr.com/441/743?lock=735118615906668",
+          "alt": "decipio quidem pax"
+        },
+        "adLink": "https://shy-cornet.biz",
+        "format": "footer-banner",
+        "impressions": [
+          {
+            "country": "Honduras",
+            "cities": "North Jedediah",
+            "userId": "96393181-c820-4b46-b66e-f37389126e9e",
+            "_id": "686d1944ad89f0d87ef8ad00"
+          }
+        ],
+        "clicks": [
+          {
+            "country": "Palau",
+            "cities": "Allen",
+            "userId": "64fdffba-e5c3-44ab-9b1f-1a65bd4168db",
+            "_id": "686d1944ad89f0d87ef8ad01"
+          }
+        ],
+        "_id": "686d1944ad89f0d87ef8acff"
+      }
+    ],
+    "totalBudgetUsed": 505.4019689407419,
+    "budget": "3233",
+    "sessionId": "aab480cf-05bb-4d3a-989e-364b4fa5874d",
+    "targetedAudience": {
+      "country": [
+        "Malaysia"
+      ],
+      "city": [
+        "Yostton"
+      ],
+      "startAt": [
+        "2025-10-21T01:47:12.395Z"
+      ],
+      "endAt": [
+        "2025-11-12T21:16:53.518Z"
+      ]
+    },
+    "userId": "1bccf0e8-3654-4a06-a076-e1ff684fef32",
+    "status": "in_progress",
+    "paymentStatus": 0,
+    "_id": "686d1944ad89f0d87ef8acfe",
+    "createdAt": "2025-07-08T13:12:36.155Z",
+    "__v": 0
+  }
+]

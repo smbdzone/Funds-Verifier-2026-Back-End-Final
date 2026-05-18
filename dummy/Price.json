@@ -1,0 +1,122 @@
+[
+  {
+    "price": "47430",
+    "assetType": "Car",
+    "value": "Incredible",
+    "category": "Toys",
+    "subCategory": "Shoes",
+    "userId": "c6efd5df301cdfc999b8a6e7",
+    "_id": "686d245fde048280cd83f4e9",
+    "__v": 0,
+    "createdAt": "2025-07-08T13:59:59.269Z",
+    "updatedAt": "2025-07-08T13:59:59.269Z"
+  },
+  {
+    "price": "23275",
+    "assetType": "Car",
+    "value": "Soft",
+    "category": "Health",
+    "subCategory": "Cheese",
+    "userId": "46acc15f4c71e58d3c64afac",
+    "_id": "686d245fde048280cd83f4ea",
+    "__v": 0,
+    "createdAt": "2025-07-08T13:59:59.273Z",
+    "updatedAt": "2025-07-08T13:59:59.273Z"
+  },
+  {
+    "price": "13126",
+    "assetType": "Car",
+    "value": "Generic",
+    "category": "Tools",
+    "subCategory": "Pizza",
+    "userId": "baed5c84a6a827e5d10863fd",
+    "_id": "686d245fde048280cd83f4eb",
+    "__v": 0,
+    "createdAt": "2025-07-08T13:59:59.276Z",
+    "updatedAt": "2025-07-08T13:59:59.276Z"
+  },
+  {
+    "price": "59445",
+    "assetType": "Property",
+    "value": "Modern",
+    "category": "Health",
+    "subCategory": "Pants",
+    "userId": "6b7fabcca9340233c5ec1fde",
+    "_id": "686d245fde048280cd83f4ec",
+    "__v": 0,
+    "createdAt": "2025-07-08T13:59:59.276Z",
+    "updatedAt": "2025-07-08T13:59:59.276Z"
+  },
+  {
+    "price": "86974",
+    "assetType": "Car",
+    "value": "Elegant",
+    "category": "Jewelry",
+    "subCategory": "Mouse",
+    "userId": "cf6e18b6efbbaad4182edd7b",
+    "_id": "686d245fde048280cd83f4ed",
+    "__v": 0,
+    "createdAt": "2025-07-08T13:59:59.277Z",
+    "updatedAt": "2025-07-08T13:59:59.277Z"
+  },
+  {
+    "price": "10743",
+    "assetType": "Property",
+    "value": "Gorgeous",
+    "category": "Electronics",
+    "subCategory": "Fish",
+    "userId": "80bde1aa2e1e8c75ca6add8e",
+    "_id": "686d245fde048280cd83f4ee",
+    "__v": 0,
+    "createdAt": "2025-07-08T13:59:59.277Z",
+    "updatedAt": "2025-07-08T13:59:59.277Z"
+  },
+  {
+    "price": "11792",
+    "assetType": "Jewelry",
+    "value": "Modern",
+    "category": "Tools",
+    "subCategory": "Gloves",
+    "userId": "bacc05e0d1d0ee648d48ea6b",
+    "_id": "686d245fde048280cd83f4ef",
+    "__v": 0,
+    "createdAt": "2025-07-08T13:59:59.277Z",
+    "updatedAt": "2025-07-08T13:59:59.277Z"
+  },
+  {
+    "price": "28681",
+    "assetType": "Car",
+    "value": "Awesome",
+    "category": "Movies",
+    "subCategory": "Bacon",
+    "userId": "5249be18eadaede3fb5d5b6e",
+    "_id": "686d245fde048280cd83f4f0",
+    "__v": 0,
+    "createdAt": "2025-07-08T13:59:59.277Z",
+    "updatedAt": "2025-07-08T13:59:59.277Z"
+  },
+  {
+    "price": "85438",
+    "assetType": "Boat",
+    "value": "Recycled",
+    "category": "Toys",
+    "subCategory": "Pants",
+    "userId": "d31f3cc1886dafaef1e4227a",
+    "_id": "686d245fde048280cd83f4f1",
+    "__v": 0,
+    "createdAt": "2025-07-08T13:59:59.278Z",
+    "updatedAt": "2025-07-08T13:59:59.278Z"
+  },
+  {
+    "price": "59060",
+    "assetType": "Boat",
+    "value": "Handmade",
+    "category": "Garden",
+    "subCategory": "Car",
+    "userId": "7b7e77b41a7bc0a57f5de6d6",
+    "_id": "686d245fde048280cd83f4f2",
+    "__v": 0,
+    "createdAt": "2025-07-08T13:59:59.278Z",
+    "updatedAt": "2025-07-08T13:59:59.278Z"
+  }
+]

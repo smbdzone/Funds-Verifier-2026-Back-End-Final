@@ -1,0 +1,704 @@
+[
+  {
+    "profile": {
+      "firstname": "Eric",
+      "lastname": "Auer",
+      "email": "eric_auer@yahoo.com",
+      "mobile": 1234567891,
+      "maritalStatus": "Married",
+      "avatar": "https://cdn.jsdelivr.net/gh/faker-js/assets-person-portrait/male/512/6.jpg",
+      "dateOfBirth": "1978-06-08"
+    },
+    "financialInfo": {
+      "verificationCertificate": "686d20568f7f91f0231f0f5b",
+      "fundsVerification": "974.75",
+      "bankName": "Schamberger Group",
+      "bankBranch": "Field Close",
+      "city": "Greenholtberg",
+      "country": "Guadeloupe",
+      "status": "Approved"
+    },
+    "personalDetails": {
+      "residenceStatus": "Resident",
+      "citizenship": "Gibraltar",
+      "industry": "Real Estate",
+      "employerName": "Mayert - Lindgren"
+    },
+    "documentation": [
+      {
+        "type": "Utility Bill",
+        "document": "686d20568f7f91f0231f0f5c",
+        "_id": "686d20568f7f91f0231f0f70"
+      }
+    ],
+    "userState": "inactive",
+    "propertyTypes": [
+      "Land",
+      "Apartments"
+    ],
+    "region": [
+      "US",
+      "Asia"
+    ],
+    "electronicConsent": {
+      "consentTerms": true,
+      "consentTaxTems": false
+    },
+    "purchaseTracker": {
+      "transactionStatus": {
+        "value": "Cancelled"
+      },
+      "assetDetails": {
+        "value": "Processing"
+      },
+      "timelineOfActivities": {
+        "value": "Processing"
+      },
+      "escrowAccountInformation": {
+        "value": "Cancelled"
+      },
+      "progressTracking": {
+        "value": "Processing"
+      }
+    },
+    "refreshToken": "acLMRv3Ps6u6zfpGEGmBRlFR3yYv3y5X",
+    "passwordChangedAt": "2024-10-13T00:11:43.994Z",
+    "passwordResetToken": "qoDS6GDKTulqxHRBqac1u9JiJMyboccO3iSePreB8osJVoknHOT8Er0E2YwkImBa",
+    "passwordResetTokenExpiresAt": "2025-07-14T02:41:32.739Z",
+    "_id": "686d20568f7f91f0231f0f6f",
+    "__v": 0,
+    "createdAt": "2025-07-08T13:42:46.642Z",
+    "updatedAt": "2025-07-08T13:42:46.642Z"
+  },
+  {
+    "profile": {
+      "firstname": "Deven",
+      "lastname": "Sanford",
+      "email": "deven_sanford38@hotmail.com",
+      "mobile": 1234567892,
+      "maritalStatus": "Divorced",
+      "avatar": "https://avatars.githubusercontent.com/u/6256071",
+      "dateOfBirth": "1991-04-06"
+    },
+    "financialInfo": {
+      "verificationCertificate": "686d20568f7f91f0231f0f5d",
+      "fundsVerification": "401.95",
+      "bankName": "Kshlerin - Ratke",
+      "bankBranch": "Arlo Radial",
+      "city": "Pollychester",
+      "country": "Romania",
+      "status": "Pending"
+    },
+    "personalDetails": {
+      "residenceStatus": "Resident",
+      "citizenship": "Bhutan",
+      "industry": "Technology",
+      "employerName": "Jakubowski - Goyette"
+    },
+    "documentation": [
+      {
+        "type": "License",
+        "document": "686d20568f7f91f0231f0f5e",
+        "_id": "686d20568f7f91f0231f0f72"
+      }
+    ],
+    "userState": "inactive",
+    "propertyTypes": [
+      "Apartments"
+    ],
+    "region": [
+      "Asia"
+    ],
+    "electronicConsent": {
+      "consentTerms": false,
+      "consentTaxTems": false
+    },
+    "purchaseTracker": {
+      "transactionStatus": {
+        "value": "Cancelled"
+      },
+      "assetDetails": {
+        "value": "Cancelled"
+      },
+      "timelineOfActivities": {
+        "value": "Processing"
+      },
+      "escrowAccountInformation": {
+        "value": "Completed"
+      },
+      "progressTracking": {
+        "value": "Pending"
+      }
+    },
+    "refreshToken": "mybjatRpQmyLYEchYRu3ldB4cMi6SD7K",
+    "passwordChangedAt": "2024-07-10T07:10:59.191Z",
+    "passwordResetToken": "sLCQx2abO9dYKWqS1H15dL4607eEKZpbUEJSlZscJl6CGRxNzULUszf8rTICp5CH",
+    "passwordResetTokenExpiresAt": "2025-07-12T23:49:31.893Z",
+    "_id": "686d20568f7f91f0231f0f71",
+    "__v": 0,
+    "createdAt": "2025-07-08T13:42:46.643Z",
+    "updatedAt": "2025-07-08T13:42:46.643Z"
+  },
+  {
+    "profile": {
+      "firstname": "Olga",
+      "lastname": "Wuckert",
+      "email": "olga.wuckert@hotmail.com",
+      "mobile": 1234567893,
+      "maritalStatus": "Single",
+      "avatar": "https://avatars.githubusercontent.com/u/31418066",
+      "dateOfBirth": "1999-03-10"
+    },
+    "financialInfo": {
+      "verificationCertificate": "686d20568f7f91f0231f0f5f",
+      "fundsVerification": "397.94",
+      "bankName": "Leffler, Welch and Torp",
+      "bankBranch": "Balmoral Road",
+      "city": "Lake Rylee",
+      "country": "Pakistan",
+      "status": "Approved"
+    },
+    "personalDetails": {
+      "residenceStatus": "Resident",
+      "citizenship": "Wallis and Futuna",
+      "industry": "Technology",
+      "employerName": "Stamm - Von"
+    },
+    "documentation": [
+      {
+        "type": "Utility Bill",
+        "document": "686d20568f7f91f0231f0f60",
+        "_id": "686d20568f7f91f0231f0f74"
+      }
+    ],
+    "userState": "inactive",
+    "propertyTypes": [
+      "Villa"
+    ],
+    "region": [
+      "United Arab Emirates"
+    ],
+    "electronicConsent": {
+      "consentTerms": false,
+      "consentTaxTems": true
+    },
+    "purchaseTracker": {
+      "transactionStatus": {
+        "value": "Processing"
+      },
+      "assetDetails": {
+        "value": "Cancelled"
+      },
+      "timelineOfActivities": {
+        "value": "Processing"
+      },
+      "escrowAccountInformation": {
+        "value": "Completed"
+      },
+      "progressTracking": {
+        "value": "Processing"
+      }
+    },
+    "refreshToken": "SBZB3iefldYBEiG4KcsIsvhrtb4DDFcW",
+    "passwordChangedAt": "2024-09-08T12:52:27.675Z",
+    "passwordResetToken": "4xVoooJFtqnP1Durakul5m1doRw0xSU6DuH71h1bHRdpx5SspiQxZCTw2swemZFE",
+    "passwordResetTokenExpiresAt": "2025-07-10T23:03:46.426Z",
+    "_id": "686d20568f7f91f0231f0f73",
+    "__v": 0,
+    "createdAt": "2025-07-08T13:42:46.643Z",
+    "updatedAt": "2025-07-08T13:42:46.643Z"
+  },
+  {
+    "profile": {
+      "firstname": "Dayne",
+      "lastname": "Von",
+      "email": "dayne.von@yahoo.com",
+      "mobile": 1234567894,
+      "maritalStatus": "Married",
+      "avatar": "https://avatars.githubusercontent.com/u/40486342",
+      "dateOfBirth": "1993-02-14"
+    },
+    "financialInfo": {
+      "verificationCertificate": "686d20568f7f91f0231f0f61",
+      "fundsVerification": "183.11",
+      "bankName": "Gleason - Schneider",
+      "bankBranch": "Marshall Cliff",
+      "city": "Nitzscheville",
+      "country": "Czechia",
+      "status": "Pending"
+    },
+    "personalDetails": {
+      "residenceStatus": "Resident",
+      "citizenship": "Norfolk Island",
+      "industry": "Technology",
+      "employerName": "Williamson LLC"
+    },
+    "documentation": [
+      {
+        "type": "Passport",
+        "document": "686d20568f7f91f0231f0f62",
+        "_id": "686d20568f7f91f0231f0f76"
+      }
+    ],
+    "userState": "inactive",
+    "propertyTypes": [
+      "Retail",
+      "Land"
+    ],
+    "region": [
+      "Asia"
+    ],
+    "electronicConsent": {
+      "consentTerms": true,
+      "consentTaxTems": false
+    },
+    "purchaseTracker": {
+      "transactionStatus": {
+        "value": "Pending"
+      },
+      "assetDetails": {
+        "value": "Processing"
+      },
+      "timelineOfActivities": {
+        "value": "Processing"
+      },
+      "escrowAccountInformation": {
+        "value": "Cancelled"
+      },
+      "progressTracking": {
+        "value": "Pending"
+      }
+    },
+    "refreshToken": "Uk8qGIZBiBTRoaDuUZpaPsFsaFWl5XD9",
+    "passwordChangedAt": "2024-12-27T13:43:41.337Z",
+    "passwordResetToken": "1E0fKLXhuGU5cfDoXnP1vfqBAblTwW7lkBB2pryfnt1AWebWYsL03VcefMiSKv1R",
+    "passwordResetTokenExpiresAt": "2025-07-12T08:07:13.036Z",
+    "_id": "686d20568f7f91f0231f0f75",
+    "__v": 0,
+    "createdAt": "2025-07-08T13:42:46.644Z",
+    "updatedAt": "2025-07-08T13:42:46.644Z"
+  },
+  {
+    "profile": {
+      "firstname": "Gloria",
+      "lastname": "Schinner",
+      "email": "gloria_schinner1@hotmail.com",
+      "mobile": 1234567895,
+      "maritalStatus": "Divorced",
+      "avatar": "https://cdn.jsdelivr.net/gh/faker-js/assets-person-portrait/female/512/56.jpg",
+      "dateOfBirth": "1975-07-15"
+    },
+    "financialInfo": {
+      "verificationCertificate": "686d20568f7f91f0231f0f63",
+      "fundsVerification": "291.44",
+      "bankName": "McLaughlin Group",
+      "bankBranch": "Abelardo Court",
+      "city": "Forreststad",
+      "country": "Somalia",
+      "status": "Pending"
+    },
+    "personalDetails": {
+      "residenceStatus": "Resident",
+      "citizenship": "Zimbabwe",
+      "industry": "Finance",
+      "employerName": "Gerlach - Wilkinson"
+    },
+    "documentation": [
+      {
+        "type": "Utility Bill",
+        "document": "686d20568f7f91f0231f0f64",
+        "_id": "686d20568f7f91f0231f0f78"
+      }
+    ],
+    "userState": "inactive",
+    "propertyTypes": [
+      "Apartments"
+    ],
+    "region": [
+      "US"
+    ],
+    "electronicConsent": {
+      "consentTerms": true,
+      "consentTaxTems": false
+    },
+    "purchaseTracker": {
+      "transactionStatus": {
+        "value": "Cancelled"
+      },
+      "assetDetails": {
+        "value": "Processing"
+      },
+      "timelineOfActivities": {
+        "value": "Completed"
+      },
+      "escrowAccountInformation": {
+        "value": "Processing"
+      },
+      "progressTracking": {
+        "value": "Pending"
+      }
+    },
+    "refreshToken": "lnCXM4TxAytkEpaF7qI5hBshHOfsdGFU",
+    "passwordChangedAt": "2025-06-22T17:33:00.735Z",
+    "passwordResetToken": "hyC53rf4RlonfK8DGnOULo66O752i8uBvJJh7bL2qRluWw3CMy95OKGu80lkW0AF",
+    "passwordResetTokenExpiresAt": "2025-07-09T19:30:07.324Z",
+    "_id": "686d20568f7f91f0231f0f77",
+    "__v": 0,
+    "createdAt": "2025-07-08T13:42:46.644Z",
+    "updatedAt": "2025-07-08T13:42:46.644Z"
+  },
+  {
+    "profile": {
+      "firstname": "Maureen",
+      "lastname": "Mosciski",
+      "email": "maureen_mosciski@hotmail.com",
+      "mobile": 1234567896,
+      "maritalStatus": "Divorced",
+      "avatar": "https://cdn.jsdelivr.net/gh/faker-js/assets-person-portrait/female/512/62.jpg",
+      "dateOfBirth": "2007-05-31"
+    },
+    "financialInfo": {
+      "verificationCertificate": "686d20568f7f91f0231f0f65",
+      "fundsVerification": "408.20",
+      "bankName": "Weber and Sons",
+      "bankBranch": "Bogisich Landing",
+      "city": "Santa Fe",
+      "country": "Virgin Islands, British",
+      "status": "Approved"
+    },
+    "personalDetails": {
+      "residenceStatus": "Non-Resident",
+      "citizenship": "Gambia",
+      "industry": "Finance",
+      "employerName": "Yost, Gutmann and Kuhic"
+    },
+    "documentation": [
+      {
+        "type": "Passport",
+        "document": "686d20568f7f91f0231f0f66",
+        "_id": "686d20568f7f91f0231f0f7a"
+      }
+    ],
+    "userState": "inactive",
+    "propertyTypes": [
+      "Villa"
+    ],
+    "region": [
+      "Europe",
+      "Asia"
+    ],
+    "electronicConsent": {
+      "consentTerms": false,
+      "consentTaxTems": false
+    },
+    "purchaseTracker": {
+      "transactionStatus": {
+        "value": "Processing"
+      },
+      "assetDetails": {
+        "value": "Cancelled"
+      },
+      "timelineOfActivities": {
+        "value": "Cancelled"
+      },
+      "escrowAccountInformation": {
+        "value": "Processing"
+      },
+      "progressTracking": {
+        "value": "Processing"
+      }
+    },
+    "refreshToken": "ETxf36aJP2hLi0nSzhZtAtULylS67d75",
+    "passwordChangedAt": "2025-04-29T12:41:08.129Z",
+    "passwordResetToken": "n4FKRWCCCZIjAj0Y86qQxs3nXuM36ajmWn9tx8H6HnmEFlkpxeYr5wEI3GFNooH2",
+    "passwordResetTokenExpiresAt": "2025-07-09T15:34:01.522Z",
+    "_id": "686d20568f7f91f0231f0f79",
+    "__v": 0,
+    "createdAt": "2025-07-08T13:42:46.644Z",
+    "updatedAt": "2025-07-08T13:42:46.644Z"
+  },
+  {
+    "profile": {
+      "firstname": "Carlee",
+      "lastname": "Towne",
+      "email": "carlee.towne@gmail.com",
+      "mobile": 1234567897,
+      "maritalStatus": "Divorced",
+      "avatar": "https://avatars.githubusercontent.com/u/61587967",
+      "dateOfBirth": "1997-01-22"
+    },
+    "financialInfo": {
+      "verificationCertificate": "686d20568f7f91f0231f0f67",
+      "fundsVerification": "991.10",
+      "bankName": "Hirthe - Altenwerth",
+      "bankBranch": "Parkside",
+      "city": "East Helene",
+      "country": "Syrian Arab Republic",
+      "status": "Approved"
+    },
+    "personalDetails": {
+      "residenceStatus": "Non-Resident",
+      "citizenship": "Democratic People's Republic of Korea",
+      "industry": "Technology",
+      "employerName": "Koelpin - Mitchell"
+    },
+    "documentation": [
+      {
+        "type": "License",
+        "document": "686d20568f7f91f0231f0f68",
+        "_id": "686d20568f7f91f0231f0f7c"
+      }
+    ],
+    "userState": "inactive",
+    "propertyTypes": [
+      "Retail",
+      "Office"
+    ],
+    "region": [
+      "Asia",
+      "Europe"
+    ],
+    "electronicConsent": {
+      "consentTerms": true,
+      "consentTaxTems": false
+    },
+    "purchaseTracker": {
+      "transactionStatus": {
+        "value": "Cancelled"
+      },
+      "assetDetails": {
+        "value": "Completed"
+      },
+      "timelineOfActivities": {
+        "value": "Processing"
+      },
+      "escrowAccountInformation": {
+        "value": "Processing"
+      },
+      "progressTracking": {
+        "value": "Cancelled"
+      }
+    },
+    "refreshToken": "CyE4aHvHxpBvgiZZnN4TFnewDegCP6IU",
+    "passwordChangedAt": "2025-04-09T23:54:58.695Z",
+    "passwordResetToken": "ZGu5bHvcP3eqMAJOOSXBHicsoNn7riwUoXofpP8Gx8TEilcgclDEusB9qOKLJhdl",
+    "passwordResetTokenExpiresAt": "2025-07-14T17:22:03.609Z",
+    "_id": "686d20568f7f91f0231f0f7b",
+    "__v": 0,
+    "createdAt": "2025-07-08T13:42:46.644Z",
+    "updatedAt": "2025-07-08T13:42:46.644Z"
+  },
+  {
+    "profile": {
+      "firstname": "Chasity",
+      "lastname": "Kunde",
+      "email": "chasity_kunde@hotmail.com",
+      "mobile": 1234567898,
+      "maritalStatus": "Married",
+      "avatar": "https://cdn.jsdelivr.net/gh/faker-js/assets-person-portrait/male/512/98.jpg",
+      "dateOfBirth": "1997-07-16"
+    },
+    "financialInfo": {
+      "verificationCertificate": "686d20568f7f91f0231f0f69",
+      "fundsVerification": "878.43",
+      "bankName": "Stokes LLC",
+      "bankBranch": "Blind Lane",
+      "city": "Ebbastead",
+      "country": "Angola",
+      "status": "Approved"
+    },
+    "personalDetails": {
+      "residenceStatus": "Resident",
+      "citizenship": "Gambia",
+      "industry": "Real Estate",
+      "employerName": "Hickle - Rolfson"
+    },
+    "documentation": [
+      {
+        "type": "Passport",
+        "document": "686d20568f7f91f0231f0f6a",
+        "_id": "686d20568f7f91f0231f0f7e"
+      }
+    ],
+    "userState": "inactive",
+    "propertyTypes": [
+      "Office",
+      "Retail",
+      "Apartments"
+    ],
+    "region": [
+      "US"
+    ],
+    "electronicConsent": {
+      "consentTerms": true,
+      "consentTaxTems": false
+    },
+    "purchaseTracker": {
+      "transactionStatus": {
+        "value": "Pending"
+      },
+      "assetDetails": {
+        "value": "Processing"
+      },
+      "timelineOfActivities": {
+        "value": "Pending"
+      },
+      "escrowAccountInformation": {
+        "value": "Completed"
+      },
+      "progressTracking": {
+        "value": "Pending"
+      }
+    },
+    "refreshToken": "VcZLMyYVLFQcZ5VlGuFkvhAmgw967zzE",
+    "passwordChangedAt": "2025-05-20T02:16:54.378Z",
+    "passwordResetToken": "iWJublHGheDCKOptAdMQdl3wFyXAxenkWpp4VU0n6eEOPvak7g2pHq5bb2i2MmLV",
+    "passwordResetTokenExpiresAt": "2025-07-14T20:10:57.448Z",
+    "_id": "686d20568f7f91f0231f0f7d",
+    "__v": 0,
+    "createdAt": "2025-07-08T13:42:46.645Z",
+    "updatedAt": "2025-07-08T13:42:46.645Z"
+  },
+  {
+    "profile": {
+      "firstname": "Joaquin",
+      "lastname": "Murray",
+      "email": "joaquin_murray44@yahoo.com",
+      "mobile": 1234567899,
+      "maritalStatus": "Single",
+      "avatar": "https://avatars.githubusercontent.com/u/87519329",
+      "dateOfBirth": "1998-12-03"
+    },
+    "financialInfo": {
+      "verificationCertificate": "686d20568f7f91f0231f0f6b",
+      "fundsVerification": "836.09",
+      "bankName": "Koelpin - Parisian",
+      "bankBranch": "Deborah Creek",
+      "city": "Schroederboro",
+      "country": "Brazil",
+      "status": "Approved"
+    },
+    "personalDetails": {
+      "residenceStatus": "Non-Resident",
+      "citizenship": "Eritrea",
+      "industry": "Healthcare",
+      "employerName": "Kub - Hayes"
+    },
+    "documentation": [
+      {
+        "type": "License",
+        "document": "686d20568f7f91f0231f0f6c",
+        "_id": "686d20568f7f91f0231f0f80"
+      }
+    ],
+    "userState": "inactive",
+    "propertyTypes": [
+      "Land",
+      "Retail",
+      "Office"
+    ],
+    "region": [
+      "Europe"
+    ],
+    "electronicConsent": {
+      "consentTerms": true,
+      "consentTaxTems": false
+    },
+    "purchaseTracker": {
+      "transactionStatus": {
+        "value": "Completed"
+      },
+      "assetDetails": {
+        "value": "Processing"
+      },
+      "timelineOfActivities": {
+        "value": "Cancelled"
+      },
+      "escrowAccountInformation": {
+        "value": "Completed"
+      },
+      "progressTracking": {
+        "value": "Completed"
+      }
+    },
+    "refreshToken": "JL4z1Z275GvZ2Jkr24BtHZiq2uhj90Z2",
+    "passwordChangedAt": "2024-07-30T18:42:04.451Z",
+    "passwordResetToken": "T8xBRPNuGInlxV0bIvBU42jfnrDOBkDVstU7FvpAHfiRJdz6lLay56PfYAVftz2K",
+    "passwordResetTokenExpiresAt": "2025-07-14T16:23:52.835Z",
+    "_id": "686d20568f7f91f0231f0f7f",
+    "__v": 0,
+    "createdAt": "2025-07-08T13:42:46.645Z",
+    "updatedAt": "2025-07-08T13:42:46.645Z"
+  },
+  {
+    "profile": {
+      "firstname": "Watson",
+      "lastname": "Nader",
+      "email": "watson_nader60@gmail.com",
+      "mobile": 1234567900,
+      "maritalStatus": "Divorced",
+      "avatar": "https://cdn.jsdelivr.net/gh/faker-js/assets-person-portrait/female/512/1.jpg",
+      "dateOfBirth": "2002-10-13"
+    },
+    "financialInfo": {
+      "verificationCertificate": "686d20568f7f91f0231f0f6d",
+      "fundsVerification": "765.49",
+      "bankName": "Kessler LLC",
+      "bankBranch": "Kayleigh Keys",
+      "city": "Kuphalcester",
+      "country": "Brazil",
+      "status": "Approved"
+    },
+    "personalDetails": {
+      "residenceStatus": "Resident",
+      "citizenship": "Andorra",
+      "industry": "Healthcare",
+      "employerName": "Welch Inc"
+    },
+    "documentation": [
+      {
+        "type": "Passport",
+        "document": "686d20568f7f91f0231f0f6e",
+        "_id": "686d20568f7f91f0231f0f82"
+      }
+    ],
+    "userState": "inactive",
+    "propertyTypes": [
+      "Apartments",
+      "Land"
+    ],
+    "region": [
+      "Asia",
+      "Europe"
+    ],
+    "electronicConsent": {
+      "consentTerms": true,
+      "consentTaxTems": true
+    },
+    "purchaseTracker": {
+      "transactionStatus": {
+        "value": "Completed"
+      },
+      "assetDetails": {
+        "value": "Pending"
+      },
+      "timelineOfActivities": {
+        "value": "Completed"
+      },
+      "escrowAccountInformation": {
+        "value": "Completed"
+      },
+      "progressTracking": {
+        "value": "Processing"
+      }
+    },
+    "refreshToken": "JsFHO4asCHTWTlOTuJ15NR9mknzOODE8",
+    "passwordChangedAt": "2024-07-25T07:42:58.898Z",
+    "passwordResetToken": "yg5AJWqWeJ0Mw4BYlt1v0qvDufV0NG52hUPOhatYe1JNZoDnqtcBnpbxDLEKxGb5",
+    "passwordResetTokenExpiresAt": "2025-07-14T23:47:27.515Z",
+    "_id": "686d20568f7f91f0231f0f81",
+    "__v": 0,
+    "createdAt": "2025-07-08T13:42:46.645Z",
+    "updatedAt": "2025-07-08T13:42:46.645Z"
+  }
+]

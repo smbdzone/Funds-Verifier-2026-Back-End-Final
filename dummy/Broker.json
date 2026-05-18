@@ -1,0 +1,47 @@
+[
+  {
+    "firstName": "Kavon",
+    "lastName": "Hills",
+    "email": "Juliana_Hilll@hotmail.com",
+    "phone": "751-887-8942 x42541",
+    "createdAt": "2025-07-07T18:40:54.108Z",
+    "_id": "686d1ccf3d7249d3072c4b79",
+    "__v": 0
+  },
+  {
+    "firstName": "Doyle",
+    "lastName": "Towne",
+    "email": "Lessie_Lind@gmail.com",
+    "phone": "(360) 895-9339",
+    "createdAt": "2025-07-08T01:45:49.302Z",
+    "_id": "686d1ccf3d7249d3072c4b7a",
+    "__v": 0
+  },
+  {
+    "firstName": "Lucy",
+    "lastName": "Sipes",
+    "email": "Faye49@yahoo.com",
+    "phone": "1-562-997-4608 x8306",
+    "createdAt": "2025-07-08T11:18:05.715Z",
+    "_id": "686d1ccf3d7249d3072c4b7b",
+    "__v": 0
+  },
+  {
+    "firstName": "Jordon",
+    "lastName": "Sipes",
+    "email": "Mattie_Effertz@yahoo.com",
+    "phone": "(520) 631-4325 x8443",
+    "createdAt": "2025-07-08T06:11:52.859Z",
+    "_id": "686d1ccf3d7249d3072c4b7c",
+    "__v": 0
+  },
+  {
+    "firstName": "Adrienne",
+    "lastName": "Ziemann",
+    "email": "Baby.Connelly@gmail.com",
+    "phone": "(269) 626-3407 x266",
+    "createdAt": "2025-07-08T01:32:17.164Z",
+    "_id": "686d1ccf3d7249d3072c4b7d",
+    "__v": 0
+  }
+]

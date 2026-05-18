@@ -1,0 +1,312 @@
+[
+  {
+    "name": "Halle",
+    "email": "Milan74@yahoo.com",
+    "password": "pwzDQJ8a8HKDD_c",
+    "phone": "1-632-607-8331 x7323",
+    "country": "Malta",
+    "city": "Denver",
+    "address": "97572 Johnson Pike",
+    "profileImage": "https://cdn.jsdelivr.net/gh/faker-js/assets-person-portrait/female/512/75.jpg",
+    "gender": "Other",
+    "lastname": "Stanton",
+    "dateOfBirth": "1978-12-04T11:50:51.854Z",
+    "documentation": [],
+    "userState": "active",
+    "role": "Evaluator",
+    "about": "Provident balbus civis laboriosam adversus ad canonicus fugit excepturi sufficio.",
+    "uuid": "f48971f3-4c5a-47e1-91db-3a423e5475e3",
+    "userType": "Individual",
+    "assetId": "01f8559f-3609-470b-8ee6-017492601196",
+    "propertyTypes": [
+      "Student Housing",
+      "Apartments"
+    ],
+    "region": [
+      "Asia",
+      "Canada"
+    ],
+    "electronicConsent": {
+      "consentTerms": false,
+      "consentTaxTerms": true
+    },
+    "financialInfo": {
+      "verificationCertificate": "686d26ecedc81bc9613ed2fe",
+      "fundsVerification": "35597943",
+      "bankName": "Mayert - Spencer",
+      "bankBranch": "Denesik, Kuhlman and Deckow",
+      "city": "Lake Bobby",
+      "country": "Marshall Islands",
+      "status": "Pending"
+    },
+    "personalDetails": {
+      "residenceStatus": "cui",
+      "citizenship": "Burkina Faso",
+      "industry": "Toys",
+      "employerName": "Ruecker - Bartell"
+    },
+    "purchaseTracker": {
+      "transactionStatus": "Cancelled",
+      "assetDetails": "Cancelled",
+      "timelineOfActivities": "Pending",
+      "escrowAccountInformation": "Completed",
+      "progressTracking": "Cancelled"
+    },
+    "refreshToken": "0sTH06xUGCSQNe1jHBrvnVnxLFZWyS",
+    "passwordChangedAt": "2025-07-08T10:25:06.670Z",
+    "passwordResetToken": "133K1seVYTZU9HGwiWKkaqFZqAh0Q0",
+    "passwordResetTokenExpiresAt": "2026-06-04T01:30:49.724Z",
+    "_id": "686d26ecedc81bc9613ed303",
+    "__v": 0,
+    "createdAt": "2025-07-08T14:10:52.243Z",
+    "updatedAt": "2025-07-08T14:10:52.243Z"
+  },
+  {
+    "name": "Matilde",
+    "email": "Valerie58@hotmail.com",
+    "password": "rrGlwXbO4QSrL5M",
+    "phone": "1-474-496-9837 x42044",
+    "country": "Montenegro",
+    "city": "Kozeyside",
+    "address": "8231 Tia Stravenue",
+    "profileImage": "https://cdn.jsdelivr.net/gh/faker-js/assets-person-portrait/female/512/27.jpg",
+    "gender": "Male",
+    "lastname": "Harvey",
+    "dateOfBirth": "1974-04-11T14:44:11.805Z",
+    "documentation": [],
+    "userState": "active",
+    "role": "Evaluator",
+    "about": "Solio aperte aranea vito assentator quae thermae timidus.",
+    "uuid": "1c845eb8-384b-45e0-86d1-fb8a6b0f3e78",
+    "userType": "Individual",
+    "assetId": "f80a9d27-364b-410f-aef1-f7da0e837245",
+    "propertyTypes": [
+      "Villa",
+      "Retail"
+    ],
+    "region": [
+      "Asia",
+      "US"
+    ],
+    "electronicConsent": {
+      "consentTerms": false,
+      "consentTaxTerms": false
+    },
+    "financialInfo": {
+      "verificationCertificate": "686d26ecedc81bc9613ed2ff",
+      "fundsVerification": "28947524",
+      "bankName": "Cummings, Beier and Wehner",
+      "bankBranch": "Green Group",
+      "city": "New Henryville",
+      "country": "Zimbabwe",
+      "status": "Approved"
+    },
+    "personalDetails": {
+      "residenceStatus": "aggero",
+      "citizenship": "Cuba",
+      "industry": "Computers",
+      "employerName": "Gutkowski, Rempel and Harber"
+    },
+    "purchaseTracker": {
+      "transactionStatus": "Completed",
+      "assetDetails": "Cancelled",
+      "timelineOfActivities": "Completed",
+      "escrowAccountInformation": "Cancelled",
+      "progressTracking": "Cancelled"
+    },
+    "refreshToken": "Nt2r6dNHcXD1H4KB9tnPDmjzasboiA",
+    "passwordChangedAt": "2025-07-07T18:02:48.566Z",
+    "passwordResetToken": "pcanpu3lZrgJ1L2U75CNbmXPEe0J83",
+    "passwordResetTokenExpiresAt": "2025-08-31T02:44:33.169Z",
+    "_id": "686d26ecedc81bc9613ed304",
+    "__v": 0,
+    "createdAt": "2025-07-08T14:10:52.243Z",
+    "updatedAt": "2025-07-08T14:10:52.243Z"
+  },
+  {
+    "name": "Krystal",
+    "email": "Crystel_Reichel@yahoo.com",
+    "password": "Xg0RWEtp9Fq_r8L",
+    "phone": "(969) 504-9768",
+    "country": "Tuvalu",
+    "city": "North Leonardland",
+    "address": "67618 E Union Street",
+    "profileImage": "https://cdn.jsdelivr.net/gh/faker-js/assets-person-portrait/male/512/87.jpg",
+    "gender": "Male",
+    "lastname": "Pfeffer",
+    "dateOfBirth": "1990-09-28T07:56:23.783Z",
+    "documentation": [],
+    "userState": "active",
+    "role": "Admin",
+    "about": "Neque celo vinum concido tantum subnecto cunctatio cicuta caries.",
+    "uuid": "dae5516b-7ed7-46c9-9893-644827616da0",
+    "userType": "Company",
+    "assetId": "f712f1f7-1034-4643-845d-0bee121f8673",
+    "propertyTypes": [
+      "Retail",
+      "Student Housing"
+    ],
+    "region": [
+      "US",
+      "Asia"
+    ],
+    "electronicConsent": {
+      "consentTerms": false,
+      "consentTaxTerms": true
+    },
+    "financialInfo": {
+      "verificationCertificate": "686d26ecedc81bc9613ed300",
+      "fundsVerification": "81753320",
+      "bankName": "Stanton LLC",
+      "bankBranch": "Hodkiewicz Group",
+      "city": "East Johnathanstad",
+      "country": "Egypt",
+      "status": "Pending"
+    },
+    "personalDetails": {
+      "residenceStatus": "beneficium",
+      "citizenship": "French Guiana",
+      "industry": "Beauty",
+      "employerName": "Schroeder Inc"
+    },
+    "purchaseTracker": {
+      "transactionStatus": "Processing",
+      "assetDetails": "Pending",
+      "timelineOfActivities": "Cancelled",
+      "escrowAccountInformation": "Completed",
+      "progressTracking": "Cancelled"
+    },
+    "refreshToken": "VCg4Nmotsra8Bzz2gDjIUds1oA6qiX",
+    "passwordChangedAt": "2025-07-08T04:44:20.845Z",
+    "passwordResetToken": "aV2iEzQ9r5oYJ8H54sO2VwnylTfxi4",
+    "passwordResetTokenExpiresAt": "2026-04-27T11:51:34.125Z",
+    "_id": "686d26ecedc81bc9613ed305",
+    "__v": 0,
+    "createdAt": "2025-07-08T14:10:52.243Z",
+    "updatedAt": "2025-07-08T14:10:52.243Z"
+  },
+  {
+    "name": "Reese",
+    "email": "Abigayle84@yahoo.com",
+    "password": "oi2LjEhcTGJ8Kd2",
+    "phone": "727.587.9250",
+    "country": "Seychelles",
+    "city": "Hacienda Heights",
+    "address": "4443 O'Hara Forest",
+    "profileImage": "https://avatars.githubusercontent.com/u/91528829",
+    "gender": "Male",
+    "lastname": "Pacocha",
+    "dateOfBirth": "1986-12-14T01:28:50.425Z",
+    "documentation": [],
+    "userState": "active",
+    "role": "TechnicalReport",
+    "about": "Ut sum balbus voveo vigor provident censura tergeo.",
+    "uuid": "11b87153-83d0-4534-8e93-af5441b61c77",
+    "userType": "Company",
+    "assetId": "e4fd5338-7770-40a3-8da9-546c58542ed3",
+    "propertyTypes": [
+      "Land",
+      "Industrial"
+    ],
+    "region": [
+      "Africa",
+      "US"
+    ],
+    "electronicConsent": {
+      "consentTerms": true,
+      "consentTaxTerms": false
+    },
+    "financialInfo": {
+      "verificationCertificate": "686d26ecedc81bc9613ed301",
+      "fundsVerification": "01930068",
+      "bankName": "Kunde - Emard",
+      "bankBranch": "Bahringer Inc",
+      "city": "Mackenziecester",
+      "country": "Somalia",
+      "status": "Approved"
+    },
+    "personalDetails": {
+      "residenceStatus": "aspernatur",
+      "citizenship": "Mozambique",
+      "industry": "Baby",
+      "employerName": "Hintz and Sons"
+    },
+    "purchaseTracker": {
+      "transactionStatus": "Cancelled",
+      "assetDetails": "Cancelled",
+      "timelineOfActivities": "Processing",
+      "escrowAccountInformation": "Processing",
+      "progressTracking": "Pending"
+    },
+    "refreshToken": "BjsvxoM4EIwRUfDHo7HpcJnMBP1ylv",
+    "passwordChangedAt": "2025-07-08T09:58:19.513Z",
+    "passwordResetToken": "hWf7bfMu2phlSbl5wGQ34IOvVnWmTp",
+    "passwordResetTokenExpiresAt": "2025-08-29T05:01:49.571Z",
+    "_id": "686d26ecedc81bc9613ed306",
+    "__v": 0,
+    "createdAt": "2025-07-08T14:10:52.244Z",
+    "updatedAt": "2025-07-08T14:10:52.244Z"
+  },
+  {
+    "name": "Israel",
+    "email": "Duane_Feeney77@yahoo.com",
+    "password": "KXAN5rVRlqzZLUV",
+    "phone": "1-210-583-6963 x5815",
+    "country": "Martinique",
+    "city": "Garland",
+    "address": "7574 Franecki River",
+    "profileImage": "https://avatars.githubusercontent.com/u/55426415",
+    "gender": "Other",
+    "lastname": "Muller",
+    "dateOfBirth": "1968-01-21T09:06:51.649Z",
+    "documentation": [],
+    "userState": "active",
+    "role": "Trustee",
+    "about": "Arto velociter maxime casso uberrime.",
+    "uuid": "9c73449d-2896-4e3c-8c49-c4ce899831b9",
+    "userType": "Individual",
+    "assetId": "2c88cdbd-eba5-41fe-a593-f6ff45bb43a2",
+    "propertyTypes": [
+      "Industrial",
+      "Retail"
+    ],
+    "region": [
+      "United Arab Emirates",
+      "Oceania"
+    ],
+    "electronicConsent": {
+      "consentTerms": true,
+      "consentTaxTerms": false
+    },
+    "financialInfo": {
+      "verificationCertificate": "686d26ecedc81bc9613ed302",
+      "fundsVerification": "15223720",
+      "bankName": "Kreiger, Bernier and Schuster",
+      "bankBranch": "Hoeger - Luettgen",
+      "city": "North Rosendo",
+      "country": "Grenada",
+      "status": "Pending"
+    },
+    "personalDetails": {
+      "residenceStatus": "cognatus",
+      "citizenship": "Saint Lucia",
+      "industry": "Computers",
+      "employerName": "Reilly, Hoppe and Bradtke"
+    },
+    "purchaseTracker": {
+      "transactionStatus": "Cancelled",
+      "assetDetails": "Pending",
+      "timelineOfActivities": "Processing",
+      "escrowAccountInformation": "Processing",
+      "progressTracking": "Processing"
+    },
+    "refreshToken": "5HGnFiQWZKYUUXMhajuIjkO3aNLsnJ",
+    "passwordChangedAt": "2025-07-07T16:02:03.471Z",
+    "passwordResetToken": "1xrHJ10Ads6zbf8zB1iIF5bLMqWlEk",
+    "passwordResetTokenExpiresAt": "2026-06-22T01:04:38.168Z",
+    "_id": "686d26ecedc81bc9613ed307",
+    "__v": 0,
+    "createdAt": "2025-07-08T14:10:52.244Z",
+    "updatedAt": "2025-07-08T14:10:52.244Z"
+  }
+]

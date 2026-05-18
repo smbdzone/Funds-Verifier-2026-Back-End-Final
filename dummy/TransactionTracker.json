@@ -1,0 +1,712 @@
+[
+  {
+    "userId": "686e5ca84da41d4a866def55",
+    "assetReferenceNumber": "12b1c2c8-9fa7-4de7-842b-56779fd6ffb4",
+    "customerName": "Jan Feest PhD",
+    "assetType": "Land",
+    "assetDescription": "Ultra tracto vetus.",
+    "customerReferenceNumber": "Q6o5J27b",
+    "documents": [
+      {
+        "name": "Title Deed/Pre Title Deed/Lease Deed/Oqood/Initial Contract of Sale",
+        "status": "verified",
+        "url": "https://smug-gazebo.com/"
+      },
+      {
+        "name": "NOC from Developer and final as built drawings If extended/improved",
+        "status": "pending",
+        "url": "https://tragic-hunger.info"
+      },
+      {
+        "name": "Owners NOC if he is not client (for corporate and individual instructions)",
+        "status": "pending",
+        "url": "https://secondary-gastropod.net"
+      },
+      {
+        "name": "Completion Status Certificate from Engineering Co, if under construction",
+        "status": "received",
+        "url": "https://orderly-management.org"
+      },
+      {
+        "name": "Floor Plans",
+        "status": "pending",
+        "url": "https://ethical-shark.org/"
+      },
+      {
+        "name": "MOU of Sale",
+        "status": "received",
+        "url": "https://humble-alb.biz/"
+      },
+      {
+        "name": "SPA of Purchased Property",
+        "status": "pending",
+        "url": "https://zany-loyalty.com/"
+      },
+      {
+        "name": "Costs/Invoices Sheet of the Upgrades if any",
+        "status": "received",
+        "url": "https://supportive-sideboard.name"
+      },
+      {
+        "name": "Upgrade Development Consultancy Contract",
+        "status": "received",
+        "url": "https://lively-bog.org"
+      },
+      {
+        "name": "Upgrade Development Contracting Contract",
+        "status": "pending",
+        "url": "https://scratchy-siege.net/"
+      }
+    ],
+    "stages": {
+      "evaluationDocumentPending": true,
+      "evaluationComplete": true,
+      "_3dRequestsent": false,
+      "_3dDone": false,
+      "technicalReportRequestsent": true,
+      "technicalReportDone": true,
+      "trusteeContacted": false,
+      "assetTransferred": true
+    },
+    "currentStage": "technicalReportDone"
+  },
+  {
+    "userId": "686e5ca84da41d4a866def56",
+    "assetReferenceNumber": "ff8dc63d-b98a-41d4-919b-6bd45b7eb5ac",
+    "customerName": "Miss Jeanette Dicki",
+    "assetType": "Apartment",
+    "assetDescription": "Aetas eum universe admoveo utroque censura talis crinis summisse.",
+    "customerReferenceNumber": "4OHz3A8J",
+    "documents": [
+      {
+        "name": "Title Deed/Pre Title Deed/Lease Deed/Oqood/Initial Contract of Sale",
+        "status": "verified",
+        "url": "https://black-and-white-steak.biz"
+      },
+      {
+        "name": "NOC from Developer and final as built drawings If extended/improved",
+        "status": "received",
+        "url": "https://forceful-almighty.org/"
+      },
+      {
+        "name": "Owners NOC if he is not client (for corporate and individual instructions)",
+        "status": "pending",
+        "url": "https://sugary-lawmaker.net"
+      },
+      {
+        "name": "Completion Status Certificate from Engineering Co, if under construction",
+        "status": "received",
+        "url": "https://ambitious-quit.org"
+      },
+      {
+        "name": "Floor Plans",
+        "status": "received",
+        "url": "https://ethical-emergent.name"
+      },
+      {
+        "name": "MOU of Sale",
+        "status": "received",
+        "url": "https://junior-larva.name"
+      },
+      {
+        "name": "SPA of Purchased Property",
+        "status": "pending",
+        "url": "https://outrageous-majority.name/"
+      },
+      {
+        "name": "Costs/Invoices Sheet of the Upgrades if any",
+        "status": "verified",
+        "url": "https://tall-emergent.info/"
+      },
+      {
+        "name": "Upgrade Development Consultancy Contract",
+        "status": "received",
+        "url": "https://assured-harp.info/"
+      },
+      {
+        "name": "Upgrade Development Contracting Contract",
+        "status": "verified",
+        "url": "https://unused-bracelet.name/"
+      }
+    ],
+    "stages": {
+      "evaluationDocumentPending": true,
+      "evaluationComplete": true,
+      "_3dRequestsent": false,
+      "_3dDone": true,
+      "technicalReportRequestsent": false,
+      "technicalReportDone": false,
+      "trusteeContacted": false,
+      "assetTransferred": true
+    },
+    "currentStage": "assetTransferred"
+  },
+  {
+    "userId": "686e5ca84da41d4a866def57",
+    "assetReferenceNumber": "e54da46e-abdd-451d-b288-11d36697a5e1",
+    "customerName": "Dewey Swaniawski",
+    "assetType": "Villa",
+    "assetDescription": "Surculus solio aufero defluo cerno.",
+    "customerReferenceNumber": "x29JxFwL",
+    "documents": [
+      {
+        "name": "Title Deed/Pre Title Deed/Lease Deed/Oqood/Initial Contract of Sale",
+        "status": "verified",
+        "url": "https://appropriate-vicinity.name/"
+      },
+      {
+        "name": "NOC from Developer and final as built drawings If extended/improved",
+        "status": "received",
+        "url": "https://taut-dividend.com"
+      },
+      {
+        "name": "Owners NOC if he is not client (for corporate and individual instructions)",
+        "status": "verified",
+        "url": "https://ripe-draw.org"
+      },
+      {
+        "name": "Completion Status Certificate from Engineering Co, if under construction",
+        "status": "received",
+        "url": "https://noxious-mainstream.net/"
+      },
+      {
+        "name": "Floor Plans",
+        "status": "received",
+        "url": "https://fatal-cellar.info/"
+      },
+      {
+        "name": "MOU of Sale",
+        "status": "verified",
+        "url": "https://whole-fun.net/"
+      },
+      {
+        "name": "SPA of Purchased Property",
+        "status": "verified",
+        "url": "https://suburban-minion.name"
+      },
+      {
+        "name": "Costs/Invoices Sheet of the Upgrades if any",
+        "status": "verified",
+        "url": "https://impolite-precedent.net/"
+      },
+      {
+        "name": "Upgrade Development Consultancy Contract",
+        "status": "received",
+        "url": "https://untimely-bidet.com/"
+      },
+      {
+        "name": "Upgrade Development Contracting Contract",
+        "status": "pending",
+        "url": "https://hungry-mathematics.net"
+      }
+    ],
+    "stages": {
+      "evaluationDocumentPending": true,
+      "evaluationComplete": true,
+      "_3dRequestsent": true,
+      "_3dDone": true,
+      "technicalReportRequestsent": false,
+      "technicalReportDone": true,
+      "trusteeContacted": true,
+      "assetTransferred": true
+    },
+    "currentStage": "evaluationDocumentPending"
+  },
+  {
+    "userId": "686e5ca84da41d4a866def58",
+    "assetReferenceNumber": "4ad18800-8d95-465e-891a-db314453b776",
+    "customerName": "Edith Huels",
+    "assetType": "Villa",
+    "assetDescription": "Alioqui inventore demulceo decor perspiciatis arbor.",
+    "customerReferenceNumber": "rF4avtps",
+    "documents": [
+      {
+        "name": "Title Deed/Pre Title Deed/Lease Deed/Oqood/Initial Contract of Sale",
+        "status": "received",
+        "url": "https://frail-flat.net"
+      },
+      {
+        "name": "NOC from Developer and final as built drawings If extended/improved",
+        "status": "pending",
+        "url": "https://tedious-patroller.org"
+      },
+      {
+        "name": "Owners NOC if he is not client (for corporate and individual instructions)",
+        "status": "received",
+        "url": "https://overdue-digit.biz/"
+      },
+      {
+        "name": "Completion Status Certificate from Engineering Co, if under construction",
+        "status": "verified",
+        "url": "https://cheerful-fledgling.net"
+      },
+      {
+        "name": "Floor Plans",
+        "status": "pending",
+        "url": "https://unripe-opera.org"
+      },
+      {
+        "name": "MOU of Sale",
+        "status": "pending",
+        "url": "https://another-fellow.info"
+      },
+      {
+        "name": "SPA of Purchased Property",
+        "status": "verified",
+        "url": "https://every-ice-cream.org/"
+      },
+      {
+        "name": "Costs/Invoices Sheet of the Upgrades if any",
+        "status": "pending",
+        "url": "https://cheerful-perfection.name"
+      },
+      {
+        "name": "Upgrade Development Consultancy Contract",
+        "status": "verified",
+        "url": "https://mean-tune-up.net/"
+      },
+      {
+        "name": "Upgrade Development Contracting Contract",
+        "status": "received",
+        "url": "https://courageous-guidance.net/"
+      }
+    ],
+    "stages": {
+      "evaluationDocumentPending": false,
+      "evaluationComplete": true,
+      "_3dRequestsent": true,
+      "_3dDone": false,
+      "technicalReportRequestsent": true,
+      "technicalReportDone": true,
+      "trusteeContacted": true,
+      "assetTransferred": false
+    },
+    "currentStage": "assetTransferred"
+  },
+  {
+    "userId": "686e5ca84da41d4a866def59",
+    "assetReferenceNumber": "7be14793-20b6-41bd-8d56-184a50b1758a",
+    "customerName": "Dr. Dexter Little",
+    "assetType": "Villa",
+    "assetDescription": "Aqua accusamus suus.",
+    "customerReferenceNumber": "dSQyZOaX",
+    "documents": [
+      {
+        "name": "Title Deed/Pre Title Deed/Lease Deed/Oqood/Initial Contract of Sale",
+        "status": "pending",
+        "url": "https://made-up-blight.name/"
+      },
+      {
+        "name": "NOC from Developer and final as built drawings If extended/improved",
+        "status": "verified",
+        "url": "https://formal-traditionalism.org/"
+      },
+      {
+        "name": "Owners NOC if he is not client (for corporate and individual instructions)",
+        "status": "received",
+        "url": "https://that-lava.com/"
+      },
+      {
+        "name": "Completion Status Certificate from Engineering Co, if under construction",
+        "status": "verified",
+        "url": "https://lanky-godparent.biz/"
+      },
+      {
+        "name": "Floor Plans",
+        "status": "verified",
+        "url": "https://glittering-flu.net"
+      },
+      {
+        "name": "MOU of Sale",
+        "status": "verified",
+        "url": "https://dependent-ribbon.info"
+      },
+      {
+        "name": "SPA of Purchased Property",
+        "status": "verified",
+        "url": "https://fluffy-adaptation.net/"
+      },
+      {
+        "name": "Costs/Invoices Sheet of the Upgrades if any",
+        "status": "received",
+        "url": "https://alert-dandelion.biz"
+      },
+      {
+        "name": "Upgrade Development Consultancy Contract",
+        "status": "verified",
+        "url": "https://coordinated-giant.name"
+      },
+      {
+        "name": "Upgrade Development Contracting Contract",
+        "status": "verified",
+        "url": "https://watery-pocket-watch.biz"
+      }
+    ],
+    "stages": {
+      "evaluationDocumentPending": false,
+      "evaluationComplete": false,
+      "_3dRequestsent": true,
+      "_3dDone": false,
+      "technicalReportRequestsent": false,
+      "technicalReportDone": true,
+      "trusteeContacted": false,
+      "assetTransferred": false
+    },
+    "currentStage": "3dRequestsent"
+  },
+  {
+    "userId": "686e5ca84da41d4a866def5a",
+    "assetReferenceNumber": "887dca35-0ea1-4397-ac77-ed6cb036f006",
+    "customerName": "Carroll Fisher V",
+    "assetType": "Warehouse",
+    "assetDescription": "Tremo soluta tibi congregatio.",
+    "customerReferenceNumber": "L01CPJJK",
+    "documents": [
+      {
+        "name": "Title Deed/Pre Title Deed/Lease Deed/Oqood/Initial Contract of Sale",
+        "status": "received",
+        "url": "https://stained-doing.com/"
+      },
+      {
+        "name": "NOC from Developer and final as built drawings If extended/improved",
+        "status": "verified",
+        "url": "https://blushing-cruelty.name"
+      },
+      {
+        "name": "Owners NOC if he is not client (for corporate and individual instructions)",
+        "status": "verified",
+        "url": "https://second-pulse.name/"
+      },
+      {
+        "name": "Completion Status Certificate from Engineering Co, if under construction",
+        "status": "received",
+        "url": "https://evil-devastation.biz"
+      },
+      {
+        "name": "Floor Plans",
+        "status": "verified",
+        "url": "https://enlightened-granny.com/"
+      },
+      {
+        "name": "MOU of Sale",
+        "status": "received",
+        "url": "https://sore-circumference.biz"
+      },
+      {
+        "name": "SPA of Purchased Property",
+        "status": "pending",
+        "url": "https://short-swordfish.info/"
+      },
+      {
+        "name": "Costs/Invoices Sheet of the Upgrades if any",
+        "status": "pending",
+        "url": "https://juicy-duster.name"
+      },
+      {
+        "name": "Upgrade Development Consultancy Contract",
+        "status": "verified",
+        "url": "https://handy-transparency.name/"
+      },
+      {
+        "name": "Upgrade Development Contracting Contract",
+        "status": "received",
+        "url": "https://teeming-finger.net/"
+      }
+    ],
+    "stages": {
+      "evaluationDocumentPending": false,
+      "evaluationComplete": true,
+      "_3dRequestsent": true,
+      "_3dDone": false,
+      "technicalReportRequestsent": true,
+      "technicalReportDone": true,
+      "trusteeContacted": true,
+      "assetTransferred": true
+    },
+    "currentStage": "technicalReportRequestsent"
+  },
+  {
+    "userId": "686e5ca84da41d4a866def5b",
+    "assetReferenceNumber": "63720ca5-c3b9-4fe8-8bd9-c781909b8d6c",
+    "customerName": "Joanna Stanton",
+    "assetType": "Warehouse",
+    "assetDescription": "Cubitum cerno cibus acerbitas.",
+    "customerReferenceNumber": "j9y035n4",
+    "documents": [
+      {
+        "name": "Title Deed/Pre Title Deed/Lease Deed/Oqood/Initial Contract of Sale",
+        "status": "received",
+        "url": "https://moist-incandescence.org/"
+      },
+      {
+        "name": "NOC from Developer and final as built drawings If extended/improved",
+        "status": "received",
+        "url": "https://teeming-airline.biz"
+      },
+      {
+        "name": "Owners NOC if he is not client (for corporate and individual instructions)",
+        "status": "pending",
+        "url": "https://sick-bar.biz"
+      },
+      {
+        "name": "Completion Status Certificate from Engineering Co, if under construction",
+        "status": "received",
+        "url": "https://partial-cuckoo.com/"
+      },
+      {
+        "name": "Floor Plans",
+        "status": "verified",
+        "url": "https://rotten-calculus.name"
+      },
+      {
+        "name": "MOU of Sale",
+        "status": "pending",
+        "url": "https://posh-pharmacopoeia.net"
+      },
+      {
+        "name": "SPA of Purchased Property",
+        "status": "received",
+        "url": "https://liquid-smog.biz/"
+      },
+      {
+        "name": "Costs/Invoices Sheet of the Upgrades if any",
+        "status": "received",
+        "url": "https://slushy-tabletop.net"
+      },
+      {
+        "name": "Upgrade Development Consultancy Contract",
+        "status": "verified",
+        "url": "https://lumpy-in-joke.biz"
+      },
+      {
+        "name": "Upgrade Development Contracting Contract",
+        "status": "received",
+        "url": "https://impressive-draw.com"
+      }
+    ],
+    "stages": {
+      "evaluationDocumentPending": true,
+      "evaluationComplete": true,
+      "_3dRequestsent": true,
+      "_3dDone": false,
+      "technicalReportRequestsent": false,
+      "technicalReportDone": false,
+      "trusteeContacted": true,
+      "assetTransferred": true
+    },
+    "currentStage": "evaluationComplete"
+  },
+  {
+    "userId": "686e5ca84da41d4a866def5c",
+    "assetReferenceNumber": "1cb3fd32-50e2-47ae-97cd-fc9aee986606",
+    "customerName": "Mr. Leslie Stroman Jr.",
+    "assetType": "Apartment",
+    "assetDescription": "Decumbo error tabella.",
+    "customerReferenceNumber": "tX6Vm3p0",
+    "documents": [
+      {
+        "name": "Title Deed/Pre Title Deed/Lease Deed/Oqood/Initial Contract of Sale",
+        "status": "pending",
+        "url": "https://those-produce.biz"
+      },
+      {
+        "name": "NOC from Developer and final as built drawings If extended/improved",
+        "status": "pending",
+        "url": "https://jaunty-disconnection.biz/"
+      },
+      {
+        "name": "Owners NOC if he is not client (for corporate and individual instructions)",
+        "status": "received",
+        "url": "https://guilty-jellyfish.net/"
+      },
+      {
+        "name": "Completion Status Certificate from Engineering Co, if under construction",
+        "status": "verified",
+        "url": "https://self-assured-privilege.info"
+      },
+      {
+        "name": "Floor Plans",
+        "status": "pending",
+        "url": "https://unlawful-cinder.name"
+      },
+      {
+        "name": "MOU of Sale",
+        "status": "pending",
+        "url": "https://serene-strategy.com/"
+      },
+      {
+        "name": "SPA of Purchased Property",
+        "status": "received",
+        "url": "https://advanced-reward.info/"
+      },
+      {
+        "name": "Costs/Invoices Sheet of the Upgrades if any",
+        "status": "verified",
+        "url": "https://both-glider.biz"
+      },
+      {
+        "name": "Upgrade Development Consultancy Contract",
+        "status": "verified",
+        "url": "https://numb-scratch.com/"
+      },
+      {
+        "name": "Upgrade Development Contracting Contract",
+        "status": "received",
+        "url": "https://limited-pantyhose.net"
+      }
+    ],
+    "stages": {
+      "evaluationDocumentPending": true,
+      "evaluationComplete": true,
+      "_3dRequestsent": false,
+      "_3dDone": false,
+      "technicalReportRequestsent": false,
+      "technicalReportDone": false,
+      "trusteeContacted": true,
+      "assetTransferred": false
+    },
+    "currentStage": "technicalReportDone"
+  },
+  {
+    "userId": "686e5ca84da41d4a866def5d",
+    "assetReferenceNumber": "675b8bcf-a8ef-4b97-8a54-f10f2f4636dc",
+    "customerName": "Edwin Hauck",
+    "assetType": "Apartment",
+    "assetDescription": "Cicuta decor victus at defluo delicate aut.",
+    "customerReferenceNumber": "d9aes2wt",
+    "documents": [
+      {
+        "name": "Title Deed/Pre Title Deed/Lease Deed/Oqood/Initial Contract of Sale",
+        "status": "pending",
+        "url": "https://granular-midwife.info/"
+      },
+      {
+        "name": "NOC from Developer and final as built drawings If extended/improved",
+        "status": "verified",
+        "url": "https://rotten-sonata.name/"
+      },
+      {
+        "name": "Owners NOC if he is not client (for corporate and individual instructions)",
+        "status": "received",
+        "url": "https://remorseful-mom.com/"
+      },
+      {
+        "name": "Completion Status Certificate from Engineering Co, if under construction",
+        "status": "verified",
+        "url": "https://deafening-casket.net/"
+      },
+      {
+        "name": "Floor Plans",
+        "status": "verified",
+        "url": "https://dismal-lady.name/"
+      },
+      {
+        "name": "MOU of Sale",
+        "status": "verified",
+        "url": "https://bossy-shadowbox.com/"
+      },
+      {
+        "name": "SPA of Purchased Property",
+        "status": "pending",
+        "url": "https://burdensome-phrase.info"
+      },
+      {
+        "name": "Costs/Invoices Sheet of the Upgrades if any",
+        "status": "pending",
+        "url": "https://fearless-populist.org/"
+      },
+      {
+        "name": "Upgrade Development Consultancy Contract",
+        "status": "received",
+        "url": "https://mammoth-bourgeoisie.name"
+      },
+      {
+        "name": "Upgrade Development Contracting Contract",
+        "status": "received",
+        "url": "https://difficult-farm.biz"
+      }
+    ],
+    "stages": {
+      "evaluationDocumentPending": true,
+      "evaluationComplete": false,
+      "_3dRequestsent": true,
+      "_3dDone": false,
+      "technicalReportRequestsent": true,
+      "technicalReportDone": false,
+      "trusteeContacted": true,
+      "assetTransferred": false
+    },
+    "currentStage": "evaluationComplete"
+  },
+  {
+    "userId": "686e5ca84da41d4a866def5e",
+    "assetReferenceNumber": "14c7236a-8aa7-4860-b6d2-aeb4099cb57a",
+    "customerName": "Gwendolyn Orn",
+    "assetType": "Apartment",
+    "assetDescription": "Templum aqua corona uberrime tredecim aduro torrens celo quis triumphus.",
+    "customerReferenceNumber": "z11wCqDh",
+    "documents": [
+      {
+        "name": "Title Deed/Pre Title Deed/Lease Deed/Oqood/Initial Contract of Sale",
+        "status": "verified",
+        "url": "https://enchanted-promise.biz/"
+      },
+      {
+        "name": "NOC from Developer and final as built drawings If extended/improved",
+        "status": "pending",
+        "url": "https://accurate-pigsty.net"
+      },
+      {
+        "name": "Owners NOC if he is not client (for corporate and individual instructions)",
+        "status": "pending",
+        "url": "https://putrid-manner.org/"
+      },
+      {
+        "name": "Completion Status Certificate from Engineering Co, if under construction",
+        "status": "received",
+        "url": "https://productive-coordination.name/"
+      },
+      {
+        "name": "Floor Plans",
+        "status": "received",
+        "url": "https://majestic-bran.net/"
+      },
+      {
+        "name": "MOU of Sale",
+        "status": "pending",
+        "url": "https://beneficial-sticker.biz/"
+      },
+      {
+        "name": "SPA of Purchased Property",
+        "status": "pending",
+        "url": "https://frilly-airman.net"
+      },
+      {
+        "name": "Costs/Invoices Sheet of the Upgrades if any",
+        "status": "received",
+        "url": "https://old-knight.biz"
+      },
+      {
+        "name": "Upgrade Development Consultancy Contract",
+        "status": "received",
+        "url": "https://shrill-interviewer.info/"
+      },
+      {
+        "name": "Upgrade Development Contracting Contract",
+        "status": "verified",
+        "url": "https://left-meal.org/"
+      }
+    ],
+    "stages": {
+      "evaluationDocumentPending": false,
+      "evaluationComplete": true,
+      "_3dRequestsent": true,
+      "_3dDone": false,
+      "technicalReportRequestsent": true,
+      "technicalReportDone": true,
+      "trusteeContacted": false,
+      "assetTransferred": false
+    },
+    "currentStage": "technicalReportDone"
+  }
+]

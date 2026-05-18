@@ -1,0 +1,898 @@
+import User from '../models/assetHolderModel.js'
+import asyncHandler from 'express-async-handler'
+import Property from '../models/propertyModel.js'
+import slugify from 'slugify'
+import processQuery from '../utils/priceRange.js'
+import Request3D from '../models/request3DModel.js'
+import Report from '../models/reportModel.js'
+import mongoose from 'mongoose'
+import upload from '../middlewares/Multer.js'
+import express from 'express'
+import { fileURLToPath } from 'url'
+import { dirname } from 'path'
+import path from 'path'
+import { verifyToken } from '../middlewares/JwtAuth.js'
+import UserModel from '../models/userModel.js'
+import { AssetsListingsPricing } from '../utils/AssetsListingsPricing.js'
+import { createNotification } from './notifications.controller.js'
+import { AddPaymentJob } from '../utils/jobs/index.js'
+import UserPaymentDetails from '../models/UserPaymentDetails.js'
+import { PUBLIC_PROPERTY_FIELDS } from '../constants/publicFields.js'
+import { attachDocumentSignedUrls } from '../helper/attachDocumentSignedUrls.js'
+import { stripNullPremiumRefs } from '../utils/listingPremiumSync.js'
+import {
+  refreshListingMediaSignedUrls,
+  refreshListingsMediaSignedUrls,
+} from '../helper/refreshAssetSignedUrls.js'
+import {
+  sanitizeListingMediaResponse,
+  sanitizeListingsMediaResponse,
+} from '../helper/sanitizeListingResponse.js'
+
+const app = express()
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = dirname(__filename)
+
+app.use(express.static(path.join(__dirname, 'public')))
+const filterPublicFields = (doc, allowedFields) => {
+  const result = {}
+  allowedFields.forEach((key) => {
+    if (doc[key] !== undefined) result[key] = doc[key]
+  })
+  return result
+}
+
+// create product
+const createProduct = asyncHandler(async (req, res) => {
+  const session = await mongoose.startSession()
+  session.startTransaction()
+  const user = req.user
+
+  try {
+    // Create the new Property
+    if (req.body.title) {
+      req.body.slug = slugify(req.body.title)
+    }
+    if (!req.body.price) {
+      return res.status(400).json({ message: 'Price of an asset is required.' })
+    }
+    req.body.listing = AssetsListingsPricing({
+      type: 'property',
+      listing: req.body.listing || 'Public',
+      price: req.body.price,
+    })
+
+    const createPdt = await Property.create([req.body], { session })
+
+    // add evaluation payment message queue
+    try {
+      const PaymentDetails = await UserPaymentDetails.create({
+        userId: user?._id,
+        userUUID: user?.uuid,
+        assetId: createPdt?.[0]?._id,
+        assetTitle: createPdt?.[0]?.title,
+        assetType: 'property',
+        customerId: req?.body?.customerId,
+        paymentMethod: req?.body?.paymentMethod,
+      })
+      await AddPaymentJob({
+        jobId: PaymentDetails?._id,
+        assetId: createPdt?.[0]?.uuid,
+        assetType: 'property',
+        PaymentDetailsId: PaymentDetails?.uuid,
+        userId: createPdt?.[0]?.userId,
+      })
+    } catch (error) {
+      console.log(`Error adding job to queue: ${error.message}`)
+    }
+
+    // Find the latest pending 3D Request
+    const pendingRequest = await Request3D.findOneAndUpdate(
+      { status: 'pending' },
+      {
+        productId: createPdt[0]._id,
+        productUUID: createPdt[0].uuid,
+        productTitle: createPdt[0].title,
+        assetType: createPdt[0].assetType,
+        status: 'successful',
+      },
+      { new: true, sort: { createdAt: -1 }, session },
+    )
+    const pendingReport = await Report.findOneAndUpdate(
+      { status: 'pending' },
+      {
+        productId: createPdt[0]._id,
+        productUUID: createPdt[0].uuid,
+        productTitle: createPdt[0].title,
+        assetType: createPdt[0].assetType,
+        status: 'successful',
+      },
+      { new: true, sort: { createdAt: -1 }, session },
+    )
+
+    if (pendingRequest || pendingReport) {
+      await session.commitTransaction()
+      session.endSession()
+      res.json({
+        property: createPdt[0],
+        updatedRequest: pendingRequest || 'No pending request found',
+        updatedReport: pendingReport || 'No pending report found',
+      })
+      //  res.json({ property: createPdt[0], updatedRequest: pendingRequest });
+    } else {
+      await session.commitTransaction()
+      res.json({
+        property: createPdt[0],
+        message:
+          'Property created successfully, but no pending 3D request or report was found to update.',
+      })
+    }
+
+    try {
+      const NotificationData = {
+        userId: user._id,
+        userUUID: user.uuid,
+        UserRole: 'Evaluator',
+        title: 'Evaluation',
+        message: `New property (${createPdt[0]?.title}) added for evaluation.`,
+        RelateRoute: `evaluation`,
+        RelatedId: createPdt[0]._id,
+      }
+
+      await createNotification({ data: NotificationData })
+    } catch (error) {
+      console.log({ error: error?.message })
+    }
+    return
+  } catch (err) {
+    await session.abortTransaction()
+    session.endSession()
+    res.status(500).json({
+      message: 'Error creating property or updating request pt update report',
+      error: err.message,
+    })
+  }
+})
+
+const getSingleProperty = asyncHandler(async (req, res) => {
+  const { id } = req.params
+
+  if (!id) {
+    return res.status(400).json({ message: 'Invalid property ID' })
+  }
+
+  const { sanitizeUUID } = await import('../utils/nosqlSanitizer.js')
+  const sanitizedId = sanitizeUUID(id)
+  if (!sanitizedId) {
+    return res.status(400).json({
+      success: false,
+      message: 'Invalid UUID format',
+    })
+  }
+
+  try {
+    const property = await Property.findOne({
+      uuid: sanitizedId,
+      isDeleted: false,
+    })
+      .populate('pictures')
+      .populate('video')
+      .populate('uploadDocument')
+      .populate('thumbnailImg')
+      .populate('video3DWalkthrough')
+      .populate('transactionDepositDocument')
+      .populate('transactionId')
+      .populate('dealhunterId')
+      .populate('userId')
+      .populate({
+        path: 'technicalReport',
+        populate: { path: 'reportFile' },
+      })
+      .populate('evaluationCertificate')
+      .lean()
+
+    if (!property) {
+      return res.status(404).json({ message: 'Property not found' })
+    }
+
+    await refreshListingMediaSignedUrls(property)
+
+    const isPrivilegedUser =
+      req.user &&
+      ['AssetHolder', 'Admin', 'Evaluator', 'Sub-Evaluator'].includes(
+        req.user.role,
+      )
+
+    if (!isPrivilegedUser) {
+      const publicFields = PUBLIC_PROPERTY_FIELDS.trim().split(/\s+/)
+      const publicProperty = filterPublicFields(property, publicFields)
+      sanitizeListingMediaResponse(publicProperty)
+      return res.json(publicProperty)
+    }
+
+    // Privileged users see evaluation certificate / technical report / invoice
+    // etc. — attach fresh `signedUrl` so the frontend can render the docs
+    // without the URL having expired since they were stored.
+    await attachDocumentSignedUrls(property)
+
+    // Strip server-internal S3 metadata (s3Bucket / s3Key / etc.) before
+    // responding. The signed URL is everything the client needs.
+    sanitizeListingMediaResponse(property)
+
+    res.json(property)
+  } catch (err) {
+    console.error('Error fetching property:', err.message)
+    res.status(500).json({ message: 'Server error' })
+  }
+})
+
+// get all product
+const getAllProduct = asyncHandler(async (req, res) => {
+  try {
+    const isAuthenticated = !!req.user
+    const user = req.user
+
+    // ------------------ BASE FILTER ------------------
+    const parseData = {
+      isDeleted: false,
+      listing: /Public/i, // 🔐 default: PUBLIC ONLY
+    }
+
+    // ------------------ SEARCH & FILTERS (SAFE) ------------------
+    if (req.query.title) {
+      const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      parseData.title = { $regex: escapeRegex(req.query.title), $options: 'i' }
+    }
+
+    if (req.query.minPrice || req.query.maxPrice) {
+      parseData.price = {}
+      if (req.query.minPrice) parseData.price.$gte = +req.query.minPrice
+      if (req.query.maxPrice) parseData.price.$lte = +req.query.maxPrice
+    }
+
+    // ------------------ AUTHENTICATED LOGIC ------------------
+    if (isAuthenticated) {
+      const isSubEvaluator = ['Sub-Evaluator', 'SubEvaluator'].includes(
+        user.role,
+      )
+
+      if (isSubEvaluator) {
+        parseData.$and = [
+          ...(parseData.$and || []),
+          {
+            $or: [{ evaluator: user._id }, { evaluatorUUID: user.uuid }],
+          },
+        ]
+        delete parseData.listing
+      }
+
+      const roleNorm = String(user.role || '')
+        .trim()
+        .toLowerCase()
+        .replace(/[\s_-]/g, '')
+      const isElevatedModerator =
+        ['Admin', 'Evaluator'].includes(user.role) ||
+        roleNorm === 'superadmin'
+
+      // Evaluator / Admin / Super Admin: moderation (all listing visibilities)
+      if (!isSubEvaluator && isElevatedModerator) {
+        delete parseData.listing
+      }
+
+      // DealHunter logic
+      if (
+        !isSubEvaluator &&
+        user.role === 'DealHunter' &&
+        user.financialInfo?.status === 'Approved'
+      ) {
+        parseData.$or = [
+          { listing: /Public/i },
+          {
+            listing: /Private/i,
+            price: { $lte: Number(user.financialInfo.fundsVerification) },
+          },
+        ]
+        delete parseData.listing
+      }
+
+      // AssetHolder dashboard
+      if (
+        !isSubEvaluator &&
+        user.role?.toLowerCase() === 'assetholder' &&
+        req.query.dashboard === 'true'
+      ) {
+        parseData.userUUID = user.uuid
+        delete parseData.listing
+      }
+    }
+
+    // ------------------ QUERY BUILD ------------------
+    let query = Property.find(parseData)
+
+    // 🔐 PUBLIC VS AUTH FIELD SELECTION
+    if (!isAuthenticated) {
+      query = query.select(PUBLIC_PROPERTY_FIELDS)
+    } else {
+      query = query.select('-__v')
+    }
+
+    query = query
+      .populate({ path: 'pictures', select: '-_id' })
+      .populate({ path: 'video', select: '-_id' })
+      .populate({ path: 'thumbnailImg', select: '-_id' })
+
+    if (isAuthenticated) {
+      query = query
+        .populate({ path: 'evaluationCertificate', select: '-_id' })
+        .populate({ path: 'video3DWalkthrough', select: '-_id' })
+        .populate({
+          path: 'technicalReport',
+          select: '-_id',
+          populate: { path: 'reportFile', select: '-_id' },
+        })
+    }
+
+    query = query.populate({
+      path: 'reviews',
+      select: isAuthenticated
+        ? 'ratingNumber review -_id'
+        : 'ratingNumber -_id',
+    })
+
+    // ------------------ PAGINATION ------------------
+    const page = +req.query.page || 1
+    const limit = +req.query.limit || 10
+    const skip = (page - 1) * limit
+
+    const total = await Property.countDocuments(parseData)
+    const products = await query.skip(skip).limit(limit)
+
+    // Post-find hook on Property model already refreshed signed URLs on
+    // populated media; re-run as a safety net for non-hooked paths.
+    await refreshListingsMediaSignedUrls(products)
+
+    // ------------------ RESPONSE SANITIZATION ------------------
+    // Doc-signing is async (it may hit S3 presign for non-image buckets), so
+    // map → async → Promise.all here. Public callers skip signing on this path
+    // (see `getAllProductByFilter` for public card PDF URLs).
+    const finalProducts = await Promise.all(
+      products.map(async (product) => {
+        const obj = product.toObject()
+
+        const reviewCount = obj.reviews?.length || 0
+        const averageRating =
+          reviewCount > 0
+            ? obj.reviews.reduce((a, c) => a + c.ratingNumber, 0) / reviewCount
+            : 0
+
+        // 🔥 REMOVE SENSITIVE FIELDS FOR PUBLIC
+        if (!isAuthenticated) {
+          delete obj.evaluationCertificate
+          delete obj.uploadDocument
+          delete obj.invoice
+          delete obj.technicalReport
+          delete obj.userUUID
+
+          // ratings → stars only
+          if (Array.isArray(obj.ratings)) {
+            obj.ratings = obj.ratings.map((r) => ({ star: r.star }))
+          }
+        }
+
+        // 🔐 SIGNED URLS ONLY FOR AUTH USERS (S3/CloudFront; legacy docs use stored url)
+        if (isAuthenticated) {
+          await attachDocumentSignedUrls(obj)
+        }
+
+        // Drop internal S3 fields before serializing (signedUrl is enough).
+        sanitizeListingMediaResponse(obj)
+
+        return {
+          ...obj,
+          reviewCount,
+          averageRating,
+        }
+      }),
+    )
+
+    return res.json({
+      products: finalProducts,
+      currentPage: page,
+      totalPages: Math.ceil(total / limit),
+      limit,
+      totalProducts: total,
+    })
+  } catch (err) {
+    return res.status(500).json({
+      message: err?.message || 'Something went wrong!',
+    })
+  }
+})
+
+// get all product
+const getAllProductByFilter = asyncHandler(async (req, res) => {
+  const header = req.headers['authorization']
+  const token = header && header.split(' ')[1]
+  let userId = null
+  // Find price by minPrice and maxPrice
+  const modifiedQuery = processQuery(req.query)
+
+  if (token) {
+    userId = verifyToken(token)
+    if (userId) {
+      const GetUser = await UserModel.findById(userId, {
+        isDeleted: false,
+      }).select('_id financialInfo')
+      if (
+        GetUser?.financialInfo &&
+        GetUser?.financialInfo?.status === 'Approved'
+      ) {
+        modifiedQuery.$or = [
+          { listing: 'Public' },
+          {
+            listing: 'Private',
+            price: { $lte: Number(GetUser.financialInfo.fundsVerification) },
+          },
+        ]
+      } else {
+        modifiedQuery.$or = [{ listing: 'Public' }]
+      }
+    }
+  }
+
+  // Facility filtering (assuming "facilities" is a field in the Property model)
+  if (req.query.facilities) {
+    const desiredFacilities = req.query.facilities.split(',')
+
+    // Choose filtering approach based on requirement:
+    if (req.query.allFacilities) {
+      // Find properties with ALL specified facilities
+      modifiedQuery.facilities = { $all: desiredFacilities }
+    } else {
+      // Find properties with AT LEAST ONE specified facility (default)
+      modifiedQuery.facilities = { $in: desiredFacilities }
+    }
+  }
+  modifiedQuery.isDeleted = false
+  modifiedQuery.status = 1
+  let query = Property.find(modifiedQuery)
+    .populate('pictures')
+    .populate('video')
+    .populate('thumbnailImg')
+    .populate('evaluationCertificate')
+    .populate('video3DWalkthrough')
+    .populate({
+      path: 'technicalReport',
+      populate: { path: 'reportFile' },
+    })
+    .select('-_id')
+  // sorting
+  if (req.query.sort) {
+    const sortBy = req.query.sort.split(',').join(' ')
+    query = query.sort(sortBy)
+  } else {
+    query = query.sort('-createdAt')
+  }
+
+  // limiting the fields
+  if (req.query.fields) {
+    const fields = req.query.fields.split(',').join(' ')
+    query = query.select(fields)
+  } else {
+    query = query.select('')
+  }
+
+  // pagination
+  const page = parseInt(req.query.page) || 1
+  const limit = parseInt(req.query.limit) || 10
+  const skip = (page - 1) * limit
+  query = query.skip(skip).limit(limit)
+
+  const productCount = await Property.countDocuments()
+
+  if (skip >= productCount) {
+    return res
+      .status(400)
+      .json({ message: 'Assets on this page does not exist' })
+  }
+
+  try {
+    const allProductRaw = await query
+    const allProduct = allProductRaw.map((p) =>
+      typeof p.toObject === 'function' ? p.toObject() : p,
+    )
+    await refreshListingsMediaSignedUrls(allProduct)
+    // Listing cards need fresh `signedUrl` on evaluation certificate / technical
+    // report. Authenticated users also get uploadDocument + invoice when present.
+    await Promise.all(
+      allProduct.map((p) =>
+        userId
+          ? attachDocumentSignedUrls(p)
+          : attachDocumentSignedUrls(p, {
+            fields: ['evaluationCertificate', 'technicalReport'],
+          }),
+      ),
+    )
+    // Strip server-internal S3 metadata before responding.
+    sanitizeListingsMediaResponse(allProduct)
+    const totalFilteredProducts =
+      await Property.countDocuments(modifiedQuery).select('-_id')
+
+    return res.status(200).json({
+      products: allProduct,
+      currentPage: page,
+      totalPages: Math.ceil(totalFilteredProducts / limit),
+      limit: req?.query?.limit ? parseFloat(req?.query?.limit) : 10,
+      totalProducts: totalFilteredProducts,
+    })
+    // return res.status(200).json(allProduct);
+  } catch (err) {
+    return res.status(500).json({
+      error: err?.message,
+      message: err?.message || 'Something went wrong!',
+    })
+  }
+})
+
+const getRelatedProduct = asyncHandler(async (req, res) => {
+  const { assetType, country, city, propertyType, price, evaluationPrices } =
+    req.query
+
+  // Construct the query object based on provided properties
+  const queryObj = {}
+  if (assetType) queryObj.assetType = assetType
+  if (country) queryObj.country = country
+  if (city) queryObj.city = city
+  if (propertyType) queryObj.propertyType = propertyType
+  if (price) queryObj.price = price
+  queryObj.isDeleted = false
+  try {
+    const allProductRaw = await Property.find(queryObj)
+      .select('-_id')
+      .populate({ path: 'pictures', select: '-_id' })
+      .populate({ path: 'thumbnailImg', select: '-_id' })
+      .populate({ path: 'video', select: '-_id' })
+
+    const allProduct = allProductRaw.map((p) =>
+      typeof p.toObject === 'function' ? p.toObject() : p,
+    )
+    await refreshListingsMediaSignedUrls(allProduct)
+    sanitizeListingsMediaResponse(allProduct)
+    return res.status(200).json(allProduct)
+  } catch (err) {
+    return res.status(200).json({ message: err?.message })
+  }
+})
+
+// get update product
+const updateProduct = asyncHandler(async (req, res) => {
+  const { moduleId } = req.params
+
+  upload.fields([
+    { name: 'technicalReport', maxCount: 1 },
+    { name: 'evaluationCertificate', maxCount: 1 },
+    { name: 'uploadDocument', maxCount: 100 },
+  ])(req, res, async (err) => {
+    if (err) {
+      return res.status(400).json({ message: err.message })
+    }
+    try {
+      // validateMongoId(id)
+      // Find the existing product
+      const product = await Property.findOne({
+        uuid: moduleId,
+        isDeleted: false,
+      }).populate('uploadDocument')
+      // Populate existing documents
+      if (!product) {
+        return res.status(404).json({ message: 'Property not found' })
+      }
+
+      // Update slug if title is provided
+      if (req.body.title) {
+        req.body.slug = slugify(req.body.title)
+      }
+
+      // Handle uploadDocument IDs (from frontend)
+      if (req.body.uploadDocument) {
+        const newDocumentIds = Array.isArray(req.body.uploadDocument)
+          ? req.body.uploadDocument // If multiple IDs are passed as an array
+          : [req.body.uploadDocument] // If only a single ID is passed as a string
+
+        // Append to existing uploadDocument array
+        req.body.uploadDocument = [
+          ...(product.uploadDocument || []).map((doc) => doc._id), // Keep existing document IDs
+          ...newDocumentIds, // Add new IDs from the request body
+        ]
+      }
+      let updatedProduct
+      // if (product?.evaluationCertificate) {
+      //   console.log('asdfghujiosdfghjk')
+
+      //   updatedProduct = await Property.findByIdAndUpdate(
+      //     id,
+      //     { price: req.body.price || product?.price },
+      //     { new: true }
+      //   )
+      // } else {
+      stripNullPremiumRefs(req.body)
+      updatedProduct = await Property.findByIdAndUpdate(
+        product._id,
+        { $set: req.body },
+        { new: true },
+      ).select('-_id')
+
+      // }
+
+      try {
+        const NotificationData = {
+          UserRole: 'AssetHolder',
+          userUUID: updatedProduct?.userUUID,
+          title: 'Assets Property',
+          message: `Property (${updatedProduct?.title}) has been updated.`,
+          RelateRoute: `property`,
+          RelatedId: updatedProduct?._id,
+        }
+        await createNotification({ data: NotificationData })
+      } catch (error) {
+        console.log({ error: error?.message })
+      }
+
+      return res.status(200).json(updatedProduct)
+    } catch (err) {
+      res.status(500).json({
+        message: 'An error occurred while updating the property',
+        error: err.message,
+      })
+    }
+  })
+})
+
+const deleteProduct = asyncHandler(async (req, res) => {
+  const { deleteId } = req.params
+
+  try {
+    // validateMongoId(id)
+    console.log(deleteId)
+
+    const property = await Property.findOne({
+      uuid: deleteId,
+      isDeleted: false,
+    })
+    console.log(property)
+
+    if (!property || property.isDeleted) {
+      return res
+        .status(404)
+        .json({ message: 'Property not found or already deleted' })
+    }
+
+    const requester = req.user
+    if (requester?.role !== 'Admin') {
+      if (
+        !requester?.uuid ||
+        String(property.userUUID) !== String(requester.uuid)
+      ) {
+        return res.status(403).json({
+          message: 'You are not allowed to delete this property',
+        })
+      }
+    }
+
+    // Soft delete
+    property.isDeleted = true
+    property.deletedAt = new Date()
+    await property.save()
+
+    // Send notification
+    try {
+      const NotificationData = {
+        userId: property.userId,
+        userUUID: property.userUUID,
+        UserRole: 'AssetHolder',
+        title: 'Assets Property',
+        message: `Property (${property.title}) has been deleted.`,
+      }
+      await createNotification({ data: NotificationData })
+    } catch (error) {
+      console.log({ error: error?.message })
+    }
+
+    res.json({ message: 'Property soft-deleted successfully', property })
+  } catch (err) {
+    res.status(500).json({ message: err.message })
+  }
+})
+
+const addToWishList = asyncHandler(async (req, res) => {
+  const { id } = req.user
+  const { prodId } = req.body
+  try {
+    const user = await User.findById({ uuid: id, isDeleted: false })
+    const allreadyAdd = user.wishlist.find((id) => id.toString() === prodId)
+    if (allreadyAdd) {
+      const user = await User.findByIdAndUpdate(
+        id,
+        { $pull: { wishlist: prodId } },
+        { new: true },
+      )
+      res.json(user)
+    } else {
+      const user = await User.findByIdAndUpdate(
+        id,
+        { $push: { wishlist: prodId } },
+        { new: true },
+      ).select('-_id')
+      res.json(user)
+    }
+  } catch (err) {
+    throw new Error(err)
+  }
+})
+
+const addRating = asyncHandler(async (req, res, next) => {
+  // const { id } = req.user;
+  const { star, prodId, comment, id } = req.body
+  try {
+    const product = await Property.findById({ uuid: prodId, isDeleted: false })
+    let allreadyRated = product.ratings.find(
+      (rating) => rating.postedBy.toString() === id.toString(),
+    )
+    if (allreadyRated) {
+      const updateRating = await Property.updateOne(
+        {
+          ratings: { $elemMatch: allreadyRated },
+        },
+        {
+          $set: { 'ratings.$.star': star, 'ratings.$.comment': comment },
+        },
+        {
+          new: true,
+        },
+      ).select('-_id')
+    } else {
+      const rateProduct = await Property.findByIdAndUpdate(
+        product._id,
+        {
+          $push: {
+            ratings: {
+              star: star,
+              comment: comment,
+              postedBy: id,
+            },
+          },
+        },
+        {
+          new: true,
+        },
+      ).select('-_id')
+    }
+    const getallrating = await Property.findById(product._id, {
+      isDeleted: false,
+    }).select('-_id')
+    let totalRating = getallrating.ratings.length
+    let ratingSum = getallrating.ratings
+      .map((item) => item.star)
+      .reduce((prev, current) => prev + current, 0)
+    let actualRating = Math.round(ratingSum / totalRating)
+    const finalProduct = await Property.findByIdAndUpdate(
+      product._id,
+      {
+        totalrating: actualRating,
+      },
+      {
+        new: true,
+      },
+    ).select('-_id')
+    res.json(finalProduct)
+  } catch (err) {
+    throw new Error(err)
+  }
+})
+
+const getPrice = async (req, res) => {
+  try {
+    const priceAggregation = await Property.aggregate([
+      {
+        $group: {
+          _id: null,
+          maxPrice: { $max: '$price' },
+          minPrice: { $min: '$price' },
+        },
+      },
+    ])
+
+    if (!priceAggregation.length) {
+      return res.status(404).json({ message: 'No products found' })
+    }
+
+    const { maxPrice, minPrice } = priceAggregation[0]
+    return res.json({ highestPrice: maxPrice, lowestPrice: minPrice })
+  } catch (err) {
+    console.log(err)
+
+    return res.status(500).json({ message: 'Internal server error' })
+  }
+}
+
+const getApprovedListingsMetrics = async (req, res) => {
+  try {
+    const currentMonth = new Date().getMonth() + 1
+    const lastMonth = currentMonth === 1 ? 12 : currentMonth - 1
+    const currentYear = new Date().getFullYear()
+    const lastMonthYear = currentMonth === 1 ? currentYear - 1 : currentYear
+
+    const metrics = await Property.aggregate([
+      {
+        $match: { status: 1 }, // Only approved listings
+      },
+      {
+        $group: {
+          _id: {
+            year: { $year: '$createdAt' },
+            month: { $month: '$createdAt' },
+          },
+          count: { $sum: 1 },
+        },
+      },
+      {
+        $sort: { '_id.year': 1, '_id.month': 1 },
+      },
+      {
+        $project: {
+          year: '$_id.year',
+          month: '$_id.month',
+          count: 1,
+          isCurrentMonth: {
+            $eq: ['$_id.month', currentMonth],
+          },
+          isLastMonth: {
+            $eq: ['$_id.month', lastMonth],
+          },
+        },
+      },
+    ])
+
+    const currentMonthData = metrics.find(
+      (m) => m.isCurrentMonth && m.year === currentYear,
+    )
+    const lastMonthData = metrics.find(
+      (m) => m.isLastMonth && m.year === lastMonthYear,
+    )
+
+    const currentMonthCount = currentMonthData?.count || 0
+    const lastMonthCount = lastMonthData?.count || 0
+
+    const percentageChange =
+      lastMonthCount === 0
+        ? 0
+        : ((currentMonthCount - lastMonthCount) / lastMonthCount) * 100
+
+    res.json({
+      totalApprovedListings: currentMonthCount,
+      monthlyTrend: {
+        currentMonth: currentMonthCount,
+        lastMonth: lastMonthCount,
+        percentageChange: percentageChange.toFixed(2),
+      },
+    })
+  } catch (error) {
+    console.log(error)
+  }
+}
+
+export {
+  createProduct,
+  //  getSingleProduct,
+  getSingleProperty,
+  getAllProduct,
+  updateProduct,
+  deleteProduct,
+  addToWishList,
+  addRating,
+  getRelatedProduct,
+  getPrice,
+  getAllProductByFilter,
+  getApprovedListingsMetrics,
+}

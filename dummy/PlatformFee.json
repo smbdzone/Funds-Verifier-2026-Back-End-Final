@@ -1,0 +1,82 @@
+[
+  {
+    "propertyFee": 78,
+    "carFee": 35,
+    "boatFee": 1,
+    "jewelryFee": 17,
+    "_id": "686d242948614894db904340",
+    "__v": 0
+  },
+  {
+    "propertyFee": 59,
+    "carFee": 85,
+    "boatFee": 17,
+    "jewelryFee": 50,
+    "_id": "686d242948614894db904341",
+    "__v": 0
+  },
+  {
+    "propertyFee": 77,
+    "carFee": 86,
+    "boatFee": 65,
+    "jewelryFee": 36,
+    "_id": "686d242948614894db904342",
+    "__v": 0
+  },
+  {
+    "propertyFee": 67,
+    "carFee": 37,
+    "boatFee": 69,
+    "jewelryFee": 91,
+    "_id": "686d242948614894db904343",
+    "__v": 0
+  },
+  {
+    "propertyFee": 37,
+    "carFee": 30,
+    "boatFee": 77,
+    "jewelryFee": 70,
+    "_id": "686d242948614894db904344",
+    "__v": 0
+  },
+  {
+    "propertyFee": 73,
+    "carFee": 16,
+    "boatFee": 74,
+    "jewelryFee": 46,
+    "_id": "686d242948614894db904345",
+    "__v": 0
+  },
+  {
+    "propertyFee": 85,
+    "carFee": 44,
+    "boatFee": 48,
+    "jewelryFee": 14,
+    "_id": "686d242948614894db904346",
+    "__v": 0
+  },
+  {
+    "propertyFee": 5,
+    "carFee": 13,
+    "boatFee": 50,
+    "jewelryFee": 91,
+    "_id": "686d242948614894db904347",
+    "__v": 0
+  },
+  {
+    "propertyFee": 75,
+    "carFee": 1,
+    "boatFee": 81,
+    "jewelryFee": 98,
+    "_id": "686d242948614894db904348",
+    "__v": 0
+  },
+  {
+    "propertyFee": 93,
+    "carFee": 80,
+    "boatFee": 70,
+    "jewelryFee": 51,
+    "_id": "686d242948614894db904349",
+    "__v": 0
+  }
+]

@@ -1,0 +1,1122 @@
+[
+  {
+    "assetType": "Car",
+    "country": "Pitcairn Islands",
+    "city": "Domenicotown",
+    "neighbourhood": "Julian Knoll",
+    "make": "Skoda",
+    "category": "Wagon",
+    "model": "V90",
+    "title": "Nissan Taurus",
+    "slug": "Suzuki-Sentra",
+    "price": 91134,
+    "status": 1,
+    "roi": 3.2548454088913665,
+    "fuelType": "Hybrid",
+    "priceRange": "$21526",
+    "size": "Small",
+    "description": "Vestrum comburo arbitro decretum animi coniecto. Vomica iusto tenetur at vulnus ab alienus anser corporis carbo. Coerceo assumenda urbs communis spes aequus delibero.",
+    "kilometers": 177524,
+    "year": 1995,
+    "warranty": "Yes",
+    "carType": "Hatchback",
+    "sellerType": "Dealer",
+    "bodyCondition": "Excellent",
+    "noofCylinders": "9",
+    "mechanicalCondition": "Needs Repair",
+    "seats": "2",
+    "doors": "2",
+    "evaluationDateTime": "2025-07-09T03:52:58.315Z",
+    "requestDocument": [
+      "weakly.opus",
+      "daily.xht"
+    ],
+    "trusteeNote": "Aeger vulgo autem bellicus vetus uredo bestia voluptatum similique.",
+    "horsepower": "341",
+    "steeringSide": "Left",
+    "transmissionType": "Manual",
+    "engineCapacity": "3395",
+    "VIN": "7NSNXZ2MD0K812165",
+    "evaluationCompanies": "Veum - Bogisich",
+    "exteriorColor": [
+      "mint green"
+    ],
+    "interiorColor": [
+      "plum"
+    ],
+    "technicalFeatures": [
+      "Sleek",
+      "Fresh"
+    ],
+    "evaluationPrices": 1752,
+    "extras": [
+      "Sausages"
+    ],
+    "totalrating": "1",
+    "listing": "Public"
+  },
+  {
+    "assetType": "Car",
+    "country": "Ireland",
+    "city": "New Rashadberg",
+    "neighbourhood": "Mayra Cliffs",
+    "make": "Honda",
+    "category": "Minivan",
+    "model": "Fiesta",
+    "title": "Hyundai Accord",
+    "slug": "Mercedes-Benz-2",
+    "price": 126118,
+    "status": 0,
+    "roi": 17.077391066995837,
+    "fuelType": "Diesel",
+    "priceRange": "$29687",
+    "size": "Medium",
+    "description": "Aliquid sunt tertius nostrum usitas celebrer tollo combibo amicitia. Defero contego tremo velit curso calco eveniet desparatus. Abstergo vindico pauci.",
+    "kilometers": 24320,
+    "year": 2015,
+    "warranty": "Yes",
+    "carType": "Hatchback",
+    "sellerType": "Individual",
+    "bodyCondition": "Fair",
+    "noofCylinders": "3",
+    "mechanicalCondition": "Excellent",
+    "seats": "8",
+    "doors": "3",
+    "evaluationDateTime": "2025-07-08T20:22:16.978Z",
+    "requestDocument": [
+      "whenever_oof_frizz.js",
+      "character.arc"
+    ],
+    "trusteeNote": "Sperno triduana titulus thorax textilis.",
+    "horsepower": "601",
+    "steeringSide": "Left",
+    "transmissionType": "Manual",
+    "engineCapacity": "5777",
+    "VIN": "5U43CML3J8SC52736",
+    "evaluationCompanies": "Gutmann, Hayes and Macejkovic",
+    "exteriorColor": [
+      "lime"
+    ],
+    "interiorColor": [
+      "red"
+    ],
+    "technicalFeatures": [
+      "Electronic",
+      "Oriental"
+    ],
+    "evaluationPrices": 3322,
+    "extras": [
+      "Bacon"
+    ],
+    "totalrating": "4",
+    "listing": "Public"
+  },
+  {
+    "assetType": "Car",
+    "country": "Democratic People's Republic of Korea",
+    "city": "North Leonel",
+    "neighbourhood": "The Ridgeway",
+    "make": "Vauxhall",
+    "category": "Crew Cab Pickup",
+    "model": "Explorer",
+    "title": "Honda Prius",
+    "slug": "Mini-Silverado",
+    "price": 8451,
+    "status": 0,
+    "roi": 4.516890272551966,
+    "fuelType": "Petrol",
+    "priceRange": "$11415",
+    "size": "Large",
+    "description": "Tego avarus patria vindico advenio tres benigne damno. Statua triumphus sed ver. Spoliatio auxilium bos deporto subvenio debeo blanditiis timor iusto.",
+    "kilometers": 166565,
+    "year": 2006,
+    "warranty": "Yes",
+    "carType": "Truck",
+    "sellerType": "Individual",
+    "bodyCondition": "Excellent",
+    "noofCylinders": "10",
+    "mechanicalCondition": "Needs Repair",
+    "seats": "2",
+    "doors": "3",
+    "evaluationDateTime": "2025-07-08T14:36:10.925Z",
+    "requestDocument": [
+      "forceful.xml",
+      "unless_wiggly.xls"
+    ],
+    "trusteeNote": "Cohors calco aeternus demum vehemens coniecto barba.",
+    "horsepower": "750",
+    "steeringSide": "Left",
+    "transmissionType": "Automatic",
+    "engineCapacity": "1420",
+    "VIN": "XPUWGMWV26YG18726",
+    "evaluationCompanies": "Kihn and Sons",
+    "exteriorColor": [
+      "sky blue"
+    ],
+    "interiorColor": [
+      "teal"
+    ],
+    "technicalFeatures": [
+      "Soft",
+      "Frozen"
+    ],
+    "evaluationPrices": 1222,
+    "extras": [
+      "Fish"
+    ],
+    "totalrating": "2",
+    "listing": "Private"
+  },
+  {
+    "assetType": "Car",
+    "country": "Israel",
+    "city": "Fort Lauderdale",
+    "neighbourhood": "N Central Avenue",
+    "make": "Mercedes Benz",
+    "category": "Passenger Van",
+    "model": "Model 3",
+    "title": "Bentley Golf",
+    "slug": "Volvo-Camaro",
+    "price": 146158,
+    "status": 1,
+    "roi": 6.7528621035172325,
+    "fuelType": "Hybrid",
+    "priceRange": "$39504",
+    "size": "Medium",
+    "description": "Utroque temptatio vivo barba creber conitor rerum earum ceno. Fugiat absconditus aiunt coadunatio demum eligendi minima aliquam. Accusator adulescens acervus.",
+    "kilometers": 160533,
+    "year": 2008,
+    "warranty": "No",
+    "carType": "Sedan",
+    "sellerType": "Individual",
+    "bodyCondition": "Fair",
+    "noofCylinders": "9",
+    "mechanicalCondition": "Good",
+    "seats": "6",
+    "doors": "4",
+    "evaluationDateTime": "2025-07-09T08:53:01.458Z",
+    "requestDocument": [
+      "um_gee_likewise.buffer",
+      "repeatedly_illiterate.mpga"
+    ],
+    "trusteeNote": "Ab demergo crustulum somnus.",
+    "horsepower": "770",
+    "steeringSide": "Left",
+    "transmissionType": "Manual",
+    "engineCapacity": "3369",
+    "VIN": "VYAZ30KM6VSR40865",
+    "evaluationCompanies": "Funk and Sons",
+    "exteriorColor": [
+      "orchid"
+    ],
+    "interiorColor": [
+      "mint green"
+    ],
+    "technicalFeatures": [
+      "Recycled",
+      "Fresh"
+    ],
+    "evaluationPrices": 2096,
+    "extras": [
+      "Keyboard"
+    ],
+    "totalrating": "3",
+    "listing": "Public"
+  },
+  {
+    "assetType": "Car",
+    "country": "Nepal",
+    "city": "New Shaun",
+    "neighbourhood": "Church Walk",
+    "make": "Subaru",
+    "category": "Wagon",
+    "model": "Grand Cherokee",
+    "title": "Lamborghini Volt",
+    "slug": "Smart-Element",
+    "price": 6705,
+    "status": 0,
+    "roi": 10.600781378382026,
+    "fuelType": "Hybrid",
+    "priceRange": "$68937",
+    "size": "Medium",
+    "description": "Capitulus viscus terminatio. Tactus aperte amiculum. Ascisco perferendis audax verto constans vinco vinco consequatur crux tremo.",
+    "kilometers": 81742,
+    "year": 2007,
+    "warranty": "Yes",
+    "carType": "Sedan",
+    "sellerType": "Dealer",
+    "bodyCondition": "Fair",
+    "noofCylinders": "7",
+    "mechanicalCondition": "Needs Repair",
+    "seats": "4",
+    "doors": "3",
+    "evaluationDateTime": "2025-07-09T07:40:54.591Z",
+    "requestDocument": [
+      "phew_instantly.lrf",
+      "keel_tune.pps"
+    ],
+    "trusteeNote": "Timidus nam cilicium ascit eius adimpleo consuasor vis.",
+    "horsepower": "704",
+    "steeringSide": "Right",
+    "transmissionType": "Automatic",
+    "engineCapacity": "1135",
+    "VIN": "Y4PK6FGZHHT797722",
+    "evaluationCompanies": "Vandervort - Rippin",
+    "exteriorColor": [
+      "lavender"
+    ],
+    "interiorColor": [
+      "red"
+    ],
+    "technicalFeatures": [
+      "Oriental",
+      "Luxurious"
+    ],
+    "evaluationPrices": 3749,
+    "extras": [
+      "Chicken"
+    ],
+    "totalrating": "5",
+    "listing": "Private"
+  },
+  {
+    "assetType": "Car",
+    "country": "Monaco",
+    "city": "Muellerchester",
+    "neighbourhood": "Reba Parkways",
+    "make": "Audi",
+    "category": "Cargo Van",
+    "model": "ATS",
+    "title": "Porsche Taurus",
+    "slug": "Mazda-Corvette",
+    "price": 186362,
+    "status": 1,
+    "roi": 1.9996622372163193,
+    "fuelType": "Hybrid",
+    "priceRange": "$60796",
+    "size": "Large",
+    "description": "Cerno vito demitto debitis. Solum pax pecus recusandae catena viduo. Subvenio spiritus demum.",
+    "kilometers": 163703,
+    "year": 2016,
+    "warranty": "Yes",
+    "carType": "SUV",
+    "sellerType": "Individual",
+    "bodyCondition": "Excellent",
+    "noofCylinders": "5",
+    "mechanicalCondition": "Needs Repair",
+    "seats": "5",
+    "doors": "4",
+    "evaluationDateTime": "2025-07-09T08:16:44.909Z",
+    "requestDocument": [
+      "contrast_since_cope.webm",
+      "gaseous_narrate.mpe"
+    ],
+    "trusteeNote": "Vereor aeneus adulatio corrumpo.",
+    "horsepower": "475",
+    "steeringSide": "Left",
+    "transmissionType": "Automatic",
+    "engineCapacity": "1990",
+    "VIN": "TC785MVUL8RB42153",
+    "evaluationCompanies": "Bartell, West and Keeling",
+    "exteriorColor": [
+      "grey"
+    ],
+    "interiorColor": [
+      "tan"
+    ],
+    "technicalFeatures": [
+      "Generic",
+      "Generic"
+    ],
+    "evaluationPrices": 4949,
+    "extras": [
+      "Gloves"
+    ],
+    "totalrating": "4",
+    "listing": "Public"
+  },
+  {
+    "assetType": "Car",
+    "country": "Papua New Guinea",
+    "city": "Bothell",
+    "neighbourhood": "Cavendish Road",
+    "make": "Kia",
+    "category": "Cargo Van",
+    "model": "CX-9",
+    "title": "BMW Corvette",
+    "slug": "BMW-Accord",
+    "price": 145791,
+    "status": 0,
+    "roi": 1.4211804611410868,
+    "fuelType": "Petrol",
+    "priceRange": "$19965",
+    "size": "Small",
+    "description": "Strues tactus cariosus. Capitulus deporto fugit perspiciatis cribro degero aetas. Adsum urbanus vis bonus claudeo angulus.",
+    "kilometers": 217634,
+    "year": 1990,
+    "warranty": "Yes",
+    "carType": "Hatchback",
+    "sellerType": "Dealer",
+    "bodyCondition": "Fair",
+    "noofCylinders": "3",
+    "mechanicalCondition": "Excellent",
+    "seats": "7",
+    "doors": "2",
+    "evaluationDateTime": "2025-07-08T18:13:25.688Z",
+    "requestDocument": [
+      "pick_gloss.elc",
+      "circa_instead.doc"
+    ],
+    "trusteeNote": "Usitas vix aliquam officia ara adstringo creo victus velociter porro.",
+    "horsepower": "546",
+    "steeringSide": "Left",
+    "transmissionType": "Automatic",
+    "engineCapacity": "5677",
+    "VIN": "4N6JWLFVP8HS19016",
+    "evaluationCompanies": "Kozey - Bartell",
+    "exteriorColor": [
+      "grey"
+    ],
+    "interiorColor": [
+      "red"
+    ],
+    "technicalFeatures": [
+      "Rustic",
+      "Generic"
+    ],
+    "evaluationPrices": 1048,
+    "extras": [
+      "Bacon"
+    ],
+    "totalrating": "2",
+    "listing": "Private"
+  },
+  {
+    "assetType": "Car",
+    "country": "Maldives",
+    "city": "Welchfort",
+    "neighbourhood": "Woodland Close",
+    "make": "Mazda",
+    "category": "Sedan",
+    "model": "Colorado",
+    "title": "Polestar Model S",
+    "slug": "Mini-Aventador",
+    "price": 21197,
+    "status": 0,
+    "roi": 7.329141739226312,
+    "fuelType": "Petrol",
+    "priceRange": "$114374",
+    "size": "Medium",
+    "description": "Adstringo quidem vobis eveniet vis. Cena ustilo peior tenax usque. Ultio dolorum vester.",
+    "kilometers": 6429,
+    "year": 2007,
+    "warranty": "No",
+    "carType": "SUV",
+    "sellerType": "Dealer",
+    "bodyCondition": "Fair",
+    "noofCylinders": "7",
+    "mechanicalCondition": "Needs Repair",
+    "seats": "4",
+    "doors": "3",
+    "evaluationDateTime": "2025-07-08T13:57:43.241Z",
+    "requestDocument": [
+      "goodwill_cheerfully.css",
+      "whether_boo_schedule.in"
+    ],
+    "trusteeNote": "Vesco error tertius vir excepturi.",
+    "horsepower": "285",
+    "steeringSide": "Right",
+    "transmissionType": "Automatic",
+    "engineCapacity": "4865",
+    "VIN": "9D1FCU049EJC76399",
+    "evaluationCompanies": "Ferry, Feil and Kemmer",
+    "exteriorColor": [
+      "olive"
+    ],
+    "interiorColor": [
+      "red"
+    ],
+    "technicalFeatures": [
+      "Ergonomic",
+      "Sleek"
+    ],
+    "evaluationPrices": 1595,
+    "extras": [
+      "Pants"
+    ],
+    "totalrating": "1",
+    "listing": "Private"
+  },
+  {
+    "assetType": "Car",
+    "country": "Kuwait",
+    "city": "Aniyahburgh",
+    "neighbourhood": "Green Close",
+    "make": "Porsche",
+    "category": "Convertible",
+    "model": "Fortwo",
+    "title": "Volvo Charger",
+    "slug": "Lamborghini-Ranchero",
+    "price": 52934,
+    "status": 0,
+    "roi": 12.236517349103023,
+    "fuelType": "Diesel",
+    "priceRange": "$16095",
+    "size": "Small",
+    "description": "Tamquam vita tibi. Corrumpo urbanus culpa aspernatur conatus cohors animus soleo. Tenetur cuius paulatim utrimque audio cruentus.",
+    "kilometers": 247191,
+    "year": 1996,
+    "warranty": "No",
+    "carType": "Truck",
+    "sellerType": "Dealer",
+    "bodyCondition": "Fair",
+    "noofCylinders": "9",
+    "mechanicalCondition": "Needs Repair",
+    "seats": "2",
+    "doors": "3",
+    "evaluationDateTime": "2025-07-08T13:28:32.748Z",
+    "requestDocument": [
+      "bourgeoisie_structure_gently.vss",
+      "whose_bliss_futon.rtf"
+    ],
+    "trusteeNote": "Aestivus capitulus coepi ambulo tergo.",
+    "horsepower": "608",
+    "steeringSide": "Right",
+    "transmissionType": "Manual",
+    "engineCapacity": "2908",
+    "VIN": "PFDKKZDYKMS679310",
+    "evaluationCompanies": "Hansen - Rath",
+    "exteriorColor": [
+      "violet"
+    ],
+    "interiorColor": [
+      "tan"
+    ],
+    "technicalFeatures": [
+      "Fresh",
+      "Awesome"
+    ],
+    "evaluationPrices": 2359,
+    "extras": [
+      "Keyboard"
+    ],
+    "totalrating": "3",
+    "listing": "Private"
+  },
+  {
+    "assetType": "Car",
+    "country": "Central African Republic",
+    "city": "Conroe",
+    "neighbourhood": "N Oak Street",
+    "make": "Bentley",
+    "category": "Convertible",
+    "model": "Land Cruiser",
+    "title": "Smart Camaro",
+    "slug": "Tesla-A8",
+    "price": 151416,
+    "status": 1,
+    "roi": 13.998686666908855,
+    "fuelType": "Hybrid",
+    "priceRange": "$88259",
+    "size": "Large",
+    "description": "Stella ancilla conduco centum utique peccatus. Trepide avaritia suadeo defungo acervus. Audentia depraedor acies commemoro celo taceo.",
+    "kilometers": 269053,
+    "year": 2022,
+    "warranty": "Yes",
+    "carType": "SUV",
+    "sellerType": "Individual",
+    "bodyCondition": "Fair",
+    "noofCylinders": "3",
+    "mechanicalCondition": "Good",
+    "seats": "6",
+    "doors": "5",
+    "evaluationDateTime": "2025-07-08T18:34:51.540Z",
+    "requestDocument": [
+      "forenenst_through_yum.rar",
+      "backburn_uh_huh.xlw"
+    ],
+    "trusteeNote": "Demonstro tenuis quasi.",
+    "horsepower": "709",
+    "steeringSide": "Left",
+    "transmissionType": "Manual",
+    "engineCapacity": "4561",
+    "VIN": "9LWWMEHLEGJG88631",
+    "evaluationCompanies": "Aufderhar, Hyatt and Koch",
+    "exteriorColor": [
+      "turquoise"
+    ],
+    "interiorColor": [
+      "lime"
+    ],
+    "technicalFeatures": [
+      "Bespoke",
+      "Tasty"
+    ],
+    "evaluationPrices": 3672,
+    "extras": [
+      "Soap"
+    ],
+    "totalrating": "3",
+    "listing": "Public"
+  },
+  {
+    "assetType": "Car",
+    "country": "Indonesia",
+    "city": "Borerland",
+    "neighbourhood": "Vince Crossing",
+    "make": "Mini",
+    "category": "Crew Cab Pickup",
+    "model": "Corvette",
+    "title": "Peugeot Aventador",
+    "slug": "Tata-Model-X",
+    "price": 127659,
+    "status": 0,
+    "roi": 11.35134900766858,
+    "fuelType": "Electric",
+    "priceRange": "$17401",
+    "size": "Large",
+    "description": "Porro texo vicissitudo communis voco. Ascisco corrupti valeo appositus sophismata cado supplanto. Utrimque acerbitas saepe ducimus congregatio acidus audentia color comprehendo creo.",
+    "kilometers": 57830,
+    "year": 2021,
+    "warranty": "No",
+    "carType": "SUV",
+    "sellerType": "Dealer",
+    "bodyCondition": "Fair",
+    "noofCylinders": "11",
+    "mechanicalCondition": "Good",
+    "seats": "2",
+    "doors": "2",
+    "evaluationDateTime": "2025-07-08T19:37:16.543Z",
+    "requestDocument": [
+      "under.iso",
+      "nor_unaware_straight.tar"
+    ],
+    "trusteeNote": "Vulariter custodia derelinquo stips aeternus tui speculum.",
+    "horsepower": "764",
+    "steeringSide": "Left",
+    "transmissionType": "Manual",
+    "engineCapacity": "1326",
+    "VIN": "2AZG61E6PYDX08838",
+    "evaluationCompanies": "Hermiston, Cummings and Marks",
+    "exteriorColor": [
+      "lavender"
+    ],
+    "interiorColor": [
+      "violet"
+    ],
+    "technicalFeatures": [
+      "Incredible",
+      "Bespoke"
+    ],
+    "evaluationPrices": 1356,
+    "extras": [
+      "Sausages"
+    ],
+    "totalrating": "5",
+    "listing": "Public"
+  },
+  {
+    "assetType": "Car",
+    "country": "Aland Islands",
+    "city": "North Stefanbury",
+    "neighbourhood": "Nona Loaf",
+    "make": "Maserati",
+    "category": "Convertible",
+    "model": "Model X",
+    "title": "Volvo Escalade",
+    "slug": "Jeep-F-150",
+    "price": 41277,
+    "status": 1,
+    "roi": 11.511220699749433,
+    "fuelType": "Electric",
+    "priceRange": "$94511",
+    "size": "Medium",
+    "description": "Velum molestias deripio apto depereo accusamus spoliatio universe. Textus tergum volva usque. Curso contra velit dolorum.",
+    "kilometers": 30930,
+    "year": 1999,
+    "warranty": "No",
+    "carType": "Sedan",
+    "sellerType": "Individual",
+    "bodyCondition": "Fair",
+    "noofCylinders": "7",
+    "mechanicalCondition": "Needs Repair",
+    "seats": "7",
+    "doors": "4",
+    "evaluationDateTime": "2025-07-08T16:30:05.859Z",
+    "requestDocument": [
+      "sandy_platypus_how.dms",
+      "what_leading.deploy"
+    ],
+    "trusteeNote": "Demonstro decumbo crustulum aequitas curvo verto necessitatibus.",
+    "horsepower": "664",
+    "steeringSide": "Left",
+    "transmissionType": "Automatic",
+    "engineCapacity": "2656",
+    "VIN": "K334RLA41SRP90253",
+    "evaluationCompanies": "Moore, Hahn and Keebler",
+    "exteriorColor": [
+      "cyan"
+    ],
+    "interiorColor": [
+      "orange"
+    ],
+    "technicalFeatures": [
+      "Luxurious",
+      "Incredible"
+    ],
+    "evaluationPrices": 3746,
+    "extras": [
+      "Chicken"
+    ],
+    "totalrating": "5",
+    "listing": "Private"
+  },
+  {
+    "assetType": "Car",
+    "country": "Namibia",
+    "city": "Kurtmouth",
+    "neighbourhood": "King Street",
+    "make": "Chevrolet",
+    "category": "Convertible",
+    "model": "Charger",
+    "title": "Mini Model Y",
+    "slug": "Toyota-Volt",
+    "price": 137813,
+    "status": 1,
+    "roi": 1.0868469733746915,
+    "fuelType": "Diesel",
+    "priceRange": "$75719",
+    "size": "Medium",
+    "description": "Confero auxilium tutis clementia sublime abeo minus. Coruscus theologus arx vergo utor. Uxor admiratio suggero suus vinum cursim.",
+    "kilometers": 194701,
+    "year": 2012,
+    "warranty": "Yes",
+    "carType": "Sedan",
+    "sellerType": "Individual",
+    "bodyCondition": "Good",
+    "noofCylinders": "9",
+    "mechanicalCondition": "Excellent",
+    "seats": "8",
+    "doors": "3",
+    "evaluationDateTime": "2025-07-08T15:59:45.477Z",
+    "requestDocument": [
+      "hungrily_given_oof.html",
+      "yuppify_messy_measly.csh"
+    ],
+    "trusteeNote": "Summisse veritas aliqua ipsam sequi incidunt capillus cui aliqua demulceo.",
+    "horsepower": "527",
+    "steeringSide": "Right",
+    "transmissionType": "Automatic",
+    "engineCapacity": "3908",
+    "VIN": "9K1KT70W16RA84248",
+    "evaluationCompanies": "Smith, Brekke and Harvey",
+    "exteriorColor": [
+      "teal"
+    ],
+    "interiorColor": [
+      "magenta"
+    ],
+    "technicalFeatures": [
+      "Licensed",
+      "Licensed"
+    ],
+    "evaluationPrices": 3458,
+    "extras": [
+      "Ball"
+    ],
+    "totalrating": "4",
+    "listing": "Private"
+  },
+  {
+    "assetType": "Car",
+    "country": "Monaco",
+    "city": "South Murray",
+    "neighbourhood": "Althea Coves",
+    "make": "Nissan",
+    "category": "SUV",
+    "model": "El Camino",
+    "title": "Honda 2",
+    "slug": "Polestar-Spyder",
+    "price": 45910,
+    "status": 0,
+    "roi": 1.6322395848248812,
+    "fuelType": "Hybrid",
+    "priceRange": "$136365",
+    "size": "Large",
+    "description": "Ver cibo utor commodi amor quod utpote stips civitas blandior. Vespillo turpis verumtamen adfectus beatae vinculum antepono demitto tamdiu. Illum deserunt molestias condico audentia adsum reprehenderit alioqui adulatio.",
+    "kilometers": 27104,
+    "year": 2018,
+    "warranty": "No",
+    "carType": "Sedan",
+    "sellerType": "Dealer",
+    "bodyCondition": "Fair",
+    "noofCylinders": "11",
+    "mechanicalCondition": "Good",
+    "seats": "8",
+    "doors": "5",
+    "evaluationDateTime": "2025-07-08T20:06:43.426Z",
+    "requestDocument": [
+      "furthermore.bz2",
+      "jogging_amidst_supportive.buffer"
+    ],
+    "trusteeNote": "Sperno vox coma decet cattus cerno.",
+    "horsepower": "749",
+    "steeringSide": "Left",
+    "transmissionType": "Automatic",
+    "engineCapacity": "1705",
+    "VIN": "4T0JBD79BHC179062",
+    "evaluationCompanies": "Wiza, Hirthe and Kozey",
+    "exteriorColor": [
+      "silver"
+    ],
+    "interiorColor": [
+      "red"
+    ],
+    "technicalFeatures": [
+      "Small",
+      "Small"
+    ],
+    "evaluationPrices": 2609,
+    "extras": [
+      "Salad"
+    ],
+    "totalrating": "4",
+    "listing": "Public"
+  },
+  {
+    "assetType": "Car",
+    "country": "Belgium",
+    "city": "Fort Stanfordcester",
+    "neighbourhood": "Henry Street",
+    "make": "Dodge",
+    "category": "Coupe",
+    "model": "Colorado",
+    "title": "Chevrolet Mercielago",
+    "slug": "Rivian-Grand-Caravan",
+    "price": 10257,
+    "status": 0,
+    "roi": 9.692128967808705,
+    "fuelType": "Electric",
+    "priceRange": "$12342",
+    "size": "Large",
+    "description": "Adsidue thermae speciosus apparatus. Titulus auctor vaco. Creber aeternus auxilium thalassinus.",
+    "kilometers": 136256,
+    "year": 2008,
+    "warranty": "Yes",
+    "carType": "Hatchback",
+    "sellerType": "Individual",
+    "bodyCondition": "Excellent",
+    "noofCylinders": "6",
+    "mechanicalCondition": "Needs Repair",
+    "seats": "6",
+    "doors": "3",
+    "evaluationDateTime": "2025-07-09T08:03:41.667Z",
+    "requestDocument": [
+      "vary_inside.in",
+      "zowie_off.avi"
+    ],
+    "trusteeNote": "Angelus tredecim ante caritas venia texo cito nisi argumentum.",
+    "horsepower": "666",
+    "steeringSide": "Right",
+    "transmissionType": "Automatic",
+    "engineCapacity": "2916",
+    "VIN": "CMU3FL8EYWNS51751",
+    "evaluationCompanies": "Abbott Group",
+    "exteriorColor": [
+      "tan"
+    ],
+    "interiorColor": [
+      "green"
+    ],
+    "technicalFeatures": [
+      "Refined",
+      "Generic"
+    ],
+    "evaluationPrices": 2712,
+    "extras": [
+      "Chips"
+    ],
+    "totalrating": "4",
+    "listing": "Public"
+  },
+  {
+    "assetType": "Car",
+    "country": "Afghanistan",
+    "city": "West Dorothea",
+    "neighbourhood": "Kassulke Forks",
+    "make": "Volkswagen",
+    "category": "Coupe",
+    "model": "Model Y",
+    "title": "Porsche Alpine",
+    "slug": "Fiat-Volt",
+    "price": 131043,
+    "status": 0,
+    "roi": 15.04010492344778,
+    "fuelType": "Electric",
+    "priceRange": "$156656",
+    "size": "Medium",
+    "description": "Arbor contabesco tredecim comitatus certe. Surgo tibi sunt. Inflammatio denique admiratio arbitro.",
+    "kilometers": 298434,
+    "year": 2003,
+    "warranty": "Yes",
+    "carType": "Hatchback",
+    "sellerType": "Dealer",
+    "bodyCondition": "Good",
+    "noofCylinders": "4",
+    "mechanicalCondition": "Good",
+    "seats": "6",
+    "doors": "2",
+    "evaluationDateTime": "2025-07-09T06:27:44.033Z",
+    "requestDocument": [
+      "or_brr_brook.elc",
+      "misjudge_however_address.mp3"
+    ],
+    "trusteeNote": "Careo amo tabernus cito cras acies spiculum.",
+    "horsepower": "141",
+    "steeringSide": "Left",
+    "transmissionType": "Manual",
+    "engineCapacity": "1443",
+    "VIN": "F9KP62BWXUMS97777",
+    "evaluationCompanies": "Windler and Sons",
+    "exteriorColor": [
+      "cyan"
+    ],
+    "interiorColor": [
+      "silver"
+    ],
+    "technicalFeatures": [
+      "Oriental",
+      "Refined"
+    ],
+    "evaluationPrices": 4007,
+    "extras": [
+      "Table"
+    ],
+    "totalrating": "2",
+    "listing": "Public"
+  },
+  {
+    "assetType": "Car",
+    "country": "Liechtenstein",
+    "city": "East Kenyonshire",
+    "neighbourhood": "Christiansen Hills",
+    "make": "Hyundai",
+    "category": "Coupe",
+    "model": "Golf",
+    "title": "Hyundai Colorado",
+    "slug": "Toyota-Model-S",
+    "price": 133250,
+    "status": 1,
+    "roi": 19.93799484258639,
+    "fuelType": "Petrol",
+    "priceRange": "$88563",
+    "size": "Large",
+    "description": "Crastinus advenio decumbo arto ater voluptate expedita vere paens. Minus bene altus. Stultus enim coepi dedecor baiulus acidus cibo corona trepide.",
+    "kilometers": 155878,
+    "year": 2015,
+    "warranty": "No",
+    "carType": "Sedan",
+    "sellerType": "Dealer",
+    "bodyCondition": "Good",
+    "noofCylinders": "7",
+    "mechanicalCondition": "Needs Repair",
+    "seats": "8",
+    "doors": "3",
+    "evaluationDateTime": "2025-07-09T06:50:59.334Z",
+    "requestDocument": [
+      "forenenst_after_acquire.spx",
+      "like_blah.ear"
+    ],
+    "trusteeNote": "Umquam usque vae caveo desolo audio.",
+    "horsepower": "748",
+    "steeringSide": "Right",
+    "transmissionType": "Automatic",
+    "engineCapacity": "2175",
+    "VIN": "T9M6MA1MMNHY72368",
+    "evaluationCompanies": "Mann Group",
+    "exteriorColor": [
+      "ivory"
+    ],
+    "interiorColor": [
+      "olive"
+    ],
+    "technicalFeatures": [
+      "Generic",
+      "Frozen"
+    ],
+    "evaluationPrices": 4829,
+    "extras": [
+      "Mouse"
+    ],
+    "totalrating": "4",
+    "listing": "Private"
+  },
+  {
+    "assetType": "Car",
+    "country": "Guinea",
+    "city": "Fort Nikolas",
+    "neighbourhood": "Dulce Mews",
+    "make": "Vauxhall",
+    "category": "Minivan",
+    "model": "2",
+    "title": "Dodge Model T",
+    "slug": "Jaguar-Camry",
+    "price": 113763,
+    "status": 1,
+    "roi": 5.885293040372888,
+    "fuelType": "Diesel",
+    "priceRange": "$196907",
+    "size": "Small",
+    "description": "Abstergo cohaero crapula arceo. Pecus comitatus turpis turpis tutamen vere quod suggero tandem. Arcesso amitto valeo quis demum cras altus.",
+    "kilometers": 189048,
+    "year": 2017,
+    "warranty": "Yes",
+    "carType": "SUV",
+    "sellerType": "Individual",
+    "bodyCondition": "Fair",
+    "noofCylinders": "6",
+    "mechanicalCondition": "Excellent",
+    "seats": "2",
+    "doors": "5",
+    "evaluationDateTime": "2025-07-09T03:09:18.665Z",
+    "requestDocument": [
+      "or.ini",
+      "fray_outside_gosh.xhtml"
+    ],
+    "trusteeNote": "Dens sui deripio delectus soleo ars.",
+    "horsepower": "690",
+    "steeringSide": "Left",
+    "transmissionType": "Automatic",
+    "engineCapacity": "4171",
+    "VIN": "5K2ML4W3N4Y861329",
+    "evaluationCompanies": "Emard - Rohan",
+    "exteriorColor": [
+      "cyan"
+    ],
+    "interiorColor": [
+      "gold"
+    ],
+    "technicalFeatures": [
+      "Elegant",
+      "Sleek"
+    ],
+    "evaluationPrices": 3523,
+    "extras": [
+      "Computer"
+    ],
+    "totalrating": "1",
+    "listing": "Private"
+  },
+  {
+    "assetType": "Car",
+    "country": "Burkina Faso",
+    "city": "Reedcester",
+    "neighbourhood": "Abshire Village",
+    "make": "Subaru",
+    "category": "Passenger Van",
+    "model": "XTS",
+    "title": "Land Rover Volt",
+    "slug": "Volvo-Grand-Caravan",
+    "price": 38067,
+    "status": 1,
+    "roi": 19.346002502877266,
+    "fuelType": "Electric",
+    "priceRange": "$113698",
+    "size": "Large",
+    "description": "Teres culpo fuga denuo. Voluptatem cinis doloremque. Pauci cunctatio solutio.",
+    "kilometers": 143404,
+    "year": 1991,
+    "warranty": "Yes",
+    "carType": "SUV",
+    "sellerType": "Dealer",
+    "bodyCondition": "Good",
+    "noofCylinders": "12",
+    "mechanicalCondition": "Good",
+    "seats": "6",
+    "doors": "2",
+    "evaluationDateTime": "2025-07-08T18:08:41.489Z",
+    "requestDocument": [
+      "or_immediately_fishery.odp",
+      "splosh_meanwhile.epub"
+    ],
+    "trusteeNote": "Acceptus veritas tergum templum terminatio sonitus aperiam voluptatum valetudo caveo.",
+    "horsepower": "794",
+    "steeringSide": "Left",
+    "transmissionType": "Automatic",
+    "engineCapacity": "3554",
+    "VIN": "TY7RJUMD43B492406",
+    "evaluationCompanies": "Hirthe Group",
+    "exteriorColor": [
+      "orchid"
+    ],
+    "interiorColor": [
+      "salmon"
+    ],
+    "technicalFeatures": [
+      "Small",
+      "Unbranded"
+    ],
+    "evaluationPrices": 2811,
+    "extras": [
+      "Towels"
+    ],
+    "totalrating": "2",
+    "listing": "Private"
+  },
+  {
+    "assetType": "Car",
+    "country": "Taiwan",
+    "city": "Wendychester",
+    "neighbourhood": "Monserrate Springs",
+    "make": "MG",
+    "category": "Crew Cab Pickup",
+    "model": "Mustang",
+    "title": "Smart Land Cruiser",
+    "slug": "NIO-A8",
+    "price": 18591,
+    "status": 0,
+    "roi": 5.561504458924731,
+    "fuelType": "Hybrid",
+    "priceRange": "$182223",
+    "size": "Small",
+    "description": "Cur atqui inflammatio talus ratione infit civis valens amplus. Quae infit assumenda abscido. Tandem abutor dicta balbus copia vergo deduco solitudo tamdiu.",
+    "kilometers": 45016,
+    "year": 2014,
+    "warranty": "No",
+    "carType": "Hatchback",
+    "sellerType": "Dealer",
+    "bodyCondition": "Good",
+    "noofCylinders": "9",
+    "mechanicalCondition": "Needs Repair",
+    "seats": "2",
+    "doors": "4",
+    "evaluationDateTime": "2025-07-09T07:39:55.528Z",
+    "requestDocument": [
+      "plus.log",
+      "whoa_qua.txt"
+    ],
+    "trusteeNote": "Crebro cotidie alo terebro brevis conforto.",
+    "horsepower": "181",
+    "steeringSide": "Right",
+    "transmissionType": "Automatic",
+    "engineCapacity": "4421",
+    "VIN": "6E9MVA9NNME468991",
+    "evaluationCompanies": "Kilback Inc",
+    "exteriorColor": [
+      "cyan"
+    ],
+    "interiorColor": [
+      "purple"
+    ],
+    "technicalFeatures": [
+      "Elegant",
+      "Sleek"
+    ],
+    "evaluationPrices": 3224,
+    "extras": [
+      "Salad"
+    ],
+    "totalrating": "1",
+    "listing": "Public"
+  }
+]

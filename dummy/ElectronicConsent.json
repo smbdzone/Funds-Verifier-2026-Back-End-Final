@@ -1,0 +1,72 @@
+[
+  {
+    "userId": "686d210c3fd856e8d03c68a8",
+    "consentTerms": true,
+    "consentTaxNotification": false,
+    "_id": "686d210c3fd856e8d03c68b2",
+    "__v": 0
+  },
+  {
+    "userId": "686d210c3fd856e8d03c68a9",
+    "consentTerms": true,
+    "consentTaxNotification": false,
+    "_id": "686d210c3fd856e8d03c68b3",
+    "__v": 0
+  },
+  {
+    "userId": "686d210c3fd856e8d03c68aa",
+    "consentTerms": true,
+    "consentTaxNotification": true,
+    "_id": "686d210c3fd856e8d03c68b4",
+    "__v": 0
+  },
+  {
+    "userId": "686d210c3fd856e8d03c68ab",
+    "consentTerms": false,
+    "consentTaxNotification": true,
+    "_id": "686d210c3fd856e8d03c68b5",
+    "__v": 0
+  },
+  {
+    "userId": "686d210c3fd856e8d03c68ac",
+    "consentTerms": false,
+    "consentTaxNotification": true,
+    "_id": "686d210c3fd856e8d03c68b6",
+    "__v": 0
+  },
+  {
+    "userId": "686d210c3fd856e8d03c68ad",
+    "consentTerms": false,
+    "consentTaxNotification": false,
+    "_id": "686d210c3fd856e8d03c68b7",
+    "__v": 0
+  },
+  {
+    "userId": "686d210c3fd856e8d03c68ae",
+    "consentTerms": true,
+    "consentTaxNotification": false,
+    "_id": "686d210c3fd856e8d03c68b8",
+    "__v": 0
+  },
+  {
+    "userId": "686d210c3fd856e8d03c68af",
+    "consentTerms": false,
+    "consentTaxNotification": true,
+    "_id": "686d210c3fd856e8d03c68b9",
+    "__v": 0
+  },
+  {
+    "userId": "686d210c3fd856e8d03c68b0",
+    "consentTerms": false,
+    "consentTaxNotification": false,
+    "_id": "686d210c3fd856e8d03c68ba",
+    "__v": 0
+  },
+  {
+    "userId": "686d210c3fd856e8d03c68b1",
+    "consentTerms": true,
+    "consentTaxNotification": false,
+    "_id": "686d210c3fd856e8d03c68bb",
+    "__v": 0
+  }
+]

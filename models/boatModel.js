@@ -1,0 +1,174 @@
+import mongoose from 'mongoose'
+const Schema = mongoose.Schema
+import { v4 as uuidv4 } from 'uuid'
+import { attachListingMediaRefreshHook } from '../helper/refreshAssetSignedUrls.js'
+
+// Define boats advertisement schema
+const BoatAdSchema = new Schema(
+  {
+    uuid: {
+      type: String,
+      default: uuidv4,
+      unique: true,
+      index: true,
+    },
+
+    assetType: { type: String, required: true },
+    country: { type: String, required: true },
+    city: { type: String, required: true },
+    neighbourhood: { type: String, required: true },
+    priceRange: String,
+    title: { type: String, maxlength: 50 },
+    phoneNumber: { type: String, required: true },
+    condition: String,
+    price: { type: Number, required: true },
+    weight: String,
+    slug: String,
+    sellerType: { type: String, default: 'Individual' },
+    description: { type: String, maxlength: 300 },
+    length: String,
+    brands: { type: String },
+    age: String,
+    usage: String,
+    locateBoat: { type: String },
+    sportsOutdoorPrice: { type: String },
+    warranty: String,
+    seats: String,
+    pictures: { type: mongoose.Schema.Types.ObjectId, ref: 'ImageAsset' },
+    video: { type: mongoose.Schema.Types.ObjectId, ref: 'VideoAsset' },
+    thumbnailImg: { type: mongoose.Schema.Types.ObjectId, ref: 'ThumbnailImg' },
+    transferDocuments: {
+      assetTransferDocument: { type: String },
+      PaymentProof: { type: String },
+    },
+    dealClosed: { type: Boolean },
+    dealer: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+    },
+    evaluationCertificate: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'EvaluationCertificate',
+    },
+    invoice: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'EvaluationCertificate',
+    },
+    feedback: { type: String, required: true },
+    evaluationDateTime: { type: Date, required: false },
+    evaluationC: {
+      type: String,
+      default: 'N/A',
+    },
+    evaluator: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+    },
+    evaluationStatus: {
+      type: String,
+      default: 'pending',
+      enum: ['approved', 'pending'],
+    },
+    video3DWalkthrough: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Request3D',
+    },
+    technicalReport: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'ReportTechnical',
+    },
+    requestDocument: [{ type: String, required: true }],
+    uploadDocument: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'EvaluationCertificate',
+      },
+    ],
+    transactionDepositDocument: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'EvaluationCertificate',
+    },
+    transactionId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Transaction',
+    },
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+    },
+    dealhunterId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+    },
+    viewingStatus: { type: String },
+    depositReceipt: { type: String },
+    userUUID: { type: String, required: true }, // Public identifier
+    evaluatorUUID: { type: String },
+
+    trusteeNote: { type: String },
+    status: {
+      type: Number,
+      enum: [0, 1],
+      default: 0, // Default to "pending"
+    },
+    roi: {
+      type: Number,
+    },
+    transactionStatus: {
+      type: String,
+      default: 'pending',
+      enum: ['complete', 'pending'],
+    },
+    ratings: [
+      {
+        star: Number,
+        comment: String,
+        postedBy: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: 'AssetHolderProfile',
+        },
+      },
+    ],
+    // Soft delete fields
+    isDeleted: { type: Boolean, default: false },
+    deletedAt: { type: Date, default: null },
+    evaludationComponents: { type: String },
+    exteriorColor: [String],
+    interiorColor: [String],
+    extras: [String],
+    category: { type: String, required: true },
+    model: { type: String, required: true },
+    listing: {
+      type: String,
+      enum: ['Private', 'Public'],
+      default: 'Public',
+    },
+    evaluationPrices: { type: Number },
+  },
+  { timestamps: true }
+)
+
+// Add a virtual for reviews
+BoatAdSchema.virtual('reviews', {
+  ref: 'Review',
+  localField: '_id',
+  foreignField: 'productId',
+})
+
+// Ensure virtuals are included in JSON output
+BoatAdSchema.set('toObject', { virtuals: true })
+BoatAdSchema.set('toJSON', { virtuals: true })
+
+/**
+ * Auto-refresh CloudFront signed URLs on every read so that any controller
+ * (current or future) that fetches a boat with populated media returns working
+ * URLs instead of stale ~1-hour signatures persisted at upload time. No-op
+ * when media refs are not populated.
+ */
+BoatAdSchema.post('find', attachListingMediaRefreshHook)
+BoatAdSchema.post('findOne', attachListingMediaRefreshHook)
+BoatAdSchema.post('findOneAndUpdate', attachListingMediaRefreshHook)
+
+// Create and export model
+const Boat = mongoose.model('Boat', BoatAdSchema)
+export default Boat

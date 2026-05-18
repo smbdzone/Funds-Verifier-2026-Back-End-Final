@@ -1,0 +1,148 @@
+[
+  {
+    "products": [
+      {
+        "product": "686d1ddc8a579ade8ea25190",
+        "count": 3,
+        "color": "lavender",
+        "price": 1215,
+        "_id": "686d1ddc8a579ade8ea251a3"
+      }
+    ],
+    "cartTotal": 3645,
+    "totalAfterDiscount": 3488.754988997805,
+    "orderBy": "686d1ddc8a579ade8ea25191",
+    "_id": "686d1ddc8a579ade8ea251a2",
+    "__v": 0,
+    "createdAt": "2025-07-08T13:32:12.464Z",
+    "updatedAt": "2025-07-08T13:32:12.464Z"
+  },
+  {
+    "products": [
+      {
+        "product": "686d1ddc8a579ade8ea25192",
+        "count": 2,
+        "color": "salmon",
+        "price": 3371,
+        "_id": "686d1ddc8a579ade8ea251a5"
+      },
+      {
+        "product": "686d1ddc8a579ade8ea25193",
+        "count": 3,
+        "color": "azure",
+        "price": 1949,
+        "_id": "686d1ddc8a579ade8ea251a6"
+      },
+      {
+        "product": "686d1ddc8a579ade8ea25194",
+        "count": 8,
+        "color": "silver",
+        "price": 2823,
+        "_id": "686d1ddc8a579ade8ea251a7"
+      },
+      {
+        "product": "686d1ddc8a579ade8ea25195",
+        "count": 4,
+        "color": "blue",
+        "price": 2572,
+        "_id": "686d1ddc8a579ade8ea251a8"
+      }
+    ],
+    "cartTotal": 45461,
+    "totalAfterDiscount": 41176.13665814657,
+    "orderBy": "686d1ddc8a579ade8ea25196",
+    "_id": "686d1ddc8a579ade8ea251a4",
+    "__v": 0,
+    "createdAt": "2025-07-08T13:32:12.466Z",
+    "updatedAt": "2025-07-08T13:32:12.466Z"
+  },
+  {
+    "products": [
+      {
+        "product": "686d1ddc8a579ade8ea25197",
+        "count": 9,
+        "color": "gold",
+        "price": 525,
+        "_id": "686d1ddc8a579ade8ea251aa"
+      },
+      {
+        "product": "686d1ddc8a579ade8ea25198",
+        "count": 7,
+        "color": "gold",
+        "price": 3496,
+        "_id": "686d1ddc8a579ade8ea251ab"
+      },
+      {
+        "product": "686d1ddc8a579ade8ea25199",
+        "count": 2,
+        "color": "teal",
+        "price": 3325,
+        "_id": "686d1ddc8a579ade8ea251ac"
+      }
+    ],
+    "cartTotal": 35847,
+    "totalAfterDiscount": 35018.32784594565,
+    "orderBy": "686d1ddc8a579ade8ea2519a",
+    "_id": "686d1ddc8a579ade8ea251a9",
+    "__v": 0,
+    "createdAt": "2025-07-08T13:32:12.466Z",
+    "updatedAt": "2025-07-08T13:32:12.466Z"
+  },
+  {
+    "products": [
+      {
+        "product": "686d1ddc8a579ade8ea2519b",
+        "count": 5,
+        "color": "mint green",
+        "price": 2148,
+        "_id": "686d1ddc8a579ade8ea251ae"
+      },
+      {
+        "product": "686d1ddc8a579ade8ea2519c",
+        "count": 9,
+        "color": "orange",
+        "price": 4976,
+        "_id": "686d1ddc8a579ade8ea251af"
+      },
+      {
+        "product": "686d1ddc8a579ade8ea2519d",
+        "count": 1,
+        "color": "gold",
+        "price": 643,
+        "_id": "686d1ddc8a579ade8ea251b0"
+      }
+    ],
+    "cartTotal": 56167,
+    "totalAfterDiscount": 54892.90099360351,
+    "orderBy": "686d1ddc8a579ade8ea2519e",
+    "_id": "686d1ddc8a579ade8ea251ad",
+    "__v": 0,
+    "createdAt": "2025-07-08T13:32:12.466Z",
+    "updatedAt": "2025-07-08T13:32:12.466Z"
+  },
+  {
+    "products": [
+      {
+        "product": "686d1ddc8a579ade8ea2519f",
+        "count": 2,
+        "color": "grey",
+        "price": 2582,
+        "_id": "686d1ddc8a579ade8ea251b2"
+      },
+      {
+        "product": "686d1ddc8a579ade8ea251a0",
+        "count": 7,
+        "color": "azure",
+        "price": 252,
+        "_id": "686d1ddc8a579ade8ea251b3"
+      }
+    ],
+    "cartTotal": 6928,
+    "totalAfterDiscount": 6442.708387453886,
+    "orderBy": "686d1ddc8a579ade8ea251a1",
+    "_id": "686d1ddc8a579ade8ea251b1",
+    "__v": 0,
+    "createdAt": "2025-07-08T13:32:12.467Z",
+    "updatedAt": "2025-07-08T13:32:12.467Z"
+  }
+]

@@ -1,0 +1,122 @@
+[
+  {
+    "userId": "686d238fddc62de4a3401db0",
+    "type": "success",
+    "performedBy": "user",
+    "title": "Ustilo carmen ait.",
+    "message": "Carus agnosco sumptus nobis cunabula angustus. Sui infit audio vulpes.",
+    "isRead": false,
+    "_id": "686d238fddc62de4a3401dba",
+    "__v": 0,
+    "createdAt": "2025-07-08T13:56:31.624Z",
+    "updatedAt": "2025-07-08T13:56:31.624Z"
+  },
+  {
+    "userId": "686d238fddc62de4a3401db1",
+    "type": "warning",
+    "performedBy": "user",
+    "title": "Studio calcar acidus.",
+    "message": "Artificiose succurro cultellus ventito acquiro apto censura urbs claustrum. Ubi eligendi terminatio crur celebrer utique provident cotidie tamen excepturi.",
+    "isRead": true,
+    "_id": "686d238fddc62de4a3401dbb",
+    "__v": 0,
+    "createdAt": "2025-07-08T13:56:31.625Z",
+    "updatedAt": "2025-07-08T13:56:31.625Z"
+  },
+  {
+    "userId": "686d238fddc62de4a3401db2",
+    "type": "unknown",
+    "performedBy": "admin",
+    "title": "Clam crustulum vilitas.",
+    "message": "Aufero bellum tui solvo tolero somniculosus ulterius adfero odio praesentium. Labore comes explicabo victoria calcar tredecim.",
+    "isRead": false,
+    "_id": "686d238fddc62de4a3401dbc",
+    "__v": 0,
+    "createdAt": "2025-07-08T13:56:31.625Z",
+    "updatedAt": "2025-07-08T13:56:31.625Z"
+  },
+  {
+    "userId": "686d238fddc62de4a3401db3",
+    "type": "unknown",
+    "performedBy": "admin",
+    "title": "Crastinus adsum conforto.",
+    "message": "Cunae crepusculum cibus conculco vigor at adopto thymbra tamen subnecto. Quaerat spectaculum abbas quia sonitus crapula.",
+    "isRead": false,
+    "_id": "686d238fddc62de4a3401dbd",
+    "__v": 0,
+    "createdAt": "2025-07-08T13:56:31.626Z",
+    "updatedAt": "2025-07-08T13:56:31.626Z"
+  },
+  {
+    "userId": "686d238fddc62de4a3401db4",
+    "type": "danger",
+    "performedBy": "admin",
+    "title": "Ater suasoria demoror.",
+    "message": "Amor spiculum peccatus. Argumentum cunctatio acceptus confido super vindico.",
+    "isRead": false,
+    "_id": "686d238fddc62de4a3401dbe",
+    "__v": 0,
+    "createdAt": "2025-07-08T13:56:31.626Z",
+    "updatedAt": "2025-07-08T13:56:31.626Z"
+  },
+  {
+    "userId": "686d238fddc62de4a3401db5",
+    "type": "danger",
+    "performedBy": "user",
+    "title": "Possimus volutabrum cinis.",
+    "message": "Turbo vaco subvenio caecus degusto autus patior conservo tristis distinctio. Magni amplexus claustrum coniecto nisi crebro.",
+    "isRead": true,
+    "_id": "686d238fddc62de4a3401dbf",
+    "__v": 0,
+    "createdAt": "2025-07-08T13:56:31.626Z",
+    "updatedAt": "2025-07-08T13:56:31.626Z"
+  },
+  {
+    "userId": "686d238fddc62de4a3401db6",
+    "type": "danger",
+    "performedBy": "user",
+    "title": "Adaugeo sortitus repellendus.",
+    "message": "Toties subnecto a communis defaeco usus labore. Consuasor beatus ara alo aliquam valde tego.",
+    "isRead": false,
+    "_id": "686d238fddc62de4a3401dc0",
+    "__v": 0,
+    "createdAt": "2025-07-08T13:56:31.626Z",
+    "updatedAt": "2025-07-08T13:56:31.626Z"
+  },
+  {
+    "userId": "686d238fddc62de4a3401db7",
+    "type": "danger",
+    "performedBy": "admin",
+    "title": "Capitulus cresco terga.",
+    "message": "Truculenter corona varietas tenus vito vox adeo caput acervus. Tricesimus damno thymbra vobis.",
+    "isRead": true,
+    "_id": "686d238fddc62de4a3401dc1",
+    "__v": 0,
+    "createdAt": "2025-07-08T13:56:31.626Z",
+    "updatedAt": "2025-07-08T13:56:31.626Z"
+  },
+  {
+    "userId": "686d238fddc62de4a3401db8",
+    "type": "info",
+    "performedBy": "user",
+    "title": "Quas arcus civis.",
+    "message": "Ascit ante volutabrum debeo demitto balbus accusator. Culpa correptius defetiscor nihil adipiscor culpa distinctio.",
+    "isRead": false,
+    "_id": "686d238fddc62de4a3401dc2",
+    "__v": 0,
+    "createdAt": "2025-07-08T13:56:31.627Z",
+    "updatedAt": "2025-07-08T13:56:31.627Z"
+  },
+  {
+    "userId": "686d238fddc62de4a3401db9",
+    "type": "danger",
+    "performedBy": "admin",
+    "title": "Vulnus volva tero.",
+    "message": "Cogo cunae cumque utor reiciendis sperno appositus abscido calco conatus. Tamdiu adeo eveniet articulus inventore.",
+    "isRead": false,
+    "_id": "686d238fddc62de4a3401dc3",
+    "__v": 0,
+    "createdAt": "2025-07-08T13:56:31.628Z",
+    "updatedAt": "2025-07-08T13:56:31.628Z"
+  }
+]

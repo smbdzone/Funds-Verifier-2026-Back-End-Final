@@ -1,0 +1,145 @@
+export const PUBLIC_PROPERTY_FIELDS = `
+  slug
+  title
+  uuid
+  images
+  thumbnailImg
+  video
+  video3DWalkthrough
+  price
+  evaluationPrices
+  roi
+  sizeSQFT
+  propertyDescription
+  description
+  additionalDescription
+  bedrooms
+  evaluationCompanies
+  developer
+  bathrooms
+  isFurnished
+  isfeatured
+  facilities
+  ratings
+  totalrating
+  status
+  assetType
+  country
+  city
+  userUUID
+    video
+  pictures
+  thumbnailImg
+`
+
+export const PUBLIC_CAR_FIELDS = `
+  uuid
+  assetType
+  country
+  city
+  neighbourhood
+  make
+  category
+  model
+  title
+  slug
+  price
+  fuelType
+  size
+  description
+  kilometers
+  year
+  warranty
+  carType
+  sellerType
+  bodyCondition
+  noofCylinders
+  mechanicalCondition
+  seats
+  doors
+  horsepower
+  steeringSide
+  transmissionType
+  engineCapacity
+  interiorColor
+  technicalFeatures
+  extras
+  evaluationPrices
+  status
+  userUUID
+  video
+  pictures
+  thumbnailImg
+`
+export const PUBLIC_BOAT_FIELDS = `
+uuid 
+assetType 
+country 
+city 
+neighbourhood 
+category 
+model
+title 
+slug 
+price 
+evaluationPrices
+pictures
+ video 
+ thumbnailImg 
+ video3DWalkthrough
+description 
+ratings
+status
+exteriorColor
+interiorColor
+category
+model
+condition
+weight
+description
+length
+brands
+age
+usage
+locateBoat
+seats
+userUUID
+  video
+  pictures
+  thumbnailImg
+`
+
+export const PUBLIC_JEWELRY_FIELDS = `
+  uuid
+  assetType
+  country
+  city 
+  neighbourhood
+  category
+  model
+  title
+  slug
+  price
+  evaluationPrices
+  priceRange
+  condition
+  description
+  age
+  usage
+  length
+  jewelryStyles
+  jewelryMetal
+  locateJewelry
+  pictures
+  video
+  thumbnailImg
+  video3DWalkthrough
+  ratings
+  status
+  grams
+  materials
+  userUUID
+  video
+  pictures
+  thumbnailImg
+`

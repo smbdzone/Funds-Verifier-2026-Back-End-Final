@@ -1,0 +1,542 @@
+[
+  {
+    "fullName": "Jesus Reilly",
+    "about": "Thesis vestigium tempora ubi patior. Terreo deinde attollo consequuntur video vilis solitudo tot ater. Ambitus solus sollicito animadverto thema coerceo doloribus esse uberrime amiculum.",
+    "role": "seller",
+    "country": "Puerto Rico",
+    "address": "66075 Kathleen Groves",
+    "phone": "(272) 783-5493 x313",
+    "profileImage": "https://avatars.githubusercontent.com/u/47361011",
+    "email": "Eleanora.Wiza89@hotmail.com",
+    "documentation": [
+      {
+        "type": "driving_license",
+        "document": "686d19bbb092181834934e6c",
+        "_id": "686d19bbb092181834934e81"
+      }
+    ],
+    "userState": "active",
+    "gender": "other",
+    "dateOfBirth": "1982-01-16T05:33:14.311Z",
+    "assetId": "10aef865-e84e-4109-9b94-8a4b87e46fd1",
+    "electronicConsent": {
+      "consentTerms": false,
+      "consentTaxTems": true
+    },
+    "_id": "686d19bbb092181834934e80",
+    "__v": 0
+  },
+  {
+    "fullName": "Jay Flatley",
+    "about": "Demulceo canto utor repudiandae. Carbo tonsor acceptus totidem. Labore armarium ratione sollers balbus uterque adaugeo villa.",
+    "role": "agent",
+    "country": "Mexico",
+    "address": "473 Ulices Fork",
+    "phone": "382.633.7120",
+    "profileImage": "https://avatars.githubusercontent.com/u/33284386",
+    "email": "Shannon.Kunde@hotmail.com",
+    "documentation": [
+      {
+        "type": "passport",
+        "document": "686d19bbb092181834934e6d",
+        "_id": "686d19bbb092181834934e83"
+      }
+    ],
+    "userState": "active",
+    "gender": "female",
+    "dateOfBirth": "1971-01-13T12:54:58.649Z",
+    "assetId": "babfab4e-3c79-42a3-9de8-2751cedac43e",
+    "electronicConsent": {
+      "consentTerms": false,
+      "consentTaxTems": false
+    },
+    "_id": "686d19bbb092181834934e82",
+    "__v": 0
+  },
+  {
+    "fullName": "Kate Stanton",
+    "about": "Cotidie considero absorbeo denego claro credo compono coerceo alo. Repellendus aggredior velit avaritia demitto supplanto at acidus. Bene perspiciatis quam libero chirographum clibanus demum.",
+    "role": "agent",
+    "country": "Cocos (Keeling) Islands",
+    "address": "61816 Gustave Curve",
+    "phone": "(209) 869-9262 x450",
+    "profileImage": "https://cdn.jsdelivr.net/gh/faker-js/assets-person-portrait/male/512/25.jpg",
+    "email": "Trisha88@gmail.com",
+    "documentation": [
+      {
+        "type": "utility_bill",
+        "document": "686d19bbb092181834934e6e",
+        "_id": "686d19bbb092181834934e85"
+      }
+    ],
+    "userState": "active",
+    "gender": "male",
+    "dateOfBirth": "1979-12-09T08:13:12.139Z",
+    "assetId": "6ae59e59-7c55-46e2-b966-f44ad7583212",
+    "electronicConsent": {
+      "consentTerms": false,
+      "consentTaxTems": false
+    },
+    "_id": "686d19bbb092181834934e84",
+    "__v": 0
+  },
+  {
+    "fullName": "Franklin Ryan III",
+    "about": "Volubilis barba bibo demum. Altus caute astrum vaco. Bardus vulgaris virtus vulgus architecto creber curatio cubitum at.",
+    "role": "investor",
+    "country": "Saudi Arabia",
+    "address": "48671 School Street",
+    "phone": "(592) 511-4750 x08684",
+    "profileImage": "https://cdn.jsdelivr.net/gh/faker-js/assets-person-portrait/female/512/81.jpg",
+    "email": "Abby.Tremblay21@yahoo.com",
+    "documentation": [
+      {
+        "type": "driving_license",
+        "document": "686d19bbb092181834934e6f",
+        "_id": "686d19bbb092181834934e87"
+      }
+    ],
+    "userState": "suspended",
+    "gender": "other",
+    "dateOfBirth": "1980-07-12T06:52:35.019Z",
+    "assetId": "7bef57b5-5a06-41eb-a100-7ba8c76c40c1",
+    "electronicConsent": {
+      "consentTerms": false,
+      "consentTaxTems": false
+    },
+    "_id": "686d19bbb092181834934e86",
+    "__v": 0
+  },
+  {
+    "fullName": "Elizabeth Shields",
+    "about": "Sollicito creator conventus calco. Ex degero curto deleniti umquam cupressus vesco uter. Terror tabernus victoria tametsi speculum vester acer ciminatio.",
+    "role": "buyer",
+    "country": "Central African Republic",
+    "address": "53965 Nightingale Close",
+    "phone": "(956) 941-9106 x5487",
+    "profileImage": "https://cdn.jsdelivr.net/gh/faker-js/assets-person-portrait/male/512/83.jpg",
+    "email": "Jaime.Langworth24@gmail.com",
+    "documentation": [
+      {
+        "type": "utility_bill",
+        "document": "686d19bbb092181834934e70",
+        "_id": "686d19bbb092181834934e89"
+      }
+    ],
+    "userState": "active",
+    "gender": "other",
+    "dateOfBirth": "1969-12-31T05:03:41.265Z",
+    "assetId": "81b399f1-9fce-45ae-ba42-64d862883cdf",
+    "electronicConsent": {
+      "consentTerms": false,
+      "consentTaxTems": false
+    },
+    "_id": "686d19bbb092181834934e88",
+    "__v": 0
+  },
+  {
+    "fullName": "Elmer Carroll",
+    "about": "Comptus totus nostrum inflammatio. Cunctatio atqui tabesco sollicito alveus suggero confido animi confido cetera. Carus terra usus cinis alienus.",
+    "role": "seller",
+    "country": "Luxembourg",
+    "address": "64697 Missouri Road",
+    "phone": "858.417.9158 x0866",
+    "profileImage": "https://cdn.jsdelivr.net/gh/faker-js/assets-person-portrait/female/512/79.jpg",
+    "email": "Reece_Towne@hotmail.com",
+    "documentation": [
+      {
+        "type": "driving_license",
+        "document": "686d19bbb092181834934e71",
+        "_id": "686d19bbb092181834934e8b"
+      }
+    ],
+    "userState": "active",
+    "gender": "female",
+    "dateOfBirth": "2002-09-25T18:37:52.180Z",
+    "assetId": "9fb8988d-5b3a-485a-a3d5-de052ba89a64",
+    "electronicConsent": {
+      "consentTerms": false,
+      "consentTaxTems": true
+    },
+    "_id": "686d19bbb092181834934e8a",
+    "__v": 0
+  },
+  {
+    "fullName": "Miss Iris Hansen",
+    "about": "Molestiae teneo tenus apto coadunatio denuo tam. Arbor surgo volva molestiae valetudo. Quas odio ustilo delinquo.",
+    "role": "investor",
+    "country": "Faroe Islands",
+    "address": "71883 Schumm Island",
+    "phone": "561.265.8082",
+    "profileImage": "https://cdn.jsdelivr.net/gh/faker-js/assets-person-portrait/male/512/59.jpg",
+    "email": "Nash98@yahoo.com",
+    "documentation": [
+      {
+        "type": "driving_license",
+        "document": "686d19bbb092181834934e72",
+        "_id": "686d19bbb092181834934e8d"
+      }
+    ],
+    "userState": "inactive",
+    "gender": "female",
+    "dateOfBirth": "1962-12-21T12:05:02.729Z",
+    "assetId": "2a12a316-a9dd-4ebc-902d-f186317a7423",
+    "electronicConsent": {
+      "consentTerms": false,
+      "consentTaxTems": true
+    },
+    "_id": "686d19bbb092181834934e8c",
+    "__v": 0
+  },
+  {
+    "fullName": "Hope Mosciski",
+    "about": "Suggero balbus amo agnitio vesica suspendo. Alii ut clementia charisma somniculosus veniam acerbitas suspendo. Utroque vitium beatus adulescens tutis viriliter coruscus conicio subseco commodo.",
+    "role": "seller",
+    "country": "Zimbabwe",
+    "address": "92974 Jacobs Ferry",
+    "phone": "791-286-0444 x94848",
+    "profileImage": "https://cdn.jsdelivr.net/gh/faker-js/assets-person-portrait/male/512/3.jpg",
+    "email": "Angelica9@hotmail.com",
+    "documentation": [
+      {
+        "type": "utility_bill",
+        "document": "686d19bbb092181834934e73",
+        "_id": "686d19bbb092181834934e8f"
+      }
+    ],
+    "userState": "suspended",
+    "gender": "male",
+    "dateOfBirth": "1988-01-25T04:56:29.119Z",
+    "assetId": "e84f873d-affc-4c9e-9c59-2d97db8aa67f",
+    "electronicConsent": {
+      "consentTerms": false,
+      "consentTaxTems": false
+    },
+    "_id": "686d19bbb092181834934e8e",
+    "__v": 0
+  },
+  {
+    "fullName": "Damon Brakus",
+    "about": "Laboriosam delinquo deprimo somniculosus consuasor adopto amet peccatus animadverto. Aiunt xiphias tergeo cimentarius titulus laborum tolero stella aqua contigo. Possimus recusandae comparo textilis.",
+    "role": "investor",
+    "country": "North Macedonia",
+    "address": "31272 Merlin Plains",
+    "phone": "(587) 505-9687 x4642",
+    "profileImage": "https://avatars.githubusercontent.com/u/15737744",
+    "email": "Korbin_Glover@hotmail.com",
+    "documentation": [
+      {
+        "type": "utility_bill",
+        "document": "686d19bbb092181834934e74",
+        "_id": "686d19bbb092181834934e91"
+      }
+    ],
+    "userState": "active",
+    "gender": "male",
+    "dateOfBirth": "1999-04-06T07:07:12.208Z",
+    "assetId": "c96f5922-eda2-4e1b-8cae-ee312db5cddb",
+    "electronicConsent": {
+      "consentTerms": true,
+      "consentTaxTems": true
+    },
+    "_id": "686d19bbb092181834934e90",
+    "__v": 0
+  },
+  {
+    "fullName": "Theodore Terry",
+    "about": "Adinventitias balbus thermae admitto vita. Aegrotatio adsum approbo despecto vinco. Cribro aut cuius torqueo textilis.",
+    "role": "seller",
+    "country": "Sierra Leone",
+    "address": "6054 Sandrine Corner",
+    "phone": "547.918.2856 x8204",
+    "profileImage": "https://avatars.githubusercontent.com/u/46362479",
+    "email": "Granville_Dooley@yahoo.com",
+    "documentation": [
+      {
+        "type": "passport",
+        "document": "686d19bbb092181834934e75",
+        "_id": "686d19bbb092181834934e93"
+      }
+    ],
+    "userState": "suspended",
+    "gender": "female",
+    "dateOfBirth": "1974-06-05T06:26:25.617Z",
+    "assetId": "f5dfc0ae-d03a-45de-b884-19a67782c93c",
+    "electronicConsent": {
+      "consentTerms": true,
+      "consentTaxTems": false
+    },
+    "_id": "686d19bbb092181834934e92",
+    "__v": 0
+  },
+  {
+    "fullName": "Rosie Herman-Ullrich IV",
+    "about": "Vetus accusamus ancilla vulgo adsuesco. Itaque valeo depulso canto eum attonbitus vociferor. Suus confugo atque astrum rem tres.",
+    "role": "investor",
+    "country": "Hungary",
+    "address": "9075 Deja Crest",
+    "phone": "1-228-835-3609 x7180",
+    "profileImage": "https://cdn.jsdelivr.net/gh/faker-js/assets-person-portrait/female/512/35.jpg",
+    "email": "Angelina_Johnson75@gmail.com",
+    "documentation": [
+      {
+        "type": "utility_bill",
+        "document": "686d19bbb092181834934e76",
+        "_id": "686d19bbb092181834934e95"
+      }
+    ],
+    "userState": "active",
+    "gender": "female",
+    "dateOfBirth": "1970-10-22T15:06:30.599Z",
+    "assetId": "f68b9fa1-06f0-43f4-863f-739b36695fcb",
+    "electronicConsent": {
+      "consentTerms": true,
+      "consentTaxTems": true
+    },
+    "_id": "686d19bbb092181834934e94",
+    "__v": 0
+  },
+  {
+    "fullName": "Toni Lubowitz",
+    "about": "Totidem adstringo ventosus ulciscor verumtamen nobis. Pauper summopere contabesco vaco acies caelum aperio blandior facere sumo. Animadverto ventito vilitas claudeo casso recusandae delego curtus.",
+    "role": "seller",
+    "country": "South Africa",
+    "address": "91179 N 4th Street",
+    "phone": "679.797.1417 x8042",
+    "profileImage": "https://avatars.githubusercontent.com/u/62465267",
+    "email": "Bud_Krajcik@gmail.com",
+    "documentation": [
+      {
+        "type": "passport",
+        "document": "686d19bbb092181834934e77",
+        "_id": "686d19bbb092181834934e97"
+      }
+    ],
+    "userState": "suspended",
+    "gender": "female",
+    "dateOfBirth": "1990-06-02T19:18:13.098Z",
+    "assetId": "f05f16d7-126e-4adf-b823-e8c4bc58af86",
+    "electronicConsent": {
+      "consentTerms": true,
+      "consentTaxTems": false
+    },
+    "_id": "686d19bbb092181834934e96",
+    "__v": 0
+  },
+  {
+    "fullName": "Tammy Farrell",
+    "about": "Quidem triduana approbo tutamen modi ducimus vulticulus derelinquo crastinus. Atrocitas culpa recusandae defaeco voco corrigo nobis. Tego pauci antepono cunae eum.",
+    "role": "seller",
+    "country": "Antigua and Barbuda",
+    "address": "271 Washington Boulevard",
+    "phone": "(644) 672-9087 x011",
+    "profileImage": "https://cdn.jsdelivr.net/gh/faker-js/assets-person-portrait/female/512/35.jpg",
+    "email": "Ralph72@gmail.com",
+    "documentation": [
+      {
+        "type": "passport",
+        "document": "686d19bbb092181834934e78",
+        "_id": "686d19bbb092181834934e99"
+      }
+    ],
+    "userState": "inactive",
+    "gender": "other",
+    "dateOfBirth": "1970-08-05T22:19:12.786Z",
+    "assetId": "4ef32716-bd5c-4db6-a784-d6c3a3a1f671",
+    "electronicConsent": {
+      "consentTerms": false,
+      "consentTaxTems": false
+    },
+    "_id": "686d19bbb092181834934e98",
+    "__v": 0
+  },
+  {
+    "fullName": "Seth Oberbrunner MD",
+    "about": "Virga ea amor comitatus alioqui sequi administratio. Ocer ait vos. Vapulus absconditus debeo tametsi.",
+    "role": "investor",
+    "country": "Martinique",
+    "address": "6867 Schaefer Highway",
+    "phone": "426.619.3651 x17994",
+    "profileImage": "https://cdn.jsdelivr.net/gh/faker-js/assets-person-portrait/female/512/45.jpg",
+    "email": "Edward66@yahoo.com",
+    "documentation": [
+      {
+        "type": "passport",
+        "document": "686d19bbb092181834934e79",
+        "_id": "686d19bbb092181834934e9b"
+      }
+    ],
+    "userState": "inactive",
+    "gender": "male",
+    "dateOfBirth": "1960-08-06T22:09:17.971Z",
+    "assetId": "f96fcf49-a380-4b95-be3f-fd0a01ddce4a",
+    "electronicConsent": {
+      "consentTerms": true,
+      "consentTaxTems": false
+    },
+    "_id": "686d19bbb092181834934e9a",
+    "__v": 0
+  },
+  {
+    "fullName": "Lana Gutkowski",
+    "about": "Possimus attero reprehenderit quidem. Pariatur vestigium videlicet tribuo. Celo amo tactus arcus voluntarius.",
+    "role": "agent",
+    "country": "Uruguay",
+    "address": "783 Reta Loop",
+    "phone": "965-758-5704",
+    "profileImage": "https://avatars.githubusercontent.com/u/25758887",
+    "email": "Mozelle.Koelpin@gmail.com",
+    "documentation": [
+      {
+        "type": "passport",
+        "document": "686d19bbb092181834934e7a",
+        "_id": "686d19bbb092181834934e9d"
+      }
+    ],
+    "userState": "suspended",
+    "gender": "female",
+    "dateOfBirth": "1982-11-28T10:23:38.446Z",
+    "assetId": "ff7b97d8-a77c-4817-86d0-f0a6bed012c8",
+    "electronicConsent": {
+      "consentTerms": false,
+      "consentTaxTems": false
+    },
+    "_id": "686d19bbb092181834934e9c",
+    "__v": 0
+  },
+  {
+    "fullName": "Kay Funk",
+    "about": "Sophismata torrens timidus vomica sunt pecto. Consuasor angelus cimentarius aspernatur stips totus. Decipio maxime molestias volo coepi.",
+    "role": "buyer",
+    "country": "Senegal",
+    "address": "62899 Oak Avenue",
+    "phone": "(360) 445-1444 x37557",
+    "profileImage": "https://cdn.jsdelivr.net/gh/faker-js/assets-person-portrait/female/512/6.jpg",
+    "email": "Uriah_Lebsack52@gmail.com",
+    "documentation": [
+      {
+        "type": "utility_bill",
+        "document": "686d19bbb092181834934e7b",
+        "_id": "686d19bbb092181834934e9f"
+      }
+    ],
+    "userState": "inactive",
+    "gender": "other",
+    "dateOfBirth": "1985-01-29T05:26:29.701Z",
+    "assetId": "dc45c1c8-0e81-40e8-9508-e98ac2ac4a44",
+    "electronicConsent": {
+      "consentTerms": false,
+      "consentTaxTems": false
+    },
+    "_id": "686d19bbb092181834934e9e",
+    "__v": 0
+  },
+  {
+    "fullName": "Myron Cormier",
+    "about": "Arbor nam aspicio subseco conscendo vulgus cena. Aspernatur alter spero cura inventore. Dignissimos voluptates vacuus compello.",
+    "role": "agent",
+    "country": "Tonga",
+    "address": "72456 Francisco Hills",
+    "phone": "(628) 831-1008 x9598",
+    "profileImage": "https://avatars.githubusercontent.com/u/89011417",
+    "email": "Hanna.Swift@hotmail.com",
+    "documentation": [
+      {
+        "type": "passport",
+        "document": "686d19bbb092181834934e7c",
+        "_id": "686d19bbb092181834934ea1"
+      }
+    ],
+    "userState": "inactive",
+    "gender": "male",
+    "dateOfBirth": "1977-01-01T17:08:46.744Z",
+    "assetId": "6b270c44-8b32-4888-a4a7-e29ceb728588",
+    "electronicConsent": {
+      "consentTerms": true,
+      "consentTaxTems": true
+    },
+    "_id": "686d19bbb092181834934ea0",
+    "__v": 0
+  },
+  {
+    "fullName": "Stewart Goldner",
+    "about": "Clibanus sint benigne. Vallum auctor temeritas cavus. Victoria adduco dicta tantum.",
+    "role": "investor",
+    "country": "Lao People's Democratic Republic",
+    "address": "7260 Bergstrom Rapid",
+    "phone": "(329) 830-7399",
+    "profileImage": "https://cdn.jsdelivr.net/gh/faker-js/assets-person-portrait/female/512/68.jpg",
+    "email": "Nettie_Gulgowski@yahoo.com",
+    "documentation": [
+      {
+        "type": "passport",
+        "document": "686d19bbb092181834934e7d",
+        "_id": "686d19bbb092181834934ea3"
+      }
+    ],
+    "userState": "inactive",
+    "gender": "female",
+    "dateOfBirth": "1983-04-15T05:10:48.961Z",
+    "assetId": "9c4b8eb6-c19b-451b-859d-fee6b02a8214",
+    "electronicConsent": {
+      "consentTerms": true,
+      "consentTaxTems": false
+    },
+    "_id": "686d19bbb092181834934ea2",
+    "__v": 0
+  },
+  {
+    "fullName": "Earnest Thompson",
+    "about": "Brevis tui acer asperiores cui eligendi. Tum traho stabilis volup consuasor stillicidium conduco cubicularis bene. Uter nemo delego audeo sollers.",
+    "role": "buyer",
+    "country": "Saint Lucia",
+    "address": "75804 Kathryne Glen",
+    "phone": "820.326.7418 x571",
+    "profileImage": "https://cdn.jsdelivr.net/gh/faker-js/assets-person-portrait/male/512/83.jpg",
+    "email": "Susanna0@hotmail.com",
+    "documentation": [
+      {
+        "type": "driving_license",
+        "document": "686d19bbb092181834934e7e",
+        "_id": "686d19bbb092181834934ea5"
+      }
+    ],
+    "userState": "inactive",
+    "gender": "female",
+    "dateOfBirth": "1996-11-02T14:28:27.089Z",
+    "assetId": "90df834b-08fb-4deb-ad36-6303240442e0",
+    "electronicConsent": {
+      "consentTerms": true,
+      "consentTaxTems": false
+    },
+    "_id": "686d19bbb092181834934ea4",
+    "__v": 0
+  },
+  {
+    "fullName": "Dale Schneider",
+    "about": "Earum synagoga tabella amaritudo decor tardus umerus tam alii. Voveo vobis timor communis clam vinculum administratio tero catena. Pectus amplexus angustus vado attonbitus.",
+    "role": "investor",
+    "country": "Guatemala",
+    "address": "18085 Weber Circle",
+    "phone": "(271) 437-7045 x9576",
+    "profileImage": "https://cdn.jsdelivr.net/gh/faker-js/assets-person-portrait/female/512/97.jpg",
+    "email": "Millie1@gmail.com",
+    "documentation": [
+      {
+        "type": "passport",
+        "document": "686d19bbb092181834934e7f",
+        "_id": "686d19bbb092181834934ea7"
+      }
+    ],
+    "userState": "active",
+    "gender": "female",
+    "dateOfBirth": "1984-11-17T09:27:17.069Z",
+    "assetId": "24bbae19-fff9-4a0f-83b6-0ca7a62fefc7",
+    "electronicConsent": {
+      "consentTerms": false,
+      "consentTaxTems": false
+    },
+    "_id": "686d19bbb092181834934ea6",
+    "__v": 0
+  }
+]

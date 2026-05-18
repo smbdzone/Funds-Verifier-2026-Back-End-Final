@@ -1,0 +1,305 @@
+[
+  {
+    "propertyTypes": [
+      "Apartments"
+    ],
+    "regions": [
+      "Europe",
+      "Africa",
+      "US"
+    ],
+    "escrowAccount": [
+      "Completed"
+    ],
+    "escrowAccountFunds": [
+      "Rejected",
+      "Pending"
+    ],
+    "carTypes": [
+      "Sedan",
+      "Convertible",
+      "SUV"
+    ],
+    "boatTypes": [
+      "Yacht"
+    ],
+    "jewelryTypes": [
+      "Watch",
+      "Ring",
+      "Bracelet"
+    ],
+    "_id": "686d20b4aa12c755efc88262",
+    "__v": 0
+  },
+  {
+    "propertyTypes": [
+      "Apartments",
+      "Building"
+    ],
+    "regions": [
+      "Asia",
+      "US",
+      "Europe"
+    ],
+    "escrowAccount": [
+      "Completed"
+    ],
+    "escrowAccountFunds": [
+      "Rejected"
+    ],
+    "carTypes": [
+      "Convertible",
+      "Sedan",
+      "SUV"
+    ],
+    "boatTypes": [
+      "Yacht",
+      "Sailboat"
+    ],
+    "jewelryTypes": [
+      "Watch",
+      "Ring"
+    ],
+    "_id": "686d20b4aa12c755efc88263",
+    "__v": 0
+  },
+  {
+    "propertyTypes": [
+      "Apartments"
+    ],
+    "regions": [
+      "Canada",
+      "UAE"
+    ],
+    "escrowAccount": [
+      "Pending",
+      "Cancelled"
+    ],
+    "escrowAccountFunds": [
+      "Rejected",
+      "Pending"
+    ],
+    "carTypes": [
+      "Convertible"
+    ],
+    "boatTypes": [
+      "Sailboat"
+    ],
+    "jewelryTypes": [
+      "Watch",
+      "Necklace",
+      "Ring"
+    ],
+    "_id": "686d20b4aa12c755efc88264",
+    "__v": 0
+  },
+  {
+    "propertyTypes": [
+      "Land",
+      "Apartments",
+      "Building"
+    ],
+    "regions": [
+      "Canada"
+    ],
+    "escrowAccount": [
+      "Processing",
+      "Cancelled"
+    ],
+    "escrowAccountFunds": [
+      "Verified",
+      "Pending"
+    ],
+    "carTypes": [
+      "Truck"
+    ],
+    "boatTypes": [
+      "Sailboat",
+      "Yacht"
+    ],
+    "jewelryTypes": [
+      "Watch"
+    ],
+    "_id": "686d20b4aa12c755efc88265",
+    "__v": 0
+  },
+  {
+    "propertyTypes": [
+      "Apartments",
+      "Villa",
+      "Retail"
+    ],
+    "regions": [
+      "Europe"
+    ],
+    "escrowAccount": [
+      "Completed",
+      "Processing"
+    ],
+    "escrowAccountFunds": [
+      "Verified"
+    ],
+    "carTypes": [
+      "SUV",
+      "Sedan"
+    ],
+    "boatTypes": [
+      "Jet Ski"
+    ],
+    "jewelryTypes": [
+      "Ring"
+    ],
+    "_id": "686d20b4aa12c755efc88266",
+    "__v": 0
+  },
+  {
+    "propertyTypes": [
+      "Villa",
+      "Retail"
+    ],
+    "regions": [
+      "Europe",
+      "Asia"
+    ],
+    "escrowAccount": [
+      "Cancelled",
+      "Pending"
+    ],
+    "escrowAccountFunds": [
+      "Pending"
+    ],
+    "carTypes": [
+      "SUV",
+      "Truck",
+      "Convertible"
+    ],
+    "boatTypes": [
+      "Jet Ski"
+    ],
+    "jewelryTypes": [
+      "Bracelet",
+      "Ring",
+      "Necklace"
+    ],
+    "_id": "686d20b4aa12c755efc88267",
+    "__v": 0
+  },
+  {
+    "propertyTypes": [
+      "Retail",
+      "Villa"
+    ],
+    "regions": [
+      "Asia",
+      "Africa",
+      "US"
+    ],
+    "escrowAccount": [
+      "Completed"
+    ],
+    "escrowAccountFunds": [
+      "Verified"
+    ],
+    "carTypes": [
+      "Convertible"
+    ],
+    "boatTypes": [
+      "Sailboat"
+    ],
+    "jewelryTypes": [
+      "Bracelet",
+      "Watch"
+    ],
+    "_id": "686d20b4aa12c755efc88268",
+    "__v": 0
+  },
+  {
+    "propertyTypes": [
+      "Land",
+      "Villa"
+    ],
+    "regions": [
+      "UAE"
+    ],
+    "escrowAccount": [
+      "Processing"
+    ],
+    "escrowAccountFunds": [
+      "Pending"
+    ],
+    "carTypes": [
+      "Convertible",
+      "Sedan"
+    ],
+    "boatTypes": [
+      "Jet Ski",
+      "Yacht"
+    ],
+    "jewelryTypes": [
+      "Necklace",
+      "Ring"
+    ],
+    "_id": "686d20b4aa12c755efc88269",
+    "__v": 0
+  },
+  {
+    "propertyTypes": [
+      "Building",
+      "Retail"
+    ],
+    "regions": [
+      "Canada"
+    ],
+    "escrowAccount": [
+      "Processing"
+    ],
+    "escrowAccountFunds": [
+      "Rejected"
+    ],
+    "carTypes": [
+      "Truck",
+      "Sedan",
+      "Convertible"
+    ],
+    "boatTypes": [
+      "Sailboat"
+    ],
+    "jewelryTypes": [
+      "Ring"
+    ],
+    "_id": "686d20b4aa12c755efc8826a",
+    "__v": 0
+  },
+  {
+    "propertyTypes": [
+      "Office",
+      "Apartments"
+    ],
+    "regions": [
+      "US"
+    ],
+    "escrowAccount": [
+      "Completed",
+      "Pending"
+    ],
+    "escrowAccountFunds": [
+      "Rejected"
+    ],
+    "carTypes": [
+      "SUV",
+      "Sedan",
+      "Convertible"
+    ],
+    "boatTypes": [
+      "Sailboat",
+      "Jet Ski"
+    ],
+    "jewelryTypes": [
+      "Necklace",
+      "Bracelet",
+      "Ring"
+    ],
+    "_id": "686d20b4aa12c755efc8826b",
+    "__v": 0
+  }
+]
