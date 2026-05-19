@@ -70,6 +70,20 @@ export const assetHolderUpdate = async (req, res, next) => {
     const isEvaluator = user.role === 'Evaluator'
     const isSubEvaluator = ['Sub-Evaluator', 'SubEvaluator'].includes(user.role)
 
+    // Evaluators may update assets in the evaluation workflow (pending or evaluated).
+    if (isEvaluator || isSubEvaluator) {
+      const evaluationStatus = asset.status
+      if (
+        evaluationStatus === 0 ||
+        evaluationStatus === 1 ||
+        evaluationStatus == null
+      ) {
+        req.user = user
+        req.asset = asset
+        return next()
+      }
+    }
+
     const userIdString = String(user._id)
     const isDirectAssignee =
       asset.evaluatorUUID === user.uuid ||

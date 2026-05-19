@@ -213,7 +213,6 @@ const getSingleProduct = asyncHandler(async (req, res) => {
     }
 
     await refreshListingMediaSignedUrls(boat)
-    sanitizeListingMediaResponse(boat)
 
     const isPrivilegedUser =
       req.user &&
@@ -223,10 +222,13 @@ const getSingleProduct = asyncHandler(async (req, res) => {
 
     // Public user → return limited fields
     if (!isPrivilegedUser) {
-      return res.json(pickFields(boat, PUBLIC_BOAT_FIELDS.trim().split(/\s+/)))
+      const publicBoat = pickFields(boat, PUBLIC_BOAT_FIELDS.trim().split(/\s+/))
+      sanitizeListingMediaResponse(publicBoat)
+      return res.json(publicBoat)
     }
 
-    // Privileged user → return full object
+    await attachDocumentSignedUrls(boat)
+    sanitizeListingMediaResponse(boat)
     res.json(boat)
   } catch (err) {
     console.error('Error fetching boat:', err.message)

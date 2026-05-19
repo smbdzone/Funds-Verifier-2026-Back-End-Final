@@ -23,7 +23,13 @@ export const PUBLIC_PROPERTY_FIELDS = `
   ratings
   totalrating
   status
+  createdAt
   assetType
+  propertyType
+  propertyForSale
+  propertyForLease
+  listing
+  neighbourhood
   country
   city
   userUUID

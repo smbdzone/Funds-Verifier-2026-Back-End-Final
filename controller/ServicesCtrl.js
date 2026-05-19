@@ -4,7 +4,6 @@ import ReportTechnical from '../models/reportModel.js'
 import { stripe } from '../libs/stripe.js'
 import Transaction from '../models/transactionModel.js'
 import validateMongoId from '../utils/validateMongodbId.js'
-import { verifyToken } from '../middlewares/JwtAuth.js'
 import Property from '../models/propertyModel.js'
 import Cars from '../models/carModel.js'
 import Boats from '../models/boatModel.js'
@@ -43,19 +42,11 @@ function getModelByAssetType(assetType) {
 // subscibe a new serice
 const SubscribeServices = async (req, res) => {
   try {
-    const authorizationHeader = req.headers['authorization']
-    if (!authorizationHeader || !authorizationHeader.startsWith('Bearer ')) {
+    if (!req.user?._id) {
       return res.status(401).json({
         success: false,
-        message: 'Bearer token not found in Authorization header',
+        message: 'Unauthorized',
       })
-    }
-    const bearerToken = authorizationHeader.split(' ')[1]
-    const userIdFromToken = verifyToken(bearerToken)
-    if (!userIdFromToken) {
-      return res
-        .status(401)
-        .json({ success: false, message: 'User ID not found in token.' })
     }
 
     const {
@@ -69,7 +60,7 @@ const SubscribeServices = async (req, res) => {
       success_url,
       cancel_url,
     } = req.body
-    const phone = req.body.phone.trim()
+    const phone = typeof req.body.phone === 'string' ? req.body.phone.trim() : ''
 
     if (!req.user._id)
       return res.status(401).json({
@@ -99,21 +90,21 @@ const SubscribeServices = async (req, res) => {
 
     const sanitizedUserUUID = sanitizeUUID(userUUID)
     const sanitizedProductId = sanitizeUUID(productId)
-    
+
     if (!sanitizedUserUUID) {
       return res.status(400).json({
         error: true,
         message: 'Invalid user UUID format',
       })
     }
-    
+
     if (!sanitizedProductId) {
       return res.status(400).json({
         error: true,
         message: 'Invalid product UUID format',
       })
     }
-    
+
     const GetUser = await User.findOne({ uuid: sanitizedUserUUID, isDeleted: false })
     if (!GetUser)
       return res.status(400).json({ error: true, message: 'User not found.' })

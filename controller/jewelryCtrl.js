@@ -201,7 +201,6 @@ const getSingleProduct = asyncHandler(async (req, res) => {
     }
 
     await refreshListingMediaSignedUrls(jewelry)
-    sanitizeListingMediaResponse(jewelry)
 
     const isPrivilegedUser =
       req.user &&
@@ -211,12 +210,16 @@ const getSingleProduct = asyncHandler(async (req, res) => {
 
     // 🔒 Public / non-privileged users
     if (!isPrivilegedUser) {
-      return res.json(
-        pickFields(jewelry, PUBLIC_JEWELRY_FIELDS.trim().split(/\s+/))
+      const publicJewelry = pickFields(
+        jewelry,
+        PUBLIC_JEWELRY_FIELDS.trim().split(/\s+/),
       )
+      sanitizeListingMediaResponse(publicJewelry)
+      return res.json(publicJewelry)
     }
 
-    // 🔓 Privileged users
+    await attachDocumentSignedUrls(jewelry)
+    sanitizeListingMediaResponse(jewelry)
     res.json(jewelry)
   } catch (err) {
     console.error('Error fetching jewelry:', err.message)

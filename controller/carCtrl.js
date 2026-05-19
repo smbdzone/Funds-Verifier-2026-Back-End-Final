@@ -197,9 +197,6 @@ const getSingleProduct = asyncHandler(async (req, res) => {
     }
 
     await refreshListingMediaSignedUrls(car)
-    // Strip server-internal S3 fields before responding (signedUrl is all the
-    // client needs — see helper/sanitizeListingResponse.js for the rationale).
-    sanitizeListingMediaResponse(car)
 
     const isPrivilegedUser =
       req.user &&
@@ -208,9 +205,13 @@ const getSingleProduct = asyncHandler(async (req, res) => {
       )
 
     if (!isPrivilegedUser) {
-      return res.json(pickFields(car, PUBLIC_CAR_FIELDS.trim().split(/\s+/)))
+      const publicCar = pickFields(car, PUBLIC_CAR_FIELDS.trim().split(/\s+/))
+      sanitizeListingMediaResponse(publicCar)
+      return res.json(publicCar)
     }
 
+    await attachDocumentSignedUrls(car)
+    sanitizeListingMediaResponse(car)
     res.json(car)
   } catch (err) {
     console.error('Error fetching car:', err.message)
@@ -284,6 +285,10 @@ const getAllProduct = asyncHandler(async (req, res) => {
 
   if (req.query.title) {
     parseData.title = { $regex: req.query.title, $options: 'i' }
+  }
+
+  if (req.query.statusFilter === '1' || req.query.status === '1') {
+    parseData.status = 1
   }
 
   // ---------------- AUTHENTICATED LOGIC ----------------
@@ -360,6 +365,13 @@ const getAllProduct = asyncHandler(async (req, res) => {
         populate: { path: 'reportFile', select: '-_id' },
       })
       .populate({ path: 'ratings.postedBy', select: '-_id' })
+  }
+
+  if (req.query.sort) {
+    const sortBy = req.query.sort.split(',').join(' ')
+    query = query.sort(sortBy)
+  } else {
+    query = query.sort('-createdAt')
   }
 
   // ---------------- PAGINATION ----------------

@@ -163,19 +163,17 @@ const getSingleProperty = asyncHandler(async (req, res) => {
   }
 
   const { sanitizeUUID } = await import('../utils/nosqlSanitizer.js')
-  const sanitizedId = sanitizeUUID(id)
-  if (!sanitizedId) {
-    return res.status(400).json({
-      success: false,
-      message: 'Invalid UUID format',
-    })
+  const sanitizedUuid = sanitizeUUID(id)
+  const lookupQuery = { isDeleted: false }
+
+  if (sanitizedUuid) {
+    lookupQuery.$or = [{ uuid: sanitizedUuid }, { slug: id }]
+  } else {
+    lookupQuery.slug = id
   }
 
   try {
-    const property = await Property.findOne({
-      uuid: sanitizedId,
-      isDeleted: false,
-    })
+    const property = await Property.findOne(lookupQuery)
       .populate('pictures')
       .populate('video')
       .populate('uploadDocument')
@@ -249,6 +247,49 @@ const getAllProduct = asyncHandler(async (req, res) => {
       parseData.price = {}
       if (req.query.minPrice) parseData.price.$gte = +req.query.minPrice
       if (req.query.maxPrice) parseData.price.$lte = +req.query.maxPrice
+    }
+
+    if (req.query.statusFilter === '1' || req.query.status === '1') {
+      parseData.status = 1
+    }
+
+    if (req.query.propertyForSale) {
+      const saleVal = String(req.query.propertyForSale).trim()
+      if (/^yes$/i.test(saleVal)) {
+        parseData.$and = [
+          ...(parseData.$and || []),
+          {
+            $or: [
+              { propertyForSale: { $regex: /^yes$/i } },
+              {
+                assetType: { $regex: /for sale|off plan/i },
+                $or: [
+                  { propertyForLease: { $exists: false } },
+                  { propertyForLease: null },
+                  { propertyForLease: '' },
+                  { propertyForLease: { $not: /^yes$/i } },
+                ],
+              },
+            ],
+          },
+        ]
+      } else {
+        parseData.propertyForSale = {
+          $regex: new RegExp(`^${saleVal}$`, 'i'),
+        }
+      }
+    }
+
+    if (req.query.propertyForLease) {
+      parseData.propertyForLease = {
+        $regex: new RegExp(`^${String(req.query.propertyForLease).trim()}$`, 'i'),
+      }
+    }
+
+    if (req.query.propertyType) {
+      parseData.propertyType = {
+        $regex: new RegExp(`^${String(req.query.propertyType).trim()}$`, 'i'),
+      }
     }
 
     // ------------------ AUTHENTICATED LOGIC ------------------
@@ -339,6 +380,13 @@ const getAllProduct = asyncHandler(async (req, res) => {
         ? 'ratingNumber review -_id'
         : 'ratingNumber -_id',
     })
+
+    if (req.query.sort) {
+      const sortBy = req.query.sort.split(',').join(' ')
+      query = query.sort(sortBy)
+    } else {
+      query = query.sort('-createdAt')
+    }
 
     // ------------------ PAGINATION ------------------
     const page = +req.query.page || 1

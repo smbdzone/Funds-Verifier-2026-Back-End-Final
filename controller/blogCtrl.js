@@ -393,9 +393,11 @@ const deleteInsightHub = async (req, res) => {
 const updateInsightHub = async (req, res) => {
   const {
     title,
+    slug,
     imagealttext,
     banner,
     services,
+    faqs,
     SEO,
     schemas,
     status,
@@ -410,9 +412,15 @@ const updateInsightHub = async (req, res) => {
     })
     if (insightHub) {
       insightHub.title = title
+      if (slug) {
+        insightHub.slug = slug
+      }
       insightHub.imagealttext = imagealttext
       insightHub.services = services
       insightHub.category = category
+      if (faqs !== undefined) {
+        insightHub.faqs = faqs
+      }
       insightHub.schemas = schemas
       insightHub.status = status || insightHub.status
 

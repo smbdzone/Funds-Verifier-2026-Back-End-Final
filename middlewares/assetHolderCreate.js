@@ -167,11 +167,35 @@ const assetModels = {
   Jewelry,
 }
 
+const isServiceSubscribePost = (req) =>
+  req.method === 'POST' &&
+  (req.path === '/subscribe' || req.originalUrl?.includes('/services/subscribe'))
+
 export const assetHolderCreate = async (req, res, next) => {
   try {
+    // authMiddleware already validated Bearer or accessToken cookie
+    if (isServiceSubscribePost(req) && req.user?._id) {
+      const user = await User.findById(req.user._id, { isDeleted: false })
+      if (!user) return res.status(404).json({ message: 'User not found' })
+      if (user.role !== 'AssetHolder' && user.role !== 'Admin') {
+        return res.status(403).json({
+          message: 'Forbidden: Only AssetHolder allowed',
+        })
+      }
+      req.user = user
+      return next()
+    }
+
     /** 1️⃣ Check Authorization Header */
     const authHeader = req.headers.authorization
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    let token = null
+    if (authHeader?.startsWith('Bearer ')) {
+      token = authHeader.split(' ')[1]
+    } else if (req.cookies?.accessToken) {
+      token = req.cookies.accessToken
+    }
+
+    if (!token) {
       await logSuspiciousActivity(req, 'Missing or invalid token')
       return res.status(401).json({
         success: false,
@@ -180,7 +204,6 @@ export const assetHolderCreate = async (req, res, next) => {
     }
 
     /** 2️⃣ Decode Token */
-    const token = authHeader.split(' ')[1]
     let decoded
     try {
       decoded = jwt.verify(token, process.env.SECRET_KEY)
