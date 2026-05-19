@@ -76,6 +76,9 @@ export const PUBLIC_CAR_FIELDS = `
   video
   pictures
   thumbnailImg
+  evaluationCertificate
+  technicalReport
+  video3DWalkthrough
 `
 export const PUBLIC_BOAT_FIELDS = `
 uuid 
@@ -113,6 +116,8 @@ userUUID
   video
   pictures
   thumbnailImg
+  evaluationCertificate
+  technicalReport
 `
 
 export const PUBLIC_JEWELRY_FIELDS = `
@@ -148,4 +153,6 @@ export const PUBLIC_JEWELRY_FIELDS = `
   video
   pictures
   thumbnailImg
+  evaluationCertificate
+  technicalReport
 `

@@ -345,18 +345,17 @@ const getAllProduct = asyncHandler(async (req, res) => {
     .populate({ path: 'pictures', select: '-_id' })
     .populate({ path: 'video', select: '-_id' })
     .populate({ path: 'thumbnailImg', select: '-_id' })
+    .populate({ path: 'evaluationCertificate', select: '-_id' })
+    .populate({ path: 'video3DWalkthrough', select: '-_id' })
+    .populate({
+      path: 'technicalReport',
+      populate: { path: 'reportFile', select: '-_id' },
+    })
 
-  // ❗ Only authenticated users get sensitive data
   if (isAuthenticated) {
     query = query
-      .populate({ path: 'evaluationCertificate', select: '-_id' })
-      .populate({ path: 'video3DWalkthrough', select: '-_id' })
       .populate({ path: 'uploadDocument', select: '-_id' })
       .populate({ path: 'invoice', select: '-_id' })
-      .populate({
-        path: 'technicalReport',
-        populate: { path: 'reportFile', select: '-_id' },
-      })
       .populate({ path: 'ratings.postedBy', select: '-_id' })
   }
 
@@ -391,6 +390,10 @@ const getAllProduct = asyncHandler(async (req, res) => {
 
       if (isAuthenticated) {
         await attachDocumentSignedUrls(obj)
+      } else {
+        await attachDocumentSignedUrls(obj, {
+          fields: ['evaluationCertificate', 'technicalReport'],
+        })
       }
 
       // Drop server-internal S3 metadata (s3Bucket/s3Key/s3VersionId/s3ETag/url)
@@ -543,6 +546,15 @@ const getAllProductByFilter = asyncHandler(async (req, res) => {
       typeof p.toObject === 'function' ? p.toObject() : p,
     )
     await refreshListingsMediaSignedUrls(allProduct)
+    await Promise.all(
+      allProduct.map((p) =>
+        userId
+          ? attachDocumentSignedUrls(p)
+          : attachDocumentSignedUrls(p, {
+            fields: ['evaluationCertificate', 'technicalReport'],
+          }),
+      ),
+    )
     sanitizeListingsMediaResponse(allProduct)
     const totalFilteredProducts = await Car.countDocuments(modifiedQuery)
 

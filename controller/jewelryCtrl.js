@@ -338,19 +338,18 @@ const getAllProduct = asyncHandler(async (req, res) => {
     .populate({ path: 'video', select: '-_id' })
     .populate({ path: 'thumbnailImg', select: '-_id' })
     .populate({ path: 'ratings.postedBy', select: '-_id' })
+    .populate({ path: 'evaluationCertificate', select: '-_id' })
+    .populate({ path: 'video3DWalkthrough', select: '-_id' })
+    .populate({
+      path: 'technicalReport',
+      select: '-_id',
+      populate: { path: 'reportFile', select: '-_id' },
+    })
 
-  /* ===================== PRIVATE POPULATES ===================== */
   if (!isPublicUser) {
     query = query
-      .populate({ path: 'evaluationCertificate', select: '-_id' })
       .populate({ path: 'uploadDocument', select: '-_id' })
       .populate({ path: 'invoice', select: '-_id' })
-      .populate({ path: 'video3DWalkthrough', select: '-_id' })
-      .populate({
-        path: 'technicalReport',
-        select: '-_id',
-        populate: { path: 'reportFile', select: '-_id' },
-      })
       .populate({
         path: 'reviews',
         select: 'ratingNumber review -_id',
@@ -400,7 +399,11 @@ const getAllProduct = asyncHandler(async (req, res) => {
           : 0
 
       const obj = product.toObject()
-      if (!isPublicUser) {
+      if (isPublicUser) {
+        await attachDocumentSignedUrls(obj, {
+          fields: ['evaluationCertificate', 'technicalReport'],
+        })
+      } else {
         await attachDocumentSignedUrls(obj)
       }
       sanitizeListingMediaResponse(obj)
@@ -521,6 +524,15 @@ const getAllProductByFilter = asyncHandler(async (req, res) => {
       typeof p.toObject === 'function' ? p.toObject() : p,
     )
     await refreshListingsMediaSignedUrls(allProduct)
+    await Promise.all(
+      allProduct.map((p) =>
+        userId
+          ? attachDocumentSignedUrls(p)
+          : attachDocumentSignedUrls(p, {
+            fields: ['evaluationCertificate', 'technicalReport'],
+          }),
+      ),
+    )
     sanitizeListingsMediaResponse(allProduct)
     return res.status(200).json({
       products: allProduct,
