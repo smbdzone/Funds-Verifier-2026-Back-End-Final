@@ -10,6 +10,10 @@ import Boats from '../models/boatModel.js'
 import Jewelry from '../models/jewelryModel.js'
 import { createNotification } from './notifications.controller.js'
 import { sanitizeUUID } from '../utils/nosqlSanitizer.js'
+import {
+  linkTechnicalReportToListing,
+  linkWalkthroughToListing,
+} from '../utils/listingPremiumSync.js'
 
 export const sendServiceNotification = async (data) => {
   try {
@@ -335,28 +339,51 @@ const UpdateUserForSubscribeServices = async (req, res) => {
     let reportTech
 
     if (service === 'all') {
-      request3dwalkthrough = await Request3D.findByIdAndUpdate(request3DId, {
-        status: 'successful',
-        payment_details,
-        payment_method_status,
-      })
-      reportTech = await ReportTechnical.findByIdAndUpdate(reportTechId, {
-        status: 'successful',
-        payment_details,
-        payment_method_status,
-      })
+      request3dwalkthrough = await Request3D.findByIdAndUpdate(
+        request3DId,
+        {
+          status: 'successful',
+          payment_details,
+          payment_method_status,
+        },
+        { new: true },
+      )
+      reportTech = await ReportTechnical.findByIdAndUpdate(
+        reportTechId,
+        {
+          status: 'successful',
+          payment_details,
+          payment_method_status,
+        },
+        { new: true },
+      )
     } else if (service === 'surveyor') {
-      reportTech = await ReportTechnical.findByIdAndUpdate(reportTechId, {
-        status: 'successful',
-        payment_details,
-        payment_method_status,
-      })
+      reportTech = await ReportTechnical.findByIdAndUpdate(
+        reportTechId,
+        {
+          status: 'successful',
+          payment_details,
+          payment_method_status,
+        },
+        { new: true },
+      )
     } else if (service === '_3dwalkthrough') {
-      request3dwalkthrough = await Request3D.findByIdAndUpdate(request3DId, {
-        status: 'successful',
-        payment_details,
-        payment_method_status,
-      })
+      request3dwalkthrough = await Request3D.findByIdAndUpdate(
+        request3DId,
+        {
+          status: 'successful',
+          payment_details,
+          payment_method_status,
+        },
+        { new: true },
+      )
+    }
+
+    if (reportTech) {
+      await linkTechnicalReportToListing(reportTech)
+    }
+    if (request3dwalkthrough) {
+      await linkWalkthroughToListing(request3dwalkthrough)
     }
 
     const TransactionRequest = new Transaction({

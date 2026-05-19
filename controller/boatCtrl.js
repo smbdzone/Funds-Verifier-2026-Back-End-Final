@@ -67,6 +67,8 @@ const createProduct = asyncHandler(async (req, res) => {
       price: req.body.price,
     })
 
+    stripNullPremiumRefs(req.body)
+
     const createPdt = await Boat.create([req.body], { session })
 
     // add evaluation payment message queue
