@@ -134,32 +134,49 @@ const optionalAuthMiddleware = asyncHandler(async (req, res, next) => {
   }
 })
 
+/** Super Admin panel users — role must be exactly `Admin`. */
 const isAdmin = asyncHandler(async (req, res, next) => {
   if (!req.user) {
-    return res.status(401).json({ message: 'Unauthorized' })
+    return res.status(401).json({ success: false, message: 'Unauthorized' })
   }
 
-  const { _id } = req.user
-
   try {
-    const adminUser = await User.findById(_id, { isDeleted: false }).select(
-      '_id role email',
-    )
+    const adminUser = await User.findOne({
+      _id: req.user._id,
+      isDeleted: false,
+    }).select('_id role email')
 
-    if (!adminUser || adminUser.isDeleted) {
-      return res.status(401).json({ message: 'User not found' })
+    if (!adminUser) {
+      return res.status(401).json({ success: false, message: 'User not found' })
     }
 
-    if (adminUser.role !== 'Admin') {
-      return res.status(400).json({ message: 'You are not an administrator' })
+    const role = String(adminUser.role || '').trim()
+    if (role !== 'Admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Forbidden — Super Admin access only',
+      })
     }
 
     next()
   } catch (err) {
-    return res
-      .status(500)
-      .json({ message: err?.message || 'Something went wrong!' })
+    return res.status(500).json({
+      success: false,
+      message: err?.message || 'Something went wrong!',
+    })
   }
 })
 
-export { authMiddleware, isAdmin, optionalAuthMiddleware }
+/** Contact PII routes: must send Authorization Bearer (Postman / Super Admin API). */
+const requireBearerAuth = asyncHandler(async (req, res, next) => {
+  const header = req.headers.authorization
+  if (!header || !header.startsWith('Bearer ') || !header.split(' ')[1]?.trim()) {
+    return res.status(401).json({
+      success: false,
+      message: 'Unauthorized — Authorization Bearer token required',
+    })
+  }
+  next()
+})
+
+export { authMiddleware, isAdmin, requireBearerAuth, optionalAuthMiddleware }

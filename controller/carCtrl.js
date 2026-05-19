@@ -238,18 +238,8 @@ const getSingleProductBySlug = asyncHandler(async (req, res) => {
 const getAllProduct = asyncHandler(async (req, res) => {
   const queryObj = { ...req.query }
 
-  // ---------------- AUTH (SAFE) ----------------
-  let user = null
-  const header = req.headers['authorization']
-  const token = header?.split(' ')[1]
-
-  if (token) {
-    const userId = verifyToken(token)
-    if (userId) {
-      user = await UserModel.findById(userId)
-    }
-  }
-
+  // ---------------- AUTH — optionalAuthMiddleware (Bearer + cookie) ----------------
+  const user = req.user || null
   const isAuthenticated = !!user
 
   // ---------------- QUERY CLEANUP ----------------
@@ -358,6 +348,7 @@ const getAllProduct = asyncHandler(async (req, res) => {
   if (isAuthenticated) {
     query = query
       .populate({ path: 'evaluationCertificate', select: '-_id' })
+      .populate({ path: 'video3DWalkthrough', select: '-_id' })
       .populate({ path: 'uploadDocument', select: '-_id' })
       .populate({ path: 'invoice', select: '-_id' })
       .populate({

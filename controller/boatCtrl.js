@@ -274,25 +274,9 @@ const getSingleProductBySlug = asyncHandler(async (req, res) => {
 const getAllProduct = asyncHandler(async (req, res) => {
   try {
     /* ----------------------------------------------------
-       1️⃣ OPTIONAL AUTH (NO 401 FOR PUBLIC)
+       1️⃣ AUTH — use optionalAuthMiddleware (Bearer + accessToken cookie)
     ---------------------------------------------------- */
-    const header = req.headers.authorization
-    const token =
-      header && header.startsWith('Bearer ') ? header.split(' ')[1] : null
-
-    let user = null
-
-    if (token) {
-      try {
-        const userId = verifyToken(token)
-        user = await UserModel.findOne({
-          _id: userId,
-          isDeleted: false,
-        })
-      } catch {
-        user = null
-      }
-    }
+    const user = req.user || null
 
     /* ----------------------------------------------------
        2️⃣ CLEAN QUERY PARAMS

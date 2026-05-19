@@ -231,19 +231,9 @@ const getSingleProduct = asyncHandler(async (req, res) => {
 const getAllProduct = asyncHandler(async (req, res) => {
   const queryObj = { ...req.query }
 
-  /* ===================== TOKEN HANDLING ===================== */
-  const header = req.headers['authorization']
-  const token = header && header.split(' ')[1]
-  let userId = null
-
-  if (token) {
-    userId = verifyToken(token)
-    if (!userId) {
-      return res.status(401).json({ message: 'Invalid token' })
-    }
-  }
-
-  const isPublicUser = !userId || req.query.token === 'false'
+  /* ===================== AUTH — optionalAuthMiddleware (Bearer + cookie) ===================== */
+  const user = req.user || null
+  const isPublicUser = !user || req.query.token === 'false'
 
   /* ===================== QUERY CLEANUP ===================== */
   const excludeField = [
@@ -292,8 +282,7 @@ const getAllProduct = asyncHandler(async (req, res) => {
   }
 
   /* ===================== ROLE-BASED ACCESS ===================== */
-  if (userId) {
-    const user = await UserModel.findById(userId, { isDeleted: false })
+  if (user) {
     const isSubEvaluator = ['Sub-Evaluator', 'SubEvaluator'].includes(user.role)
 
     if (isSubEvaluator) {
