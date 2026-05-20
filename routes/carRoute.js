@@ -15,7 +15,6 @@ import {
   addRating,
   deleteImgs,
   getRelatedProduct,
-  getSingleProductBySlug,
   getPrice,
   getAllProductByFilter,
   getApprovedListingsMetrics,
@@ -47,7 +46,6 @@ router.get(
   publicTokenMiddleware,
   getSingleProduct
 )
-router.get('/', publicTokenMiddleware, getSingleProductBySlug)
 router.put('/rating', publicTokenMiddleware, addRating)
 router.put('/:moduleId', authMiddleware, assetHolderUpdate, updateProduct)
 router.delete('/:id', assetHolderCreate, authorizeUserByUUID, deleteProduct)

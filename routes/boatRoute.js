@@ -18,7 +18,6 @@ import {
   getRelatedProduct,
   getPrice,
   getAllProductByFilter,
-  getSingleProductBySlug,
   getApprovedListingsMetrics,
 } from '../controller/boatCtrl.js'
 // import { getSingleProductBySlug } from "../controller/carCtrl.js";
@@ -50,7 +49,6 @@ router.get(
   publicTokenMiddleware,
   getSingleProduct
 )
-router.get('/', publicTokenMiddleware, getSingleProductBySlug)
 
 // router.put('/wishlist',assetHolderCreate, authorizeUserByUUID,isAdmin, addToWishList)
 router.put('/rating', publicTokenMiddleware, addRating)

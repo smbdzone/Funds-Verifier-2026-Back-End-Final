@@ -164,21 +164,26 @@ const createProduct = asyncHandler(async (req, res) => {
   }
 })
 
-// get single product
+// get single product by id or slug
 const getSingleProduct = asyncHandler(async (req, res) => {
   const { id } = req.params
 
+  if (!id) {
+    return res.status(400).json({ message: 'Invalid car ID' })
+  }
+
   const { sanitizeUUID } = await import('../utils/nosqlSanitizer.js')
-  const sanitizedId = sanitizeUUID(id)
-  if (!sanitizedId) {
-    return res.status(400).json({
-      success: false,
-      message: 'Invalid UUID format',
-    })
+  const sanitizedUuid = sanitizeUUID(id)
+  const lookupQuery = { isDeleted: false }
+
+  if (sanitizedUuid) {
+    lookupQuery.$or = [{ uuid: sanitizedUuid }, { slug: id }]
+  } else {
+    lookupQuery.slug = id
   }
 
   try {
-    const car = await Car.findOne({ uuid: sanitizedId, isDeleted: false })
+    const car = await Car.findOne(lookupQuery)
       .populate('pictures')
       .populate('video')
       .populate('thumbnailImg')
