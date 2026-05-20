@@ -57,6 +57,11 @@ const CarAdSchema = new Schema(
       PaymentProof: { type: String },
     },
     dealClosed: { type: Boolean },
+    successFeePaymentStatus: {
+      type: String,
+      enum: ['Pending', 'Paid'],
+      default: 'Pending',
+    },
     dealer: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',

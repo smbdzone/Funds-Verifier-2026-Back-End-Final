@@ -25,6 +25,7 @@ import {
   authMiddleware,
   optionalAuthMiddleware,
 } from '../middlewares/authMiddleware.js'
+import { adminOnly } from '../middlewares/adminOnly.js'
 import {
   signupLimiter,
   loginLimiter,
@@ -86,22 +87,18 @@ router.put(
   updateStatus,
 )
 
-// financial statements
+// financial statements (admin dashboard only)
 router.get(
   '/financial-statements',
-  authMiddleware,
+  ...adminOnly,
   financialInfoLimiter,
-  authorizeUserByUUID,
-  authorize('editOwnProfile'),
   GetUsersFinancialInfo,
 )
 
 router.put(
   '/financial-statements/:id',
-  authMiddleware,
+  ...adminOnly,
   financialInfoLimiter,
-  authorizeUserByUUID,
-  authorize('editOwnProfile'),
   UpdateUsersFinancialInfo,
 )
 
@@ -126,8 +123,8 @@ router.get(
   getSingleUser,
 )
 
-// get users by role
-router.get('/role-id/:role', authMiddleware, getUserByRole)
+// get users by role (admin dashboard only)
+router.get('/role-id/:role', ...adminOnly, getUserByRole)
 
 // switch user role/status
 router.put(

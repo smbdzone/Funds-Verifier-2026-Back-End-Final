@@ -23,6 +23,7 @@ import prices from './priceRoute.js'
 import userRouter from './userRoutes.js'
 import transactionRouter from './transactionRoute.js'
 import platformFee from './platformFeeRoute.js'
+import successFeeRoute from './successFeeRoute.js'
 import blogRoute from './blogRouter.js'
 import countriesRoute from './countriesRoute.js'
 import advertisementRoute from './advertisementRoute.js'
@@ -55,6 +56,7 @@ router.use('/boat', boatRoute)
 router.use('/jewelry', jewelryRoute)
 router.use('/', assetRoute)
 router.use('/platform-fee', platformFee)
+router.use('/success-fee', successFeeRoute)
 router.use('/pay', transactionRouter)
 router.use('/blog', blogRoute)
 router.use('/countries', countriesRoute)

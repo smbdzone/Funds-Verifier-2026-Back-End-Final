@@ -7,7 +7,7 @@ import {
   GetNotificationById,
   UpdateNotificationAsRead,
 } from '../controller/notifications.controller.js'
-import { authMiddleware } from '../middlewares/authMiddleware.js'
+import { authMiddleware, isAdmin } from '../middlewares/authMiddleware.js'
 import { authorizeUserByUUID } from '../middlewares/authorizeUser.js'
 import Notifications from '../models/notificationsModel.js'
 import { getIO } from '../utils/socket.js'
@@ -59,6 +59,7 @@ router.get(
 router.get(
   '/role/:role',
   authMiddleware,
+  isAdmin,
   authorizeUserByUUID,
   async (req, res) => {
     try {
@@ -74,8 +75,10 @@ router.get(
 
       // Admin → all notifications
       if (loggedInUser.role === 'Admin') {
-        const notifications = await GetAllNotificationByUserRole({...payload,userId: loggedInUser.uuid,
-          UserRole: loggedInUser.role,})
+        const notifications = await GetAllNotificationByUserRole({
+          ...payload, userId: loggedInUser.uuid,
+          UserRole: loggedInUser.role,
+        })
 
         return res.status(200).json(notifications)
       }

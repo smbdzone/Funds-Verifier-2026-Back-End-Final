@@ -5,12 +5,24 @@ import Property from '../models/propertyModel.js'
 
 export const PurchaseTrackerForAssetHolder = async (req, res) => {
   try {
-    const userId = req.query.userId
+    const userId = req.query.userId || req.query.userUUID
 
     if (!userId)
       return res
         .status(400)
         .json({ message: 'userId is required in query parameters.' })
+
+    const requester = req.user
+    if (
+      requester?.role !== 'Admin' &&
+      String(userId) !== String(requester._id) &&
+      String(userId) !== String(requester.uuid)
+    ) {
+      return res.status(403).json({
+        success: false,
+        message: 'Forbidden — you can only access your own purchase tracker',
+      })
+    }
 
     const getProductsWithType = async (
       Model,

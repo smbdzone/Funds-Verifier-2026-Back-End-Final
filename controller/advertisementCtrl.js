@@ -109,14 +109,12 @@ const GetAllAdvertisements = async (req, res) => {
     const user = await User.findById(userId, { isDeleted: false }).select(
       'role',
     )
-    console.log(user, 'dsfghjkl;kjhgfdsfghj')
-
-    // if (!user || user?.role !== 'Admin') {
-    //   return res.status(403).json({
-    //     success: false,
-    //     message: 'You are not authorized to access this.',
-    //   })
-    // }
+    if (!user || user?.role !== 'Admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'You are not authorized to access this.',
+      })
+    }
 
     // Get total count before pagination
     const total = await Advertisement.countDocuments()
@@ -192,9 +190,10 @@ const GetOneAdvertisements = async (req, res) => {
     )
 
     if (!user || user?.role !== 'Admin') {
-      return res
-        .status(400)
-        .json({ message: 'You are not admin to access this.' })
+      return res.status(403).json({
+        success: false,
+        message: 'You are not authorized to access this.',
+      })
     }
 
     const result = await Advertisement.aggregate([
@@ -586,9 +585,8 @@ function getCurrentPrice() {
   const currentTime = new Date()
   const currentHour = currentTime.getHours()
   const currentMinute = currentTime.getMinutes()
-  const currentTimeString = `${currentHour}:${
-    currentMinute < 10 ? '0' : ''
-  }${currentMinute}`
+  const currentTimeString = `${currentHour}:${currentMinute < 10 ? '0' : ''
+    }${currentMinute}`
 
   const currentDay = currentTime.getDay()
 
@@ -728,9 +726,8 @@ function getCurrentPriceForImpression() {
   const currentTime = new Date()
   const currentHour = currentTime.getHours()
   const currentMinute = currentTime.getMinutes()
-  const currentTimeString = `${currentHour}:${
-    currentMinute < 10 ? '0' : ''
-  }${currentMinute}`
+  const currentTimeString = `${currentHour}:${currentMinute < 10 ? '0' : ''
+    }${currentMinute}`
 
   const currentDay = currentTime.getDay()
 
@@ -821,7 +818,7 @@ const updatedImpressions = async (req, res) => {
           (impression) =>
             impression.userId.toString() === userIdFromToken.toString() &&
             new Date(impression.date).getTime() >
-              currentDate.getTime() - 24 * 60 * 60 * 1000,
+            currentDate.getTime() - 24 * 60 * 60 * 1000,
         ),
       )
 

@@ -23,6 +23,8 @@ import initNotificationSocket from './sockets/notificationSocket.js'
 const localOrigin = [
   'http://localhost:5002',
   'http://localhost:3011',
+  'http://127.0.0.1:5002',
+  'http://127.0.0.1:3011',
 ]
 // Configure CORS
 const corsOptions = {
@@ -38,21 +40,32 @@ dotenv.config()
 const app = express()
 
 // Configure Helmet for security headers
+const isProduction = process.env.NODE_ENV === 'production'
 app.use(
   helmet({
     contentSecurityPolicy: {
       directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'"],
         styleSrc: ["'self'", "'unsafe-inline'"],
         imgSrc: ["'self'", 'data:', 'https:', 'http:', 'res.cloudinary.com'],
         connectSrc: ["'self'", 'https:', 'http:', 'res.cloudinary.com'],
         frameSrc: ["'none'"],
+        objectSrc: ["'none'"],
+        baseUri: ["'self'"],
+        formAction: ["'self'"],
+        frameAncestors: ["'none'"],
       },
     },
     xssFilter: true,
-    referrerPolicy: {
-      policy: 'strict-origin-when-cross-origin',
-    },
-  })
+    xContentTypeOptions: true,
+    frameguard: { action: 'deny' },
+    referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+    hsts: isProduction
+      ? { maxAge: 31536000, includeSubDomains: true, preload: true }
+      : false,
+    permittedCrossDomainPolicies: { permittedPolicies: 'none' },
+  }),
 )
 
 

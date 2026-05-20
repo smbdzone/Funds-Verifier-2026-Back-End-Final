@@ -20,11 +20,14 @@ import {
   GetOneAdvertisements,
 } from '../controller/advertisementCtrl.js'
 import { authMiddleware } from '../middlewares/authMiddleware.js'
+import { adminOnly } from '../middlewares/adminOnly.js'
+import { assertWalletAccess } from '../middlewares/assertWalletAccess.js'
 import AdsWallet from '../models/AdsWalletModel.js'
+
 router.post('/create-advertisement', create)
 router.get('/', getAll)
-router.get('/approvals/all', GetAllAdvertisements)
-router.get('/single/:id', GetOneAdvertisements)
+router.get('/approvals/all', ...adminOnly, GetAllAdvertisements)
+router.get('/single/:id', ...adminOnly, GetOneAdvertisements)
 
 router.get('/getById', getAll)
 router.get('/getUserAdvertisement', getUserAdvertisements)
@@ -40,20 +43,23 @@ router.put('/updatedImpressions', updatedImpressions)
 router.put('/:id', update)
 router.delete('/:id', deleteAdvertisement)
 
-router.get('/user/wallet/:id', async (req, res) => {
-  try {
-    const { id } = req.params
-    const wallet = await AdsWallet.findOne({ userId: id, isDeleted: false })
-    return res.status(200).json({ success: true, wallet: wallet })
-  } catch (error) {
-    return res
-      .status(500)
-      .json({
+router.get(
+  '/user/wallet/:id',
+  authMiddleware,
+  assertWalletAccess,
+  async (req, res) => {
+    try {
+      const { id } = req.params
+      const wallet = await AdsWallet.findOne({ userId: id, isDeleted: false })
+      return res.status(200).json({ success: true, wallet: wallet })
+    } catch (error) {
+      return res.status(500).json({
         success: false,
         message: 'Internal Server Error',
         error: error.message,
       })
-  }
-})
+    }
+  },
+)
 
 export default router
