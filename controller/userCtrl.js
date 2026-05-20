@@ -856,6 +856,37 @@ const verifyUserToken = asyncHandler(async (req, res) => {
   })
 })
 
+const SERVICE_PROVIDER_ROLES = new Set([
+  'Evaluator',
+  'TechnicalReport',
+  '3dWalkthrough',
+  'Trustee',
+])
+
+/** Minimal provider list for booking (asset holders / deal hunters). */
+const getServiceProvidersByRole = asyncHandler(async (req, res) => {
+  const { role } = req.params
+
+  if (!SERVICE_PROVIDER_ROLES.has(role)) {
+    return res.status(400).json({ message: 'Invalid service provider role' })
+  }
+
+  const query = { role, isDeleted: { $ne: true } }
+  if (role === 'Evaluator') {
+    query.$or = [
+      { parentEvaluator: { $exists: false } },
+      { parentEvaluator: null },
+      { parentEvaluator: '' },
+    ]
+  }
+
+  const users = await User.find(query)
+    .select('uuid name lastname role')
+    .lean()
+
+  res.json(users)
+})
+
 const getUserByRole = asyncHandler(async (req, res) => {
   const { role } = req.params
   const requester = req.user
@@ -1242,6 +1273,7 @@ export {
   deleteUser,
   updateUser,
   getUserByRole,
+  getServiceProvidersByRole,
   switchUser,
   GetUsersFinancialInfo,
   sendVerificationEmail,

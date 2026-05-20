@@ -11,6 +11,7 @@ import {
   getSingleUser,
   updateUser,
   getUserByRole,
+  getServiceProvidersByRole,
   verifyUserToken,
   switchUser,
   uaePassLogin,
@@ -62,6 +63,13 @@ router.get(
   authMiddleware,
   authorize('viewOthersProfile'),
   getEvaluator,
+)
+
+// service providers for listing / evaluation booking (asset holders, deal hunters, etc.)
+router.get(
+  '/service-providers/:role',
+  authMiddleware,
+  getServiceProvidersByRole,
 )
 
 // verify email (public)

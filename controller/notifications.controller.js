@@ -84,12 +84,26 @@ const GetAllNotificationByUserId = async ({ role, userId, limit, page }) => {
   }
 }
 
+// Roles that receive personal notifications (scoped to one user)
+const PERSONAL_NOTIFICATION_ROLES = new Set([
+  'AssetHolder',
+  'DealHunter',
+  'Evaluator',
+  'SubEvaluator',
+  'Sub-Evaluator',
+  'Trustee',
+  'TechnicalReport',
+  '3dWalkthrough',
+])
+
 // Get all Notification by user role
 const GetAllNotificationByUserRole = async ({
-  userId,
+  userUUID,
+  userMongoId,
   UserRole,
   limit,
   page,
+  isAdmin = false,
 }) => {
   try {
     const perPage = parseInt(limit) || 20
@@ -98,19 +112,20 @@ const GetAllNotificationByUserRole = async ({
 
     const findClause = {
       isDeleted: false,
+      UserRole,
     }
 
-    // Non-admin users → filter by role
-    if (UserRole !== 'Admin') {
-      findClause.UserRole = UserRole
-    }
-
-    // Certain roles → filter by userId
+    // Logged-in users (non-admin): only their own notifications for that role
     if (
-      userId &&
-      (UserRole === 'AssetHolder' || UserRole === 'DealHunter')
+      !isAdmin &&
+      userUUID &&
+      PERSONAL_NOTIFICATION_ROLES.has(UserRole)
     ) {
-      findClause.userId = userId
+      const ownerMatch = [{ userUUID }, { userId: userUUID }]
+      if (userMongoId) {
+        ownerMatch.push({ userId: String(userMongoId) })
+      }
+      findClause.$or = ownerMatch
     }
 
     const notifications = await Notifications.find(findClause)

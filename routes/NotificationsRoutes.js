@@ -7,7 +7,7 @@ import {
   GetNotificationById,
   UpdateNotificationAsRead,
 } from '../controller/notifications.controller.js'
-import { authMiddleware, isAdmin } from '../middlewares/authMiddleware.js'
+import { authMiddleware } from '../middlewares/authMiddleware.js'
 import { authorizeUserByUUID } from '../middlewares/authorizeUser.js'
 import Notifications from '../models/notificationsModel.js'
 import { getIO } from '../utils/socket.js'
@@ -59,35 +59,42 @@ router.get(
 router.get(
   '/role/:role',
   authMiddleware,
-  isAdmin,
   authorizeUserByUUID,
   async (req, res) => {
     try {
       const loggedInUser = req.userResource
+      const requestedRole = String(req.params.role || '').trim()
+      const userRole = String(loggedInUser.role || '').trim()
+      const isAdmin = userRole === 'Admin'
+
+      let effectiveRole = userRole
+      if (loggedInUser.parentEvaluator && userRole === 'Evaluator') {
+        effectiveRole = 'SubEvaluator'
+      }
+
+      if (!isAdmin) {
+        const allowed = new Set([userRole, effectiveRole, 'Sub-Evaluator'])
+        if (userRole === 'Evaluator' && loggedInUser.parentEvaluator) {
+          allowed.add('SubEvaluator')
+        }
+        if (!allowed.has(requestedRole)) {
+          return res.status(403).json({
+            success: false,
+            message: 'Forbidden: cannot access notifications for this role',
+          })
+        }
+      }
 
       const page = Number(req.query.page) || 1
       const limit = Number(req.query.limit) || 10
 
-      const payload = {
+      const notifications = await GetAllNotificationByUserRole({
         page,
         limit,
-      }
-
-      // Admin → all notifications
-      if (loggedInUser.role === 'Admin') {
-        const notifications = await GetAllNotificationByUserRole({
-          ...payload, userId: loggedInUser.uuid,
-          UserRole: loggedInUser.role,
-        })
-
-        return res.status(200).json(notifications)
-      }
-
-      // Non-admin → user-specific
-      const notifications = await GetAllNotificationByUserRole({
-        ...payload,
-        userId: loggedInUser.uuid,
-        UserRole: loggedInUser.role,
+        userUUID: loggedInUser.uuid,
+        userMongoId: loggedInUser._id,
+        UserRole: isAdmin ? requestedRole : requestedRole || effectiveRole,
+        isAdmin,
       })
 
       return res.status(200).json(notifications)
@@ -161,6 +168,18 @@ router.delete('/:id', authMiddleware, authorizeUserByUUID, async (req, res) => {
       return res
         .status(404)
         .json({ message: 'Notification not found or already deleted' })
+    }
+
+    const ownsNotification =
+      notification.userUUID === loggedInUser.uuid ||
+      String(notification.userId) === String(loggedInUser._id) ||
+      String(notification.userId) === loggedInUser.uuid
+
+    if (loggedInUser.role !== 'Admin' && !ownsNotification) {
+      return res.status(403).json({
+        success: false,
+        message: 'Forbidden: cannot delete this notification',
+      })
     }
 
     // Get the notification's userUUID before soft-deleting
