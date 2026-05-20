@@ -25,6 +25,7 @@ import {
 } from '../helper/sanitizeListingResponse.js'
 import { attachDocumentSignedUrls } from '../helper/attachDocumentSignedUrls.js'
 import { stripNullPremiumRefs } from '../utils/listingPremiumSync.js'
+import { buildListingIdQuery } from '../utils/listingIdLookup.js'
 import express from 'express'
 import upload from '../middlewares/Multer.js'
 
@@ -652,7 +653,7 @@ const updateProduct = asyncHandler(async (req, res) => {
     try {
       // validateMongoId(id)
       // Find the existing product
-      const product = await Boat.findOne({ uuid: moduleId, isDeleted: false })
+      const product = await Boat.findOne(buildListingIdQuery(moduleId))
       if (!product) {
         return res.status(404).json({ message: 'boat not found' })
       }

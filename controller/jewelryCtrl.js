@@ -25,6 +25,7 @@ import {
 } from '../helper/sanitizeListingResponse.js'
 import { attachDocumentSignedUrls } from '../helper/attachDocumentSignedUrls.js'
 import { stripNullPremiumRefs } from '../utils/listingPremiumSync.js'
+import { buildListingIdQuery } from '../utils/listingIdLookup.js'
 import upload from '../middlewares/Multer.js'
 
 import express from 'express'
@@ -588,10 +589,7 @@ const updateProduct = asyncHandler(async (req, res) => {
 
     try {
       // Find the existing product
-      const product = await Jewelry.findOne({
-        uuid: moduleId,
-        isDeleted: false,
-      })
+      const product = await Jewelry.findOne(buildListingIdQuery(moduleId))
       if (!product) {
         return res.status(404).json({ message: 'jwellery not found' })
       }

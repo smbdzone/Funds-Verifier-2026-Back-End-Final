@@ -24,24 +24,24 @@ import { adminOnly } from '../middlewares/adminOnly.js'
 import { assertWalletAccess } from '../middlewares/assertWalletAccess.js'
 import AdsWallet from '../models/AdsWalletModel.js'
 
-router.post('/create-advertisement', create)
-router.get('/', getAll)
+router.post('/create-advertisement', authMiddleware, create)
+router.get('/', authMiddleware, getAll)
 router.get('/approvals/all', ...adminOnly, GetAllAdvertisements)
 router.get('/single/:id', ...adminOnly, GetOneAdvertisements)
 
-router.get('/getById', getAll)
-router.get('/getUserAdvertisement', getUserAdvertisements)
-router.get('/getAllSideBanners', getAllSideBanners)
-router.get('/getAllLargeBanners', getAllLargeBanners)
-router.get('/getAllFooterBanners', getAllFooterBanners)
+router.get('/getById', authMiddleware, getAll)
+router.get('/getUserAdvertisement', authMiddleware, getUserAdvertisements)
+router.get('/getAllSideBanners', authMiddleware, getAllSideBanners)
+router.get('/getAllLargeBanners', authMiddleware, getAllLargeBanners)
+router.get('/getAllFooterBanners', authMiddleware, getAllFooterBanners)
 router.get('/byDateAndTime', getByDateAndTime)
-router.get('/getAdvertisementById/:id', getById)
+router.get('/getAdvertisementById/:id', authMiddleware, getById)
 // Get advertisements by user; secured inside controller using bearer token & role
 router.get('/user/:userId', authMiddleware, getByUserId)
-router.put('/updatedClicks', updatedClicks)
-router.put('/updatedImpressions', updatedImpressions)
-router.put('/:id', update)
-router.delete('/:id', deleteAdvertisement)
+router.put('/updatedClicks', authMiddleware, updatedClicks)
+router.put('/updatedImpressions', authMiddleware, updatedImpressions)
+router.put('/:id', authMiddleware, update)
+router.delete('/:id', authMiddleware, deleteAdvertisement)
 
 router.get(
   '/user/wallet/:id',

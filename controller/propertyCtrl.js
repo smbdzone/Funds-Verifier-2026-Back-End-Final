@@ -28,6 +28,7 @@ import {
   sanitizeListingMediaResponse,
   sanitizeListingsMediaResponse,
 } from '../helper/sanitizeListingResponse.js'
+import { buildListingIdQuery } from '../utils/listingIdLookup.js'
 
 const app = express()
 
@@ -630,10 +631,9 @@ const updateProduct = asyncHandler(async (req, res) => {
     try {
       // validateMongoId(id)
       // Find the existing product
-      const product = await Property.findOne({
-        uuid: moduleId,
-        isDeleted: false,
-      }).populate('uploadDocument')
+      const product = await Property.findOne(
+        buildListingIdQuery(moduleId),
+      ).populate('uploadDocument')
       // Populate existing documents
       if (!product) {
         return res.status(404).json({ message: 'Property not found' })

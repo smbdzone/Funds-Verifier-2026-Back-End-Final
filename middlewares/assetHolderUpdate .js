@@ -6,6 +6,7 @@ import Car from '../models/carModel.js'
 import Boat from '../models/boatModel.js'
 import Jewelry from '../models/jewelryModel.js'
 import { logSuspiciousActivity } from './logSuspicious.js'
+import { buildListingIdQuery } from '../utils/listingIdLookup.js'
 
 const assetModels = {
   Property,
@@ -39,7 +40,7 @@ export const assetHolderUpdate = async (req, res, next) => {
 
     for (const key in assetModels) {
       const Model = assetModels[key]
-      const record = await Model.findOne({ uuid: moduleId, isDeleted: false })
+      const record = await Model.findOne(buildListingIdQuery(moduleId))
 
       if (record) {
         assetFound = { record, model: key }
