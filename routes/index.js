@@ -40,9 +40,11 @@ import contactRoutes from './contactRoutes.js'
 import publicRoutes from './publicToken.js'
 import testRoute from './testRoute.js'
 import { createPaymentIntent } from '../controller/createPaymentIntentCtrl.js'
+import { pdfPreviewProxy } from '../controller/pdfPreviewCtrl.js'
 
 const router = express.Router()
 
+router.get('/pdf-preview', pdfPreviewProxy)
 router.post('/create-payment-intent', createPaymentIntent)
 
 router.use('/user', userRouter)
