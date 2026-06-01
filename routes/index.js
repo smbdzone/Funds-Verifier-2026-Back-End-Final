@@ -41,8 +41,11 @@ import publicRoutes from './publicToken.js'
 import testRoute from './testRoute.js'
 import { createPaymentIntent } from '../controller/createPaymentIntentCtrl.js'
 import { pdfPreviewProxy } from '../controller/pdfPreviewCtrl.js'
+import { issueCsrfToken } from '../middlewares/csrfMiddleware.js'
 
 const router = express.Router()
+
+router.get('/csrf-token', issueCsrfToken)
 
 router.get('/pdf-preview', pdfPreviewProxy)
 router.post('/create-payment-intent', createPaymentIntent)

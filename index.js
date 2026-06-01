@@ -18,6 +18,7 @@ import { errorHandler, notFound } from './middlewares/errorHandler.js'
 import { apiLimiter, contactFormLimiter, emailFormLimiter } from './middlewares/rateLimiter.js'
 import { initSocket } from './utils/socket.js'
 import initNotificationSocket from './sockets/notificationSocket.js'
+import { csrfProtection } from './middlewares/csrfMiddleware.js'
 
 
 const localOrigin = [
@@ -33,7 +34,15 @@ const corsOptions = {
     'https://fundsverifier.com',
     ...(process.env.NODE_ENV === 'development' ? localOrigin : [])
   ],
-  credentials: true, // Allow credentials (cookies)
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: [
+    'Content-Type',
+    'Authorization',
+    'x-csrf-token',
+    'X-CSRF-Token',
+    'x-public-token',
+  ],
 }
 
 dotenv.config()
@@ -96,6 +105,7 @@ app.get('/', (req, res) => {
 })
 // Apply to all requests
 app.use('/api', apiLimiter)
+app.use('/api', csrfProtection)
 //routes
 app.use('/api/', routes)
 

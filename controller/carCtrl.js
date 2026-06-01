@@ -39,6 +39,11 @@ import { createNotification } from './notifications.controller.js'
 import { AddPaymentJob } from '../utils/jobs/index.js'
 import UserPaymentDetails from '../models/UserPaymentDetails.js'
 import { PUBLIC_CAR_FIELDS } from '../constants/publicFields.js'
+import {
+  getSafeStringParam,
+  getSafeTitleRegex,
+  pickScalarFilters,
+} from '../utils/listingQuery.js'
 
 const app = express()
 const __filename = fileURLToPath(import.meta.url)
@@ -244,31 +249,14 @@ const getSingleProductBySlug = asyncHandler(async (req, res) => {
 
 // // get all product
 const getAllProduct = asyncHandler(async (req, res) => {
-  const queryObj = { ...req.query }
-
   // ---------------- AUTH — optionalAuthMiddleware (Bearer + cookie) ----------------
   const user = req.user || null
   const isAuthenticated = !!user
 
-  // ---------------- QUERY CLEANUP ----------------
-  const excludeField = [
-    'page',
-    'sort',
-    'limit',
-    'fields',
-    'date',
-    'minPrice',
-    'maxPrice',
-    'statusFilter',
-    'title',
-    'dashboard',
-  ]
-
-  excludeField.forEach((el) => delete queryObj[el])
-
-  let queryStr = JSON.stringify(queryObj)
-  queryStr = queryStr.replace(/\b(gte|gt|lte|lt)\b/g, (m) => `$${m}`)
-  const parseData = JSON.parse(queryStr)
+  // ---------------- SAFE FILTER PARAMS ----------------
+  const parseData = {
+    ...pickScalarFilters(req.query),
+  }
 
   // ---------------- PUBLIC DEFAULT ----------------
   parseData.isDeleted = false
@@ -282,7 +270,10 @@ const getAllProduct = asyncHandler(async (req, res) => {
   }
 
   if (req.query.title) {
-    parseData.title = { $regex: req.query.title, $options: 'i' }
+    const titleFilter = getSafeTitleRegex(req.query)
+    if (titleFilter) {
+      parseData.title = titleFilter
+    }
   }
 
   if (req.query.statusFilter === '1' || req.query.status === '1') {

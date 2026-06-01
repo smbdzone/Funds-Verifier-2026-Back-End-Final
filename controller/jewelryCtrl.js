@@ -49,6 +49,10 @@ import { createNotification } from './notifications.controller.js'
 import UserPaymentDetails from '../models/UserPaymentDetails.js'
 import { AddPaymentJob } from '../utils/jobs/index.js'
 import { PUBLIC_JEWELRY_FIELDS } from '../constants/publicFields.js'
+import {
+  getSafeTitleRegex,
+  pickScalarFilters,
+} from '../utils/listingQuery.js'
 
 // create product
 const createProduct = asyncHandler(async (req, res) => {
@@ -237,32 +241,14 @@ const getSingleProduct = asyncHandler(async (req, res) => {
 
 // // get all product
 const getAllProduct = asyncHandler(async (req, res) => {
-  const queryObj = { ...req.query }
-
   /* ===================== AUTH — optionalAuthMiddleware (Bearer + cookie) ===================== */
   const user = req.user || null
   const isPublicUser = !user || req.query.token === 'false'
 
-  /* ===================== QUERY CLEANUP ===================== */
-  const excludeField = [
-    'page',
-    'sort',
-    'limit',
-    'fields',
-    'date',
-    'minPrice',
-    'maxPrice',
-    'statusFilter',
-    'title',
-    'token',
-    'dashboard',
-  ]
-
-  excludeField.forEach((el) => delete queryObj[el])
-
-  let queryStr = JSON.stringify(queryObj)
-  queryStr = queryStr.replace(/\b(gte|gt|lte|lt)\b/g, (m) => `$${m}`)
-  const parseData = JSON.parse(queryStr)
+  /* ===================== SAFE FILTER PARAMS ===================== */
+  const parseData = {
+    ...pickScalarFilters(req.query),
+  }
 
   /* ===================== PRICE FILTER ===================== */
   if (req.query.minPrice || req.query.maxPrice) {
@@ -285,8 +271,9 @@ const getAllProduct = asyncHandler(async (req, res) => {
   }
 
   /* ===================== TITLE SEARCH ===================== */
-  if (req.query.title) {
-    parseData.title = { $regex: req.query.title, $options: 'i' }
+  const titleFilter = getSafeTitleRegex(req.query)
+  if (titleFilter) {
+    parseData.title = titleFilter
   }
 
   /* ===================== ROLE-BASED ACCESS ===================== */

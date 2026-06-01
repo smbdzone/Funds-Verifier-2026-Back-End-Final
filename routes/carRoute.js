@@ -2,7 +2,6 @@ import express from 'express'
 import {
   authMiddleware,
   isAdmin,
-  optionalAuthMiddleware,
 } from '../middlewares/authMiddleware.js'
 const router = express.Router()
 
@@ -26,27 +25,21 @@ import {
   formLimiter,
   listingReadLimiter,
 } from '../middlewares/rateLimiter.js'
-import { publicTokenMiddleware } from '../middlewares/publicTokenMiddleware.js'
+import { listingReadAccess } from '../middlewares/listingReadAccess.js'
 
 router.post('/', assetHolderCreate, formLimiter, createProduct)
 router.get(
   '/',
   listingReadLimiter,
-  optionalAuthMiddleware,
-  publicTokenMiddleware,
+  ...listingReadAccess,
   getAllProduct
 )
-router.get('/filter', publicTokenMiddleware, getAllProductByFilter)
+router.get('/filter', ...listingReadAccess, getAllProductByFilter)
 
-router.get('/price', publicTokenMiddleware, getPrice)
-router.get('/related-car', publicTokenMiddleware, getRelatedProduct)
-router.get(
-  '/:id',
-  optionalAuthMiddleware,
-  publicTokenMiddleware,
-  getSingleProduct
-)
-router.put('/rating', publicTokenMiddleware, addRating)
+router.get('/price', ...listingReadAccess, getPrice)
+router.get('/related-car', ...listingReadAccess, getRelatedProduct)
+router.get('/:id', ...listingReadAccess, getSingleProduct)
+router.put('/rating', ...listingReadAccess, addRating)
 router.put('/:moduleId', authMiddleware, assetHolderUpdate, updateProduct)
 router.delete('/:id', assetHolderCreate, authorizeUserByUUID, deleteProduct)
 router.delete(

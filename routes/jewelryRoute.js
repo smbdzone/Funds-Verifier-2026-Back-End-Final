@@ -16,7 +16,6 @@ import {
 import {
   authMiddleware,
   isAdmin,
-  optionalAuthMiddleware,
 } from '../middlewares/authMiddleware.js'
 import { assetHolderCreate } from '../middlewares/assetHolderCreate.js'
 import { authorizeUserByUUID } from '../middlewares/authorizeUser.js'
@@ -25,30 +24,24 @@ import {
   formLimiter,
   listingReadLimiter,
 } from '../middlewares/rateLimiter.js'
-import { publicTokenMiddleware } from '../middlewares/publicTokenMiddleware.js'
+import { listingReadAccess } from '../middlewares/listingReadAccess.js'
 // import { uploadPhoto, productImgResize } from '../middlewares/uploadImgs.js';
 
 router.post('/', assetHolderCreate, formLimiter, createProduct)
 router.get(
   '/',
   listingReadLimiter,
-  optionalAuthMiddleware,
-  publicTokenMiddleware,
+  ...listingReadAccess,
   getAllProduct
 )
-router.get('/filter', publicTokenMiddleware, getAllProductByFilter)
+router.get('/filter', ...listingReadAccess, getAllProductByFilter)
 
-router.get('/price', publicTokenMiddleware, getPrice)
+router.get('/price', ...listingReadAccess, getPrice)
 
-router.get('/related-jewelry', publicTokenMiddleware, getRelatedProduct)
-router.get(
-  '/:id',
-  optionalAuthMiddleware,
-  publicTokenMiddleware,
-  getSingleProduct
-)
+router.get('/related-jewelry', ...listingReadAccess, getRelatedProduct)
+router.get('/:id', ...listingReadAccess, getSingleProduct)
 // router.put('/wishlist',authMiddleware,isAdmin, addToWishList)
-router.put('/rating', publicTokenMiddleware, addRating)
+router.put('/rating', ...listingReadAccess, addRating)
 // router.put('/upload-imgs',authMiddleware,isAdmin, uploadPhoto.array('images',10),productImgResize, uploadImgs)
 // router.put('/:id',authMiddleware,isAdmin, updateProduct)
 router.put('/:moduleId', authMiddleware, assetHolderUpdate, updateProduct)

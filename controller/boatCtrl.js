@@ -40,6 +40,11 @@ import { createNotification } from './notifications.controller.js'
 import UserPaymentDetails from '../models/UserPaymentDetails.js'
 import { AddPaymentJob } from '../utils/jobs/index.js'
 import { PUBLIC_BOAT_FIELDS } from '../constants/publicFields.js'
+import {
+  getSafeStringParam,
+  getSafeTitleRegex,
+  pickScalarFilters,
+} from '../utils/listingQuery.js'
 const app = express()
 
 const __filename = fileURLToPath(import.meta.url)
@@ -287,27 +292,11 @@ const getAllProduct = asyncHandler(async (req, res) => {
     const user = req.user || null
 
     /* ----------------------------------------------------
-       2️⃣ CLEAN QUERY PARAMS
+       2️⃣ SAFE FILTER PARAMS (no raw req.query spread)
     ---------------------------------------------------- */
-    const queryObj = { ...req.query }
-
-    const excludeFields = [
-      'page',
-      'sort',
-      'limit',
-      'fields',
-      'date',
-      'minPrice',
-      'maxPrice',
-      'statusFilter',
-      'title',
-      'dashboard',
-    ]
-    excludeFields.forEach((f) => delete queryObj[f])
-
-    let queryStr = JSON.stringify(queryObj)
-    queryStr = queryStr.replace(/\b(gte|gt|lte|lt)\b/g, (m) => `$${m}`)
-    const parseData = JSON.parse(queryStr)
+    const parseData = {
+      ...pickScalarFilters(req.query),
+    }
 
     /* ----------------------------------------------------
        3️⃣ COMMON FILTERS
@@ -334,8 +323,9 @@ const getAllProduct = asyncHandler(async (req, res) => {
     }
 
     // Title search
-    if (req.query.title) {
-      parseData.title = { $regex: req.query.title, $options: 'i' }
+    const titleFilter = getSafeTitleRegex(req.query)
+    if (titleFilter) {
+      parseData.title = titleFilter
     }
 
     /* ----------------------------------------------------
@@ -509,7 +499,10 @@ const getAllProductByFilter = asyncHandler(async (req, res) => {
   }
   // Title filtering
   if (req.query.brands) {
-    modifiedQuery.brands = { $regex: req.query.brands, $options: 'i' } // Case-insensitive search
+    const brands = getSafeStringParam(req.query, 'brands')
+    if (brands) {
+      modifiedQuery.brands = { $regex: brands, $options: 'i' }
+    }
   }
 
   // Facility filtering (assuming "facilities" is a field in the Property model)

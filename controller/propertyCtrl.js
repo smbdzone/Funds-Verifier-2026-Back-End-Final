@@ -28,6 +28,11 @@ import {
   sanitizeListingMediaResponse,
   sanitizeListingsMediaResponse,
 } from '../helper/sanitizeListingResponse.js'
+import {
+  getSafeStringParam,
+  getSafeTitleRegex,
+  pickScalarFilters,
+} from '../utils/listingQuery.js'
 import { buildListingIdQuery } from '../utils/listingIdLookup.js'
 
 const app = express()
@@ -241,10 +246,12 @@ const getAllProduct = asyncHandler(async (req, res) => {
     }
 
     // ------------------ SEARCH & FILTERS (SAFE) ------------------
-    if (req.query.title) {
-      const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-      parseData.title = { $regex: escapeRegex(req.query.title), $options: 'i' }
+    const titleFilter = getSafeTitleRegex(req.query)
+    if (titleFilter) {
+      parseData.title = titleFilter
     }
+
+    Object.assign(parseData, pickScalarFilters(req.query))
 
     if (req.query.minPrice || req.query.maxPrice) {
       parseData.price = {}
@@ -587,8 +594,11 @@ const getAllProductByFilter = asyncHandler(async (req, res) => {
 })
 
 const getRelatedProduct = asyncHandler(async (req, res) => {
-  const { assetType, country, city, propertyType, price, evaluationPrices } =
-    req.query
+  const assetType = getSafeStringParam(req.query, 'assetType')
+  const country = getSafeStringParam(req.query, 'country')
+  const city = getSafeStringParam(req.query, 'city')
+  const propertyType = getSafeStringParam(req.query, 'propertyType')
+  const price = getSafeStringParam(req.query, 'price')
 
   // Construct the query object based on provided properties
   const queryObj = {}

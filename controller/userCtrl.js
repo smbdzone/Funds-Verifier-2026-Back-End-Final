@@ -915,27 +915,68 @@ const getUserByRole = asyncHandler(async (req, res) => {
   }
 })
 
+const isAdminRole = (role) => {
+  const roleNorm = String(role || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[\s_-]/g, '')
+  return role === 'Admin' || roleNorm === 'superadmin'
+}
+
+const findUserByRouteId = async (id, { includeDeleted = false } = {}) => {
+  const sanitizedUuid = sanitizeUUID(id)
+  if (sanitizedUuid) {
+    const query = { uuid: sanitizedUuid }
+    if (!includeDeleted) {
+      query.isDeleted = false
+    }
+    const byUuid = await User.findOne(query)
+    if (byUuid) return byUuid
+  }
+
+  const mongoId = sanitizeMongoId(id)
+  if (!mongoId) return null
+
+  const query = { _id: mongoId }
+  if (!includeDeleted) {
+    query.isDeleted = false
+  }
+  return User.findOne(query)
+}
+
 const deleteUser = asyncHandler(async (req, res) => {
   const { id } = req.params
+  const requester = req.user
 
   try {
-    const sanitizedId = sanitizeUUID(id)
-    if (!sanitizedId) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid UUID format',
-      })
-    }
+    const isAdmin = isAdminRole(requester?.role)
+    const user = await findUserByRouteId(id, { includeDeleted: isAdmin })
 
-    let user = await User.findOne({ uuid: sanitizedId, isDeleted: false })
     if (!user) {
-      const mongoId = sanitizeMongoId(id)
-      if (mongoId) {
-        user = await User.findOne({ _id: mongoId })
-      }
+      return res
+        .status(404)
+        .json({ message: 'User not found or already deleted' })
     }
 
-    if (!user || user.isDeleted) {
+    if (isAdmin) {
+      await User.deleteOne({ _id: user._id })
+
+      try {
+        const NotificationData = {
+          UserRole: 'Admin',
+          userUUID: req.user.uuid,
+          title: 'User Deleted',
+          message: `User (${user.email}) has been permanently deleted.`,
+        }
+        await createNotification({ data: NotificationData })
+      } catch (error) {
+        console.log({ error: error?.message })
+      }
+
+      return res.json({ message: 'User permanently deleted' })
+    }
+
+    if (user.isDeleted) {
       return res
         .status(404)
         .json({ message: 'User not found or already deleted' })
@@ -1145,6 +1186,9 @@ const validateToken = asyncHandler(async (req, res) => {
   }
 })
 
+const FORGOT_PASSWORD_SUCCESS_MESSAGE =
+  'If an account exists for this email, a password reset link has been sent.'
+
 const forgotPassword = async (req, res) => {
   try {
     const { email } = req.body
@@ -1158,17 +1202,10 @@ const forgotPassword = async (req, res) => {
     }
 
     const user = await User.findOne({ email: sanitizedEmail })
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: 'User not found',
-      })
-    }
-
-    if (user.userType === 'SOP3') {
-      return res.status(403).json({
-        success: false,
-        message: 'This account is not eligible for password reset',
+    if (!user || user.userType === 'SOP3') {
+      return res.status(200).json({
+        success: true,
+        message: FORGOT_PASSWORD_SUCCESS_MESSAGE,
       })
     }
 
@@ -1197,15 +1234,19 @@ This link will expire in 15 minutes.
 If you didn’t request this, please ignore this email.
 `
 
-    await sendEmail({
-      to: user.email,
-      subject: 'Password Reset Request',
-      text: message,
-    })
+    try {
+      await sendEmail({
+        to: user.email,
+        subject: 'Password Reset Request',
+        text: message,
+      })
+    } catch (emailError) {
+      console.error('Forgot password email failed:', emailError.message)
+    }
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
-      message: 'Password reset email sent',
+      message: FORGOT_PASSWORD_SUCCESS_MESSAGE,
     })
   } catch (error) {
     res.status(500).json({

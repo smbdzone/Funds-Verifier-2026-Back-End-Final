@@ -82,7 +82,7 @@ export const sanitizeEmail = (email) => {
   if (!email || typeof email !== "string") {
     return null;
   }
-  const sanitized = email.trim();
+  const sanitized = email.trim().toLowerCase();
 
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(sanitized)) {
     return null;

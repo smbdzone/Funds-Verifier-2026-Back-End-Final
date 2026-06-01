@@ -17,33 +17,26 @@ import {
 import {
   authMiddleware,
   isAdmin,
-  optionalAuthMiddleware,
 } from '../middlewares/authMiddleware.js'
 import { assetHolderCreate } from '../middlewares/assetHolderCreate.js'
 import { assetHolderUpdate } from '../middlewares/assetHolderUpdate .js'
 import { formLimiter, listingReadLimiter } from '../middlewares/rateLimiter.js'
-import { publicTokenMiddleware } from '../middlewares/publicTokenMiddleware.js'
+import { listingReadAccess } from '../middlewares/listingReadAccess.js'
 
 router.post('/', assetHolderCreate, formLimiter, createProduct)
 router.get(
   '/',
   listingReadLimiter,
-  publicTokenMiddleware,
-  optionalAuthMiddleware,
+  ...listingReadAccess,
   getAllProduct,
 )
-router.get('/filter', publicTokenMiddleware, getAllProductByFilter)
-router.get('/price', getPrice)
-router.get('/related-property', publicTokenMiddleware, getRelatedProduct)
-router.put('/rating', publicTokenMiddleware, addRating)
+router.get('/filter', ...listingReadAccess, getAllProductByFilter)
+router.get('/price', ...listingReadAccess, getPrice)
+router.get('/related-property', ...listingReadAccess, getRelatedProduct)
+router.put('/rating', ...listingReadAccess, addRating)
 router.put('/:moduleId', authMiddleware, assetHolderUpdate, updateProduct)
 router.delete('/:deleteId', authMiddleware, assetHolderCreate, deleteProduct)
-router.get(
-  '/:id',
-  optionalAuthMiddleware,
-  publicTokenMiddleware,
-  getSingleProperty,
-)
+router.get('/:id', ...listingReadAccess, getSingleProperty)
 router.get(
   '/metrics/approved-listings',
   authMiddleware,

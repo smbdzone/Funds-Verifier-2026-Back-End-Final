@@ -1,22 +1,47 @@
+import {
+  LISTING_QUERY_PARAMS,
+  getSafeStringParam,
+} from './listingQuery.js'
+
+const RESERVED_KEYS = new Set([
+  'minPrice',
+  'maxPrice',
+  'page',
+  'limit',
+  'statusFilter',
+  'token',
+  'sort',
+  'fields',
+  'dashboard',
+  'title',
+  'date',
+])
+
+const FILTER_PASSTHROUGH = [...LISTING_QUERY_PARAMS].filter(
+  (key) => !RESERVED_KEYS.has(key),
+)
+
 function processQuery(query) {
-  const { minPrice, maxPrice, page, limit, ...restQuery } = query;
-  const priceFilter = {};
+  const modifiedQuery = {}
 
-  const parsedMin = parseFloat(minPrice);
-  const parsedMax = parseFloat(maxPrice);
-
-  if (minPrice !== undefined && maxPrice !== undefined) {
-    priceFilter.price = { $gte: parsedMin, $lte: parsedMax };
+  for (const key of FILTER_PASSTHROUGH) {
+    const val = getSafeStringParam(query, key)
+    if (val !== null) {
+      modifiedQuery[key] = val
+    }
   }
-  // Combine price filter with remaining query (restQuery)
-  const modifiedQuery = { ...restQuery, ...priceFilter };
 
-  if (modifiedQuery.limit) delete modifiedQuery.limit;
-  if (modifiedQuery.page) delete modifiedQuery.page;
-  if (modifiedQuery.statusFilter) delete modifiedQuery.statusFilter;
-  if (modifiedQuery.token) delete modifiedQuery.token;
+  const parsedMin = parseFloat(query?.minPrice)
+  const parsedMax = parseFloat(query?.maxPrice)
 
-  return modifiedQuery;
+  if (query?.minPrice !== undefined && !Number.isNaN(parsedMin)) {
+    modifiedQuery.price = { ...(modifiedQuery.price || {}), $gte: parsedMin }
+  }
+  if (query?.maxPrice !== undefined && !Number.isNaN(parsedMax)) {
+    modifiedQuery.price = { ...(modifiedQuery.price || {}), $lte: parsedMax }
+  }
+
+  return modifiedQuery
 }
 
-export default processQuery;
+export default processQuery

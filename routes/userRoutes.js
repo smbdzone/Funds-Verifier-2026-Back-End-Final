@@ -45,12 +45,12 @@ import {
 
 const router = express.Router()
 
-// create user
+// create user (public: max 5 signups per email per 24h)
 router.post(
   '/signup',
-  signupLimiter,
   validateUserInputs,
   optionalAuthMiddleware,
+  signupLimiter,
   createUser,
 )
 
@@ -159,8 +159,14 @@ router.put(
 // get UAE pass token
 router.post('/get-token', uaePassLogin)
 
-// store UAE pass user info in db
-router.post('/store-user', storeUserThroughUaePass)
+// store UAE pass user info in db (same signup rate limit for public registrations)
+router.post(
+  '/store-user',
+  validateEmail,
+  optionalAuthMiddleware,
+  signupLimiter,
+  storeUserThroughUaePass,
+)
 
 router.post(
   '/forgot-password',

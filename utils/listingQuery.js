@@ -1,0 +1,137 @@
+import { escapeRegex as escapeRegexString } from './nosqlSanitizer.js'
+
+/** Allowed query keys on listing read endpoints (GET /, /filter, /related-*, etc.). */
+export const LISTING_QUERY_PARAMS = new Set([
+  'page',
+  'limit',
+  'sort',
+  'fields',
+  'date',
+  'minPrice',
+  'maxPrice',
+  'statusFilter',
+  'status',
+  'title',
+  'dashboard',
+  'token',
+  'assetType',
+  'country',
+  'city',
+  'neighbourhood',
+  'propertyType',
+  'propertyForSale',
+  'propertyForLease',
+  'facilities',
+  'allFacilities',
+  'bedrooms',
+  'make',
+  'model',
+  'brands',
+  'interiorColor',
+  'exteriorColor',
+  'technicalFeatures',
+  'extras',
+  'materials',
+  'grams',
+  'allextras',
+  'allExteriorColor',
+  'allinteriorColor',
+  'allTechnicalFeatures',
+  'allMaterials',
+  'price',
+  'evaluationPrices',
+])
+
+/** Scalar filter fields copied as plain equality matches on list endpoints. */
+export const LISTING_FILTER_FIELDS = new Set([
+  'assetType',
+  'country',
+  'city',
+  'neighbourhood',
+  'propertyType',
+  'propertyForSale',
+  'propertyForLease',
+  'make',
+  'model',
+  'brands',
+  'bedrooms',
+  'grams',
+  'interiorColor',
+  'exteriorColor',
+  'technicalFeatures',
+  'extras',
+  'materials',
+])
+
+export function isScalarQueryValue(value) {
+  return (
+    value === undefined ||
+    value === null ||
+    typeof value === 'string' ||
+    typeof value === 'number' ||
+    typeof value === 'boolean'
+  )
+}
+
+export function validateListingQuery(query) {
+  if (!query || typeof query !== 'object') {
+    return { ok: true }
+  }
+
+  for (const [key, value] of Object.entries(query)) {
+    if (
+      key.includes('[') ||
+      key.includes(']') ||
+      key.startsWith('$') ||
+      key.includes('.')
+    ) {
+      return { ok: false, message: 'Invalid query parameter' }
+    }
+
+    if (!LISTING_QUERY_PARAMS.has(key)) {
+      return { ok: false, message: 'Invalid query parameter' }
+    }
+
+    if (!isScalarQueryValue(value)) {
+      return { ok: false, message: 'Invalid query parameter' }
+    }
+  }
+
+  return { ok: true }
+}
+
+export function getSafeStringParam(query, key) {
+  const value = query?.[key]
+  if (value === undefined || value === null || value === '') {
+    return null
+  }
+  if (
+    typeof value !== 'string' &&
+    typeof value !== 'number' &&
+    typeof value !== 'boolean'
+  ) {
+    return null
+  }
+  return String(value).trim()
+}
+
+export function getSafeTitleRegex(query) {
+  const title = getSafeStringParam(query, 'title')
+  if (!title) {
+    return null
+  }
+  return { $regex: escapeRegexString(title), $options: 'i' }
+}
+
+export function pickScalarFilters(query, allowedFields = LISTING_FILTER_FIELDS) {
+  const filters = {}
+  for (const field of allowedFields) {
+    const val = getSafeStringParam(query, field)
+    if (val) {
+      filters[field] = val
+    }
+  }
+  return filters
+}
+
+export { escapeRegexString as escapeRegex }
