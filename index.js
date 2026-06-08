@@ -42,6 +42,8 @@ const corsOptions = {
     'x-csrf-token',
     'X-CSRF-Token',
     'x-public-token',
+    'x-api-key',
+    'X-API-Key',
   ],
 }
 
@@ -82,7 +84,16 @@ app.use(morgan('tiny'))
 app.disable('x-powered-by')
 
 // Use JSON parser and CORS middleware
-app.use(express.json({ limit: '20mb' }))
+app.use(
+  express.json({
+    limit: '50mb',
+    verify: (req, _res, buf) => {
+      if (req.originalUrl?.includes('/clozer/installment-updates')) {
+        req.rawBody = buf.toString('utf8')
+      }
+    },
+  }),
+)
 app.use(cors(corsOptions))
 app.use(cookieParser())
 

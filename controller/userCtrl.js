@@ -21,6 +21,7 @@ import {
   sanitizeUUID,
   sanitizeMongoId,
 } from '../utils/nosqlSanitizer.js'
+import { sanitizeEmiratesIdPayload } from '../utils/emiratesIdValidator.js'
 
 // Base cookie options object
 const isProd = process.env.NODE_ENV === 'production'
@@ -1045,6 +1046,16 @@ const updateUser = asyncHandler(async (req, res) => {
     const updatePayload = { ...req.body }
     // Role changes are not allowed from profile update endpoint for any user.
     delete updatePayload.role
+
+    if (updatePayload.emiratesId) {
+      try {
+        updatePayload.emiratesId = sanitizeEmiratesIdPayload(
+          updatePayload.emiratesId,
+        )
+      } catch (err) {
+        return res.status(err.statusCode || 400).json({ message: err.message })
+      }
+    }
 
     upUser = await User.findOneAndUpdate(
       { _id: loggedInUser?._id },

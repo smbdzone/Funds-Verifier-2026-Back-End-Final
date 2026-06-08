@@ -35,6 +35,7 @@ import RequestedItemsPriceRoutes from './RequestedItemsPriceRoutes.js'
 import SalesTrackerRoute from './SalesTrackerRoute.js'
 import PurchaseTrackerRoute from './PurchaseTrackerRoute.js'
 import ServicesRoutes from './ServicesRoutes.js'
+import clozerRoutes from './clozerRoutes.js'
 import AssignAssetsRoutes from './AssignAssetsRoutes.js'
 import contactRoutes from './contactRoutes.js'
 import publicRoutes from './publicToken.js'
@@ -89,6 +90,7 @@ router.use('/payment/revenue', RevenueRoute)
 router.use('/assets/prices', RequestedItemsPriceRoutes)
 router.use('/assets/assign', AssignAssetsRoutes)
 router.use('/services', ServicesRoutes)
+router.use('/clozer', clozerRoutes)
 router.use('/test', testRoute)
 
 export default router

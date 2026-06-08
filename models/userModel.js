@@ -110,6 +110,11 @@ const userSchema = new Schema(
       industry: String,
       employerName: String,
     },
+    emiratesId: {
+      fullName: String,
+      number: String,
+      expiryDate: Date,
+    },
     isEmailVerified: { type: Boolean, default: false },
     emailVerificationToken: String,
     emailVerificationExpires: Date,

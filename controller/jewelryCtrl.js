@@ -78,26 +78,31 @@ const createProduct = asyncHandler(async (req, res) => {
 
     const createPdt = await Jewelry.create([req.body], { session })
 
-    // add evaluation payment message queue
-    try {
-      const PaymentDetails = await UserPaymentDetails.create({
-        userId: user?._id,
-        userUUID: user?.uuid,
-        assetId: createPdt?.[0]?._id,
-        assetTitle: createPdt?.[0]?.title,
-        assetType: 'jewelry',
-        customerId: req?.body?.customerId,
-        paymentMethod: req?.body?.paymentMethod,
-      })
-      await AddPaymentJob({
-        jobId: PaymentDetails?._id,
-        assetId: createPdt?.[0]?._id,
-        assetType: 'property',
-        PaymentDetailsId: PaymentDetails?._id,
-        userId: createPdt?.[0]?.userId,
-      })
-    } catch (error) {
-      console.log(`Error adding job to queue: ${error.message}`)
+    const paidViaClozer =
+      req.body?.payment_provider === 'clozer' ||
+      Boolean(req.body?.clozer_transaction_id)
+
+    if (!paidViaClozer) {
+      try {
+        const PaymentDetails = await UserPaymentDetails.create({
+          userId: user?._id,
+          userUUID: user?.uuid,
+          assetId: createPdt?.[0]?._id,
+          assetTitle: createPdt?.[0]?.title,
+          assetType: 'jewelry',
+          customerId: req?.body?.customerId,
+          paymentMethod: req?.body?.paymentMethod,
+        })
+        await AddPaymentJob({
+          jobId: PaymentDetails?._id,
+          assetId: createPdt?.[0]?._id,
+          assetType: 'property',
+          PaymentDetailsId: PaymentDetails?._id,
+          userId: createPdt?.[0]?.userId,
+        })
+      } catch (error) {
+        console.log(`Error adding job to queue: ${error.message}`)
+      }
     }
 
     // Try to find and update the latest pending 3D Request

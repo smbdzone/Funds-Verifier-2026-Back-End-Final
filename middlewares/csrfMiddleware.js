@@ -33,6 +33,33 @@ function timingSafeEqual(a, b) {
   return crypto.timingSafeEqual(bufA, bufB)
 }
 
+function hasClozerApiKey(req) {
+  const expectedKey = process.env.CLOZER_API_KEY
+  if (!expectedKey) return false
+
+  const bearer = req.headers.authorization || req.headers.Authorization
+  const apiKeyHeader = req.headers['x-api-key']
+
+  let provided = null
+  if (bearer && String(bearer).startsWith('Bearer ')) {
+    provided = String(bearer).split(' ')[1]?.trim()
+  } else if (apiKeyHeader) {
+    provided = String(apiKeyHeader).trim()
+  }
+
+  return Boolean(provided && timingSafeEqual(provided, expectedKey))
+}
+
+function isClozerServerRoute(req) {
+  const path = req.originalUrl || req.path || ''
+  return (
+    path.includes('/clozer/transactions/') ||
+    path.includes('/clozer/installment-updates') ||
+    path.includes('/clozer/verify-redirect/') ||
+    path.includes('/clozer/sample-transaction')
+  )
+}
+
 export function issueCsrfToken(req, res) {
   const token = crypto.randomBytes(32).toString('hex')
   res.cookie(CSRF_COOKIE_NAME, token, csrfCookieOptions())
@@ -42,6 +69,7 @@ export function issueCsrfToken(req, res) {
 /**
  * CSRF protection for cookie-based browser requests.
  * Skipped when Authorization Bearer is present (SPA — cross-site cannot set that header).
+ * Skipped for Clozer server-to-server routes authenticated via CLOZER_API_KEY.
  */
 export function csrfProtection(req, res, next) {
   if (SAFE_METHODS.has(req.method)) {
@@ -49,6 +77,10 @@ export function csrfProtection(req, res, next) {
   }
 
   if (hasBearerAuth(req)) {
+    return next()
+  }
+
+  if (isClozerServerRoute(req) && hasClozerApiKey(req)) {
     return next()
   }
 

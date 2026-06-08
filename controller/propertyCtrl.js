@@ -73,26 +73,32 @@ const createProduct = asyncHandler(async (req, res) => {
 
     const createPdt = await Property.create([req.body], { session })
 
-    // add evaluation payment message queue
-    try {
-      const PaymentDetails = await UserPaymentDetails.create({
-        userId: user?._id,
-        userUUID: user?.uuid,
-        assetId: createPdt?.[0]?._id,
-        assetTitle: createPdt?.[0]?.title,
-        assetType: 'property',
-        customerId: req?.body?.customerId,
-        paymentMethod: req?.body?.paymentMethod,
-      })
-      await AddPaymentJob({
-        jobId: PaymentDetails?._id,
-        assetId: createPdt?.[0]?.uuid,
-        assetType: 'property',
-        PaymentDetailsId: PaymentDetails?.uuid,
-        userId: createPdt?.[0]?.userId,
-      })
-    } catch (error) {
-      console.log(`Error adding job to queue: ${error.message}`)
+    // Deferred Stripe evaluation fee — skip when customer pays via Clozer installments
+    const paidViaClozer =
+      req.body?.payment_provider === 'clozer' ||
+      Boolean(req.body?.clozer_transaction_id)
+
+    if (!paidViaClozer) {
+      try {
+        const PaymentDetails = await UserPaymentDetails.create({
+          userId: user?._id,
+          userUUID: user?.uuid,
+          assetId: createPdt?.[0]?._id,
+          assetTitle: createPdt?.[0]?.title,
+          assetType: 'property',
+          customerId: req?.body?.customerId,
+          paymentMethod: req?.body?.paymentMethod,
+        })
+        await AddPaymentJob({
+          jobId: PaymentDetails?._id,
+          assetId: createPdt?.[0]?.uuid,
+          assetType: 'property',
+          PaymentDetailsId: PaymentDetails?.uuid,
+          userId: createPdt?.[0]?.userId,
+        })
+      } catch (error) {
+        console.log(`Error adding job to queue: ${error.message}`)
+      }
     }
 
     // Find the latest pending 3D Request
