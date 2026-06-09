@@ -301,47 +301,85 @@ const resizeImages =
     }
 
 // ------------------- Video Conversion -------------------
+function isMp4Container(buffer) {
+  if (!buffer || buffer.length < 12) return false
+  return buffer.slice(4, 8).toString('ascii') === 'ftyp'
+}
+
+function skipVideoConversion(file) {
+  const name = String(file.originalname || '').toLowerCase()
+  if (name.endsWith('.mp4')) return true
+  if (file.mimetype === 'video/mp4') return true
+  return isMp4Container(file.buffer)
+}
+
+function reencodeVideoToMp4(file) {
+  return new Promise((resolve, reject) => {
+    const inputStream = new Readable()
+    inputStream.push(file.buffer)
+    inputStream.push(null)
+
+    const outputStream = new PassThrough()
+    const chunks = []
+
+    outputStream.on('data', (chunk) => chunks.push(chunk))
+    outputStream.on('end', () => {
+      const finalBuffer = Buffer.concat(chunks)
+      resolve({
+        ...file,
+        buffer: finalBuffer,
+        mimetype: 'video/mp4',
+        size: finalBuffer.length,
+      })
+    })
+    outputStream.on('error', reject)
+
+    ffmpeg(inputStream)
+      .outputOptions('-c:v libx264', '-crf 20', '-preset fast')
+      .format('mp4')
+      .on('error', (ffmpegErr) => {
+        if (skipVideoConversion(file)) {
+          console.warn(
+            '[upload] FFmpeg unavailable; uploading original MP4 without re-encode',
+            ffmpegErr.message,
+          )
+          resolve({
+            ...file,
+            mimetype: 'video/mp4',
+          })
+          return
+        }
+        reject(ffmpegErr)
+      })
+      .pipe(outputStream, { end: true })
+  })
+}
+
 const convertVideos = async (req, res, next) => {
   try {
     if (!req.files) return next()
 
     req.files = await Promise.all(
-      req.files.map((file) => {
-        return new Promise((resolve, reject) => {
-          const inputStream = new Readable()
-          inputStream.push(file.buffer)
-          inputStream.push(null)
-
-          const outputStream = new PassThrough()
-          const chunks = []
-
-          outputStream.on('data', (chunk) => chunks.push(chunk))
-          outputStream.on('end', () => {
-            const finalBuffer = Buffer.concat(chunks)
-            resolve({
-              ...file,
-              buffer: finalBuffer,
-              mimetype: 'video/mp4',
-              size: finalBuffer.length,
-            })
-          })
-          outputStream.on('error', reject)
-
-          ffmpeg(inputStream)
-            .outputOptions('-c:v libx264', '-crf 20', '-preset fast')
-            .format('mp4')
-            .on('error', reject)
-            .pipe(outputStream, { end: true })
-        })
-      })
+      req.files.map(async (file) => {
+        if (skipVideoConversion(file)) {
+          return {
+            ...file,
+            mimetype: 'video/mp4',
+          }
+        }
+        return reencodeVideoToMp4(file)
+      }),
     )
 
     next()
   } catch (err) {
     console.error('Video conversion error:', err)
-    res
-      .status(500)
-      .json({ message: 'Video conversion failed', error: err.message })
+    res.status(500).json({
+      message: 'Video conversion failed',
+      error: err.message,
+      hint:
+        'Upload an MP4 file under 5MB, or install full FFmpeg on the server (apt install ffmpeg).',
+    })
   }
 }
 
