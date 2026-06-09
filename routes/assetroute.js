@@ -29,6 +29,7 @@ import {
 import { authMiddleware } from '../middlewares/authMiddleware.js'
 import { authorizeUserByUUID } from '../middlewares/authorizeUser.js'
 import { fileUploadLimiter } from '../middlewares/rateLimiter.js'
+import { VIDEO_MAX_COUNT } from '../utils/uploadLimits.js'
 
 // Decrypted PDF for listing/detail (encrypted-at-rest S3 objects)
 router.get(
@@ -42,7 +43,7 @@ router.post(
   authMiddleware,
   fileUploadLimiter,
   authorizeUserByUUID,
-  uploadVideo.single('video'),
+  uploadVideo.array('video', VIDEO_MAX_COUNT),
   convertVideos, // convert video to mp4
   secureUploadMiddleware, // validate & upload
   uploadVideoFun, // controller

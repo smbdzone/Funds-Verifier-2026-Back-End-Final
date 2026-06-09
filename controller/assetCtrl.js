@@ -83,27 +83,38 @@ const thumbnailImg = asyncHandler(async (req, res) => {
 
 const uploadVideoFun = asyncHandler(async (req, res) => {
   try {
-    const file = req.file
+    const files = req.files?.length
+      ? req.files
+      : req.file
+        ? [req.file]
+        : []
+    if (!files.length) {
+      return res.status(400).json({ error: 'No video file uploaded' })
+    }
+
     const userUUID = req.user?.uuid || req.query.userId
     const SIGNED_URL_EXPIRES_IN_SECONDS = 60 * 60 // 1 hour
 
+    const videos = files.map((file) => ({
+      s3Bucket: file.s3Bucket,
+      s3Key: file.s3Key,
+      s3VersionId: file.s3VersionId,
+      s3ETag: file.s3ETag,
+      originalName: file.originalname,
+      contentType: file.mimetype,
+      size: file.size,
+      uploadedAt: file.uploadedAt,
+      url: file.cloudFrontUrl,
+    }))
+
     const createVideo = await VideoAsset.create({
       userUUID,
-      videos: {
-        s3Bucket: file.s3Bucket,
-        s3Key: file.s3Key,
-        s3VersionId: file.s3VersionId,
-        s3ETag: file.s3ETag,
-        originalName: file.originalname,
-        contentType: file.mimetype,
-        size: file.size,
-        uploadedAt: file.uploadedAt,
-        url: file.cloudFrontUrl, // CloudFront read path (unsigned for videos by default)
-      },
+      videos,
     })
 
+    const firstKey = files[0].s3Key
     const signed = generateCloudFrontSignedUrl(
-      file.s3Key,
+      firstKey,
       SIGNED_URL_EXPIRES_IN_SECONDS
     )
     return res.json({
