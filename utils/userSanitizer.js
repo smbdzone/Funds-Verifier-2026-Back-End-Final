@@ -16,7 +16,7 @@ export const sanitizeUserForSelf = async (user) => {
   // Convert to plain object if Mongoose document
   const userObj = user.toObject ? user.toObject() : { ...user }
 
-  // Remove sensitive internal tokens and financial info (never expose these)
+  // Remove sensitive internal tokens (financialInfo is included for self profile editing)
   const {
     password,
     refreshToken,
@@ -25,7 +25,6 @@ export const sanitizeUserForSelf = async (user) => {
     emailVerificationToken,
     emailVerificationExpires,
     pendingEmailChange,
-    financialInfo,
     ...sanitized
   } = userObj
 

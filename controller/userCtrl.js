@@ -771,10 +771,15 @@ const getCurrentUser = asyncHandler(async (req, res) => {
     }
 
     const currentUser = await User.findById(requester._id)
-      .select('-password -financialInfo')
+      .select('-password')
       .populate('parentEvaluator')
       .populate({
         path: 'documentation.document',
+        select:
+          'Certificate.name Certificate.s3Key Certificate.encrypted Certificate.url uuid',
+      })
+      .populate({
+        path: 'financialInfo.verificationCertificate',
         select:
           'Certificate.name Certificate.s3Key Certificate.encrypted Certificate.url uuid',
       })
@@ -1018,9 +1023,14 @@ const updateUser = asyncHandler(async (req, res) => {
         { $push: { documentation: req.body.documentation } },
         { new: true },
       )
-        .select('-password -financialInfo')
+        .select('-password')
         .populate({
           path: 'documentation.document',
+          select:
+            'Certificate.name Certificate.s3Key Certificate.encrypted Certificate.url uuid',
+        })
+        .populate({
+          path: 'financialInfo.verificationCertificate',
           select:
             'Certificate.name Certificate.s3Key Certificate.encrypted Certificate.url uuid',
         })
@@ -1057,6 +1067,24 @@ const updateUser = asyncHandler(async (req, res) => {
       }
     }
 
+    if (
+      updatePayload.financialInfo &&
+      typeof updatePayload.financialInfo === 'object'
+    ) {
+      const fi = { ...updatePayload.financialInfo }
+      delete updatePayload.financialInfo
+
+      if (fi.status === undefined) {
+        fi.status = loggedInUser?.financialInfo?.status || 'Pending'
+      }
+
+      for (const [key, value] of Object.entries(fi)) {
+        if (value !== undefined && value !== null) {
+          updatePayload[`financialInfo.${key}`] = value
+        }
+      }
+    }
+
     upUser = await User.findOneAndUpdate(
       { _id: loggedInUser?._id },
       updatePayload,
@@ -1064,9 +1092,14 @@ const updateUser = asyncHandler(async (req, res) => {
         new: true,
       },
     )
-      .select('-password -financialInfo')
+      .select('-password')
       .populate({
         path: 'documentation.document',
+        select:
+          'Certificate.name Certificate.s3Key Certificate.encrypted Certificate.url uuid',
+      })
+      .populate({
+        path: 'financialInfo.verificationCertificate',
         select:
           'Certificate.name Certificate.s3Key Certificate.encrypted Certificate.url uuid',
       })
