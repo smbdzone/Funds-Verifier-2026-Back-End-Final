@@ -32,6 +32,13 @@ const SuccessFeeSchema = new mongoose.Schema({
     min: 0,
     default: 2000,
   },
+  fullPayDiscountPercent: {
+    type: Number,
+    required: true,
+    min: 0,
+    max: 50,
+    default: 5,
+  },
   isDeleted: { type: Boolean, default: false },
   deletedAt: { type: Date, default: null },
 })

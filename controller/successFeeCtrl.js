@@ -11,6 +11,13 @@ const DEFAULT_FEES = {
   boatSuccessFee: 3000,
   carSuccessFee: 2000,
   jewelrySuccessFee: 2000,
+  fullPayDiscountPercent: 5,
+}
+
+const clampDiscountPercent = (value) => {
+  const num = Number(value)
+  if (!Number.isFinite(num) || num <= 0) return 0
+  return Math.min(50, Math.max(0, num))
 }
 
 const ASSET_KINDS = {
@@ -45,7 +52,24 @@ const resolveFees = async () => {
     boatSuccessFee: doc.boatSuccessFee,
     carSuccessFee: doc.carSuccessFee,
     jewelrySuccessFee: doc.jewelrySuccessFee,
+    fullPayDiscountPercent: doc.fullPayDiscountPercent ?? DEFAULT_FEES.fullPayDiscountPercent,
   }
+}
+
+export const resolveFullPayDiscountPercent = async () => {
+  const doc = await SuccessFee.findOne({ isDeleted: false }).select(
+    'fullPayDiscountPercent',
+  )
+  if (doc?.fullPayDiscountPercent != null) {
+    return clampDiscountPercent(doc.fullPayDiscountPercent)
+  }
+
+  const envFallback = Number(process.env.FULL_PAY_DISCOUNT_PERCENT)
+  if (Number.isFinite(envFallback)) {
+    return clampDiscountPercent(envFallback)
+  }
+
+  return DEFAULT_FEES.fullPayDiscountPercent
 }
 
 const fetchSoldFromModel = async (Model, kind) => {
@@ -63,6 +87,19 @@ const fetchSoldFromModel = async (Model, kind) => {
     type: kind,
     successFeePaymentStatus: row.successFeePaymentStatus || 'Pending',
   }))
+}
+
+export const getPublicFullPayDiscount = async (req, res) => {
+  try {
+    const fullPayDiscountPercent = await resolveFullPayDiscountPercent()
+    return res.status(200).json({ success: true, fullPayDiscountPercent })
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to fetch full pay discount',
+      error: error.message,
+    })
+  }
 }
 
 export const getSuccessFees = async (req, res) => {
@@ -87,6 +124,7 @@ export const updateSuccessFees = async (req, res) => {
       boatSuccessFee,
       carSuccessFee,
       jewelrySuccessFee,
+      fullPayDiscountPercent,
     } = req.body
 
     const values = [
@@ -102,12 +140,28 @@ export const updateSuccessFees = async (req, res) => {
       })
     }
 
+    const discountValue =
+      fullPayDiscountPercent == null
+        ? DEFAULT_FEES.fullPayDiscountPercent
+        : Number(fullPayDiscountPercent)
+
+    if (
+      Number.isNaN(discountValue) ||
+      discountValue < 0 ||
+      discountValue > 50
+    ) {
+      return res.status(400).json({
+        message: 'Full pay discount must be between 0 and 50 percent.',
+      })
+    }
+
     let doc = await SuccessFee.findOne({ isDeleted: false })
     if (doc) {
       doc.propertySuccessFee = Number(propertySuccessFee)
       doc.boatSuccessFee = Number(boatSuccessFee)
       doc.carSuccessFee = Number(carSuccessFee)
       doc.jewelrySuccessFee = Number(jewelrySuccessFee)
+      doc.fullPayDiscountPercent = discountValue
       await doc.save()
     } else {
       doc = await SuccessFee.create({
@@ -115,6 +169,7 @@ export const updateSuccessFees = async (req, res) => {
         boatSuccessFee: Number(boatSuccessFee),
         carSuccessFee: Number(carSuccessFee),
         jewelrySuccessFee: Number(jewelrySuccessFee),
+        fullPayDiscountPercent: discountValue,
       })
     }
 

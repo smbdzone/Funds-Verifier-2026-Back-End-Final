@@ -72,10 +72,17 @@ function buildClozerPayload(transaction, user) {
   }
 }
 
+function getClozerApplyBaseUrl() {
+  if (process.env.CLOZER_APPLY_URL) {
+    return process.env.CLOZER_APPLY_URL
+  }
+  return process.env.NODE_ENV === 'production'
+    ? 'https://clozer.ae/apply'
+    : 'https://test.clozer.ae/fvwebsite/'
+}
+
 function buildRedirectUrl(fvTransactionId, token) {
-  const base =
-    process.env.CLOZER_APPLY_URL || 'https://clozer.ae/apply'
-  const url = new URL(base)
+  const url = new URL(getClozerApplyBaseUrl())
   url.searchParams.set('transaction_id', fvTransactionId)
   url.searchParams.set('token', token)
   return url.toString()
