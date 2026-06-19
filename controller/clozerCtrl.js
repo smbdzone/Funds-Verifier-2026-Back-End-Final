@@ -77,8 +77,8 @@ function getClozerApplyBaseUrl() {
     return process.env.CLOZER_APPLY_URL
   }
   return process.env.NODE_ENV === 'production'
-    ? 'https://clozer.ae/apply'
-    : 'https://test.clozer.ae/fvwebsite/'
+    ? 'https://clozer.ae/fundsverifier'
+    : 'https://test.clozer.ae/fundsverifier'
 }
 
 function buildRedirectUrl(fvTransactionId, token) {

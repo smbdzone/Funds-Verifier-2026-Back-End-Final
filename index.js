@@ -20,6 +20,7 @@ import { initSocket } from './utils/socket.js'
 import initNotificationSocket from './sockets/notificationSocket.js'
 import { csrfProtection } from './middlewares/csrfMiddleware.js'
 
+dotenv.config()
 
 const localOrigin = [
   'http://localhost:5002',
@@ -27,13 +28,25 @@ const localOrigin = [
   'http://127.0.0.1:5002',
   'http://127.0.0.1:3011',
 ]
-// Configure CORS
-const corsOptions = {
-  origin: [
+
+function buildCorsOrigins() {
+  const defaults = [
     'https://fv.admin.fundsverifier.com',
     'https://fundsverifier.com',
-    ...(process.env.NODE_ENV === 'development' ? localOrigin : [])
-  ],
+  ]
+  const extra = String(process.env.CORS_ORIGINS || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean)
+  const origins = [...new Set([...defaults, ...extra])]
+  if (process.env.NODE_ENV !== 'production') {
+    origins.push(...localOrigin)
+  }
+  return origins
+}
+
+const corsOptions = {
+  origin: buildCorsOrigins(),
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: [
@@ -46,8 +59,6 @@ const corsOptions = {
     'X-API-Key',
   ],
 }
-
-dotenv.config()
 const app = express()
 
 // Configure Helmet for security headers
