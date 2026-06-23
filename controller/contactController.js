@@ -206,6 +206,10 @@ export const createContact = async (req, res) => {
         <p><strong>Subject:</strong> ${clean(subject)}</p>
         <p><strong>Message:</strong> ${clean(message)}</p>
       `,
+    }).then((result) => {
+      if (!result.success) {
+        console.warn(`Contact notification email failed: ${result.error}`)
+      }
     })
 
     res

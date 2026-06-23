@@ -22,6 +22,10 @@ import {
   sanitizeMongoId,
 } from '../utils/nosqlSanitizer.js'
 import { sanitizeEmiratesIdPayload } from '../utils/emiratesIdValidator.js'
+import {
+  parseUaePassName,
+  hasMalformedUaePassName,
+} from '../utils/parseUaePassName.js'
 
 // Base cookie options object
 const isProd = process.env.NODE_ENV === 'production'
@@ -276,11 +280,17 @@ const sendVerificationEmail = async (user) => {
     <p>Link expires in 24 hours.</p>
   `
 
-  await sendEmail({
+  const result = await sendEmail({
     to: user.email,
     subject: 'Verify Your Email',
     html,
   })
+
+  if (!result.success) {
+    console.warn(
+      `Verification email not sent to ${user.email}: ${result.error}`,
+    )
+  }
 }
 
 const verifyEmail = asyncHandler(async (req, res) => {
@@ -314,6 +324,9 @@ const verifyEmail = asyncHandler(async (req, res) => {
 
 const storeUserThroughUaePass = asyncHandler(async (req, res) => {
   const { name, email, phone, role, uuid, userType, lastname } = req.body
+  const parsedName = parseUaePassName(name, lastname)
+  const normalizedName = parsedName.firstName || name
+  const normalizedLastname = parsedName.lastName || lastname
 
   try {
     const sanitizedEmail = sanitizeEmail(email)
@@ -339,16 +352,25 @@ const storeUserThroughUaePass = asyncHandler(async (req, res) => {
 
     if (!user) {
       user = new User({
-        name,
+        name: normalizedName,
         email: sanitizedEmail,
         phone: phone || null,
         role: roleDecision.role,
         uuid: resolveUserUuid(uuid),
         userType,
-        lastname,
+        lastname: normalizedLastname,
         isEmailVerified: true,
         userState: 'active',
       })
+      await user.save()
+    } else if (
+      hasMalformedUaePassName(user.name) &&
+      parsedName.firstName
+    ) {
+      user.name = normalizedName
+      if (normalizedLastname) {
+        user.lastname = normalizedLastname
+      }
       await user.save()
     }
 
@@ -484,7 +506,15 @@ const createUser = asyncHandler(async (req, res) => {
 
     const adminEmail = process.env.ADMIN_EMAIL || 'ashiqarooj846@gmail.com'
 
-    sendEmail({
+    const notifyByEmail = (payload) => {
+      sendEmail(payload).then((result) => {
+        if (!result.success) {
+          console.warn(`Signup notification email failed: ${result.error}`)
+        }
+      })
+    }
+
+    notifyByEmail({
       to: adminEmail,
       subject: clean(`New User Registered: ${resolvedName}`),
       text: `A new user has registered.\n\nName: ${resolvedName}\nEmail: ${sanitizedEmail}\nRole: ${roleDecision.role}`,
@@ -501,7 +531,7 @@ const createUser = asyncHandler(async (req, res) => {
 
       const parentUser = await User.findOne({ uuid: sanitizedParentUUID })
       if (parentUser && parentUser.email) {
-        sendEmail({
+        notifyByEmail({
           to: parentUser.email,
           subject: clean(`Your Evaluated User ${resolvedName} has registered`),
           text: `User ${resolvedName} (${sanitizedEmail}) has been assigned to you as parent evaluator.`,
@@ -509,7 +539,7 @@ const createUser = asyncHandler(async (req, res) => {
       }
     }
 
-    sendEmail({
+    notifyByEmail({
       to: sanitizedEmail,
       subject: clean(`Welcome to Funds Verifier, ${resolvedName}!`),
       text: `Hello ${resolvedName},\n\nYour account has been successfully created.\nEmail: ${sanitizedEmail}\nRole: ${roleDecision.role}`,

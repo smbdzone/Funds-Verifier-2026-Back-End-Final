@@ -32,6 +32,7 @@ import {
   getSafeStringParam,
   getSafeTitleRegex,
   pickScalarFilters,
+  applyListingStatusFilters,
 } from '../utils/listingQuery.js'
 import { buildListingIdQuery } from '../utils/listingIdLookup.js'
 
@@ -265,9 +266,7 @@ const getAllProduct = asyncHandler(async (req, res) => {
       if (req.query.maxPrice) parseData.price.$lte = +req.query.maxPrice
     }
 
-    if (req.query.statusFilter === '1' || req.query.status === '1') {
-      parseData.status = 1
-    }
+    applyListingStatusFilters(parseData, req.query)
 
     if (req.query.propertyForSale) {
       const saleVal = String(req.query.propertyForSale).trim()
@@ -329,7 +328,7 @@ const getAllProduct = asyncHandler(async (req, res) => {
         .toLowerCase()
         .replace(/[\s_-]/g, '')
       const isElevatedModerator =
-        ['Admin', 'Evaluator'].includes(user.role) ||
+        ['Admin', 'Evaluator', 'Trustee'].includes(user.role) ||
         roleNorm === 'superadmin'
 
       // Evaluator / Admin / Super Admin: moderation (all listing visibilities)

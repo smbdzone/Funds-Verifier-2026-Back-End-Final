@@ -52,6 +52,7 @@ import { PUBLIC_JEWELRY_FIELDS } from '../constants/publicFields.js'
 import {
   getSafeTitleRegex,
   pickScalarFilters,
+  applyListingStatusFilters,
 } from '../utils/listingQuery.js'
 
 // create product
@@ -271,9 +272,7 @@ const getAllProduct = asyncHandler(async (req, res) => {
   }
 
   /* ===================== STATUS FILTER ===================== */
-  if (req.query.statusFilter === '1') {
-    parseData.status = 1
-  }
+  applyListingStatusFilters(parseData, req.query)
 
   /* ===================== TITLE SEARCH ===================== */
   const titleFilter = getSafeTitleRegex(req.query)
@@ -295,7 +294,7 @@ const getAllProduct = asyncHandler(async (req, res) => {
       .toLowerCase()
       .replace(/[\s_-]/g, '')
     const isElevatedModerator =
-      ['Admin', 'Evaluator'].includes(user.role) || roleNorm === 'superadmin'
+      ['Admin', 'Evaluator', 'Trustee'].includes(user.role) || roleNorm === 'superadmin'
 
     if (!isSubEvaluator && isElevatedModerator) {
       delete parseData.listing

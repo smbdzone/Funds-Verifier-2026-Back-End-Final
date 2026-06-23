@@ -44,6 +44,7 @@ import {
   getSafeStringParam,
   getSafeTitleRegex,
   pickScalarFilters,
+  applyListingStatusFilters,
 } from '../utils/listingQuery.js'
 const app = express()
 
@@ -322,9 +323,7 @@ const getAllProduct = asyncHandler(async (req, res) => {
     }
 
     // Status
-    if (req.query.statusFilter === '1') {
-      parseData.status = 1
-    }
+    applyListingStatusFilters(parseData, req.query)
 
     // Title search
     const titleFilter = getSafeTitleRegex(req.query)
@@ -367,7 +366,7 @@ const getAllProduct = asyncHandler(async (req, res) => {
           .toLowerCase()
           .replace(/[\s_-]/g, '')
         const isElevatedModerator =
-          ['Admin', 'Evaluator'].includes(user.role) ||
+          ['Admin', 'Evaluator', 'Trustee'].includes(user.role) ||
           roleNorm === 'superadmin'
         if (isElevatedModerator) {
           delete parseData.listing

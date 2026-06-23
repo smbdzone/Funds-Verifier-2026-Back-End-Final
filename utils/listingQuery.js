@@ -40,7 +40,22 @@ export const LISTING_QUERY_PARAMS = new Set([
   'allMaterials',
   'price',
   'evaluationPrices',
+  'transactionStatus',
 ])
+
+/** Apply admin/listing status filters from query string onto a Mongo filter object. */
+export function applyListingStatusFilters(parseData, query) {
+  if (query?.statusFilter === '1' || query?.status === '1') {
+    parseData.status = 1
+  } else if (query?.status === '0') {
+    parseData.status = 0
+  }
+
+  const transactionStatus = getSafeStringParam(query, 'transactionStatus')
+  if (transactionStatus) {
+    parseData.transactionStatus = transactionStatus.toLowerCase()
+  }
+}
 
 /** Scalar filter fields copied as plain equality matches on list endpoints. */
 export const LISTING_FILTER_FIELDS = new Set([
