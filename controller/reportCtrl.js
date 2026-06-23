@@ -10,6 +10,8 @@ import { assertListingApprovedForPremium } from '../utils/listingApprovalHelper.
 import {
   linkTechnicalReportToListing,
   listingMetaFromApproval,
+  clearUnpaidPremiumOnListing,
+  modelForAssetType,
 } from '../utils/listingPremiumSync.js'
 
 export const createReport = async (req, res) => {
@@ -32,6 +34,7 @@ export const createReport = async (req, res) => {
       productId,
     } = req.body
 
+    let listingMeta = {}
     if (productUUID || productId) {
       const approval = await assertListingApprovedForPremium({
         productUUID,
@@ -40,6 +43,13 @@ export const createReport = async (req, res) => {
       })
       if (!approval.ok) {
         return res.status(approval.status).json({ message: approval.message })
+      }
+      listingMeta = listingMetaFromApproval(approval)
+      const AssetModel = modelForAssetType(assetType)
+      if (AssetModel && approval.listing) {
+        await clearUnpaidPremiumOnListing(approval.listing, AssetModel, [
+          'technicalReport',
+        ])
       }
     }
 

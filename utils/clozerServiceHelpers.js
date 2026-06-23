@@ -7,6 +7,7 @@ import Jewelry from '../models/jewelryModel.js'
 import {
   linkTechnicalReportToListing,
   linkWalkthroughToListing,
+  clearUnpaidPremiumOnListing,
 } from './listingPremiumSync.js'
 import { sendServiceNotification } from '../controller/ServicesCtrl.js'
 import { sanitizeUUID } from './nosqlSanitizer.js'
@@ -43,6 +44,18 @@ export async function createPendingServiceRecords({
 }) {
   let reportTech
   let request3D
+
+  if (product && AssetModel) {
+    const fieldsToClear = []
+    if (service === '_3dwalkthrough') fieldsToClear.push('video3DWalkthrough')
+    else if (service === 'surveyor') fieldsToClear.push('technicalReport')
+    else if (service === 'all') {
+      fieldsToClear.push('technicalReport', 'video3DWalkthrough')
+    }
+    if (fieldsToClear.length) {
+      await clearUnpaidPremiumOnListing(product, AssetModel, fieldsToClear)
+    }
+  }
 
   const base = {
     name: GetUser?.name,

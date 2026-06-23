@@ -23,7 +23,11 @@ import {
   sanitizeListingsMediaResponse,
 } from '../helper/sanitizeListingResponse.js'
 import { attachDocumentSignedUrls } from '../helper/attachDocumentSignedUrls.js'
-import { stripNullPremiumRefs } from '../utils/listingPremiumSync.js'
+import {
+  stripNullPremiumRefs,
+  refreshListingPremiumFieldsForEdit,
+  sanitizeUnpaidPremiumServicesForClient,
+} from '../utils/listingPremiumSync.js'
 import { buildListingIdQuery } from '../utils/listingIdLookup.js'
 import upload from '../middlewares/Multer.js'
 import express from 'express'
@@ -225,11 +229,13 @@ const getSingleProduct = asyncHandler(async (req, res) => {
     if (!isPrivilegedUser) {
       const publicCar = pickFields(car, PUBLIC_CAR_FIELDS.trim().split(/\s+/))
       sanitizeListingMediaResponse(publicCar)
+      sanitizeUnpaidPremiumServicesForClient(publicCar)
       return res.json(publicCar)
     }
 
     await attachDocumentSignedUrls(car)
     sanitizeListingMediaResponse(car)
+    await refreshListingPremiumFieldsForEdit(car)
     res.json(car)
   } catch (err) {
     console.error('Error fetching car:', err.message)

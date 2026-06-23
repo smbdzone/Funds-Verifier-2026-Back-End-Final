@@ -19,7 +19,11 @@ import { AddPaymentJob } from '../utils/jobs/index.js'
 import UserPaymentDetails from '../models/UserPaymentDetails.js'
 import { PUBLIC_PROPERTY_FIELDS } from '../constants/publicFields.js'
 import { attachDocumentSignedUrls } from '../helper/attachDocumentSignedUrls.js'
-import { stripNullPremiumRefs } from '../utils/listingPremiumSync.js'
+import {
+  stripNullPremiumRefs,
+  refreshListingPremiumFieldsForEdit,
+  sanitizeUnpaidPremiumServicesForClient,
+} from '../utils/listingPremiumSync.js'
 import {
   refreshListingMediaSignedUrls,
   refreshListingsMediaSignedUrls,
@@ -221,6 +225,7 @@ const getSingleProperty = asyncHandler(async (req, res) => {
       const publicFields = PUBLIC_PROPERTY_FIELDS.trim().split(/\s+/)
       const publicProperty = filterPublicFields(property, publicFields)
       sanitizeListingMediaResponse(publicProperty)
+      sanitizeUnpaidPremiumServicesForClient(publicProperty)
       return res.json(publicProperty)
     }
 
@@ -232,6 +237,7 @@ const getSingleProperty = asyncHandler(async (req, res) => {
     // Strip server-internal S3 metadata (s3Bucket / s3Key / etc.) before
     // responding. The signed URL is everything the client needs.
     sanitizeListingMediaResponse(property)
+    await refreshListingPremiumFieldsForEdit(property)
 
     res.json(property)
   } catch (err) {

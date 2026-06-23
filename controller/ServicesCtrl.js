@@ -13,6 +13,7 @@ import { sanitizeUUID } from '../utils/nosqlSanitizer.js'
 import {
   linkTechnicalReportToListing,
   linkWalkthroughToListing,
+  clearUnpaidPremiumOnListing,
 } from '../utils/listingPremiumSync.js'
 
 export const sendServiceNotification = async (data) => {
@@ -117,6 +118,20 @@ const SubscribeServices = async (req, res) => {
       uuid: sanitizedProductId,
       isDeleted: false,
     })
+    if (!product) {
+      return res.status(404).json({ error: true, message: 'Product not found.' })
+    }
+
+    const fieldsToClear = []
+    if (service === '_3dwalkthrough') fieldsToClear.push('video3DWalkthrough')
+    else if (service === 'surveyor') fieldsToClear.push('technicalReport')
+    else if (service === 'all') {
+      fieldsToClear.push('technicalReport', 'video3DWalkthrough')
+    }
+    if (fieldsToClear.length) {
+      await clearUnpaidPremiumOnListing(product, AssetModel, fieldsToClear)
+    }
+
     let reportTech
     let request3D
 

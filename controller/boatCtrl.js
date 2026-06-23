@@ -24,7 +24,11 @@ import {
   sanitizeListingsMediaResponse,
 } from '../helper/sanitizeListingResponse.js'
 import { attachDocumentSignedUrls } from '../helper/attachDocumentSignedUrls.js'
-import { stripNullPremiumRefs } from '../utils/listingPremiumSync.js'
+import {
+  stripNullPremiumRefs,
+  refreshListingPremiumFieldsForEdit,
+  sanitizeUnpaidPremiumServicesForClient,
+} from '../utils/listingPremiumSync.js'
 import { buildListingIdQuery } from '../utils/listingIdLookup.js'
 import express from 'express'
 import upload from '../middlewares/Multer.js'
@@ -242,11 +246,13 @@ const getSingleProduct = asyncHandler(async (req, res) => {
     if (!isPrivilegedUser) {
       const publicBoat = pickFields(boat, PUBLIC_BOAT_FIELDS.trim().split(/\s+/))
       sanitizeListingMediaResponse(publicBoat)
+      sanitizeUnpaidPremiumServicesForClient(publicBoat)
       return res.json(publicBoat)
     }
 
     await attachDocumentSignedUrls(boat)
     sanitizeListingMediaResponse(boat)
+    await refreshListingPremiumFieldsForEdit(boat)
     res.json(boat)
   } catch (err) {
     console.error('Error fetching boat:', err.message)

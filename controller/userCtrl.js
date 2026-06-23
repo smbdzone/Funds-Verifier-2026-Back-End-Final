@@ -325,7 +325,7 @@ const verifyEmail = asyncHandler(async (req, res) => {
 const storeUserThroughUaePass = asyncHandler(async (req, res) => {
   const { name, email, phone, role, uuid, userType, lastname } = req.body
   const parsedName = parseUaePassName(name, lastname)
-  const normalizedName = parsedName.firstName || name
+  const normalizedName = parsedName.fullName || parsedName.firstName || name
   const normalizedLastname = parsedName.lastName || lastname
 
   try {
@@ -364,8 +364,9 @@ const storeUserThroughUaePass = asyncHandler(async (req, res) => {
       })
       await user.save()
     } else if (
-      hasMalformedUaePassName(user.name) &&
-      parsedName.firstName
+      parsedName.fullName &&
+      (hasMalformedUaePassName(user.name) ||
+        parsedName.fullName.length > String(user.name || '').length)
     ) {
       user.name = normalizedName
       if (normalizedLastname) {
