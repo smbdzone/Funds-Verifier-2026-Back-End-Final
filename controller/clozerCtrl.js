@@ -386,7 +386,7 @@ export const getClozerTransaction = async (req, res) => {
 export const getClozerTransactionStatus = async (req, res) => {
   try {
     const { transaction_id } = req.params
-    const transaction = await Transaction.findOne({
+    let transaction = await Transaction.findOne({
       fvTransactionId: transaction_id,
       payment_provider: 'clozer',
       isDeleted: false,
@@ -398,6 +398,50 @@ export const getClozerTransactionStatus = async (req, res) => {
         success: false,
         message: 'Transaction not found',
       })
+    }
+
+    const clozerStatus = String(transaction.clozer_status || '').toLowerCase()
+    const paymentStatus = String(
+      transaction.payment_method_status || '',
+    ).toLowerCase()
+    const isPaid =
+      PAID_CLOZER_STATUSES.has(clozerStatus) ||
+      ['active', 'succeeded'].includes(paymentStatus)
+    const isFullyPaid =
+      clozerStatus === 'completed' ||
+      (transaction.total_paid >= transaction.total_amount &&
+        transaction.total_amount > 0)
+
+    const meta = transaction.service_metadata || {}
+    if (
+      (isPaid || isFullyPaid) &&
+      ['_3dwalkthrough', 'surveyor', 'all'].includes(transaction.service_type) &&
+      !meta.service_fulfilled
+    ) {
+      await fulfillServicePayment({
+        userId: transaction.user,
+        service: meta.service || transaction.service_type,
+        request3DId: meta.request3DId,
+        reportTechId: meta.reportTechId,
+        payment_details: {
+          payment_status: isFullyPaid ? 'succeeded' : 'active',
+          status: clozerStatus,
+          total_paid: transaction.total_paid,
+          total_amount: transaction.total_amount,
+          provider: 'clozer',
+        },
+        payment_provider: 'clozer',
+      })
+      transaction = await Transaction.findByIdAndUpdate(
+        transaction._id,
+        {
+          $set: {
+            service_metadata: { ...meta, service_fulfilled: true },
+            payment_method_status: isFullyPaid ? 'succeeded' : 'active',
+          },
+        },
+        { new: true },
+      )
     }
 
     return res.status(200).json({

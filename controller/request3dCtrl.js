@@ -11,6 +11,8 @@ import {
   listingMetaFromApproval,
   clearUnpaidPremiumOnListing,
   modelForAssetType,
+  isPremiumServiceRecordPaid,
+  fillListingTitleOnPremiumRecord,
 } from '../utils/listingPremiumSync.js'
 
 export const createRequest = async (req, res) => {
@@ -114,10 +116,22 @@ export const createRequest = async (req, res) => {
 
 export const getRequests = async (req, res) => {
   try {
-    const requests = await Request3D.find({ isDeleted: false }).select(
-      '-_id -productId -userId -createdAt -updatedAt '
+    const requests = await Request3D.find({ isDeleted: false })
+      .sort({ createdAt: -1 })
+      .lean()
+
+    const paidRequests = []
+    for (const request of requests) {
+      if (!isPremiumServiceRecordPaid(request)) continue
+      await fillListingTitleOnPremiumRecord(request)
+      paidRequests.push(request)
+    }
+
+    const payload = paidRequests.map(
+      ({ _id, productId, userId, createdAt, updatedAt, ...rest }) => rest,
     )
-    res.status(200).json(requests)
+
+    res.status(200).json(payload)
   } catch (error) {
     res.status(500).json({ message: 'Error fetching requests', error })
   }

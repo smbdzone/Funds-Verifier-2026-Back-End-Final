@@ -37,6 +37,7 @@ import {
   getSafeTitleRegex,
   pickScalarFilters,
   applyListingStatusFilters,
+  applyEvaluatorPendingFilter,
 } from '../utils/listingQuery.js'
 import { buildListingIdQuery } from '../utils/listingIdLookup.js'
 
@@ -108,24 +109,22 @@ const createProduct = asyncHandler(async (req, res) => {
 
     // Find the latest pending 3D Request
     const pendingRequest = await Request3D.findOneAndUpdate(
-      { status: 'pending' },
+      { status: 'pending', isDeleted: { $ne: true } },
       {
         productId: createPdt[0]._id,
         productUUID: createPdt[0].uuid,
         productTitle: createPdt[0].title,
         assetType: createPdt[0].assetType,
-        status: 'successful',
       },
       { new: true, sort: { createdAt: -1 }, session },
     )
     const pendingReport = await Report.findOneAndUpdate(
-      { status: 'pending' },
+      { status: 'pending', isDeleted: { $ne: true } },
       {
         productId: createPdt[0]._id,
         productUUID: createPdt[0].uuid,
         productTitle: createPdt[0].title,
         assetType: createPdt[0].assetType,
-        status: 'successful',
       },
       { new: true, sort: { createdAt: -1 }, session },
     )
@@ -273,6 +272,7 @@ const getAllProduct = asyncHandler(async (req, res) => {
     }
 
     applyListingStatusFilters(parseData, req.query)
+    applyEvaluatorPendingFilter(parseData, req.query)
 
     if (req.query.propertyForSale) {
       const saleVal = String(req.query.propertyForSale).trim()

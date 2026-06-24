@@ -41,6 +41,7 @@ export const LISTING_QUERY_PARAMS = new Set([
   'price',
   'evaluationPrices',
   'transactionStatus',
+  'evaluatorPending',
 ])
 
 /** Apply admin/listing status filters from query string onto a Mongo filter object. */
@@ -55,6 +56,13 @@ export function applyListingStatusFilters(parseData, query) {
   if (transactionStatus) {
     parseData.transactionStatus = transactionStatus.toLowerCase()
   }
+}
+
+/** Evaluator dashboards: submitted listings awaiting evaluation (paid + booked slot). */
+export function applyEvaluatorPendingFilter(parseData, query) {
+  if (query?.evaluatorPending !== 'true') return
+  parseData.status = 0
+  parseData.evaluationDateTime = { $exists: true, $ne: null }
 }
 
 /** Scalar filter fields copied as plain equality matches on list endpoints. */

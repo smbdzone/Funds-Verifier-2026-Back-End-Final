@@ -71,6 +71,22 @@ export async function linkWalkthroughToListing(request) {
   await Model.updateOne(query, { $set: { video3DWalkthrough: request._id } })
 }
 
+/** Ensure dashboard rows show the linked listing title when productTitle was not stored. */
+export async function fillListingTitleOnPremiumRecord(record) {
+  if (!record) return record
+  if (String(record.productTitle || '').trim()) return record
+
+  const Model = modelForAssetType(record.assetType)
+  const query = listingQueryFromPremiumRecord(record)
+  if (!Model || !query) return record
+
+  const listing = await Model.findOne(query).select('title').lean()
+  if (listing?.title) {
+    record.productTitle = listing.title
+  }
+  return record
+}
+
 export async function markReportDelivered(reportUuid, extra = {}) {
   return Report.findOneAndUpdate(
     { uuid: reportUuid, isDeleted: { $ne: true } },
@@ -97,7 +113,7 @@ export async function markWalkthroughDelivered(requestUuid, extra = {}) {
   )
 }
 
-const PAID_PAYMENT_STATUSES = new Set(['paid', 'succeeded'])
+const PAID_PAYMENT_STATUSES = new Set(['paid', 'succeeded', 'active', 'approved'])
 const PAID_RECORD_STATUSES = new Set(['successful'])
 
 export function isPremiumServiceRecordPaid(record) {
@@ -129,6 +145,11 @@ export async function clearUnpaidPremiumOnListing(product, AssetModel, fields) {
       isDeleted: { $ne: true },
     })
     if (!record || isPremiumServiceRecordPaid(record)) continue
+
+    // Checkout may still be in progress — do not remove the request yet.
+    const createdAt = record.createdAt ? new Date(record.createdAt).getTime() : 0
+    const checkoutGraceMs = 45 * 60 * 1000
+    if (createdAt && Date.now() - createdAt < checkoutGraceMs) continue
 
     await RecordModel.findByIdAndUpdate(refId, {
       $set: { isDeleted: true, deletedAt: new Date() },

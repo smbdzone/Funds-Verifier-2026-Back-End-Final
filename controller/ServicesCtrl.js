@@ -353,43 +353,34 @@ const UpdateUserForSubscribeServices = async (req, res) => {
     let request3dwalkthrough
     let reportTech
 
+    const paymentUpdate = {
+      payment_details,
+      payment_method_status,
+      isDeleted: false,
+      deletedAt: null,
+    }
+
     if (service === 'all') {
       request3dwalkthrough = await Request3D.findByIdAndUpdate(
         request3DId,
-        {
-          status: 'successful',
-          payment_details,
-          payment_method_status,
-        },
+        paymentUpdate,
         { new: true },
       )
       reportTech = await ReportTechnical.findByIdAndUpdate(
         reportTechId,
-        {
-          status: 'successful',
-          payment_details,
-          payment_method_status,
-        },
+        paymentUpdate,
         { new: true },
       )
     } else if (service === 'surveyor') {
       reportTech = await ReportTechnical.findByIdAndUpdate(
         reportTechId,
-        {
-          status: 'successful',
-          payment_details,
-          payment_method_status,
-        },
+        paymentUpdate,
         { new: true },
       )
     } else if (service === '_3dwalkthrough') {
       request3dwalkthrough = await Request3D.findByIdAndUpdate(
         request3DId,
-        {
-          status: 'successful',
-          payment_details,
-          payment_method_status,
-        },
+        paymentUpdate,
         { new: true },
       )
     }

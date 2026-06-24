@@ -49,6 +49,7 @@ import {
   getSafeTitleRegex,
   pickScalarFilters,
   applyListingStatusFilters,
+  applyEvaluatorPendingFilter,
 } from '../utils/listingQuery.js'
 const app = express()
 
@@ -111,22 +112,22 @@ const createProduct = asyncHandler(async (req, res) => {
 
     // Try to find and update the latest pending 3D Request
     const pendingRequest = await Request3D.findOneAndUpdate(
-      { status: 'pending' },
+      { status: 'pending', isDeleted: { $ne: true } },
       {
         productId: createPdt[0]._id,
+        productUUID: createPdt[0].uuid,
         productTitle: createPdt[0].title,
         assetType: createPdt[0].assetType,
-        status: 'successful',
       },
       { new: true, sort: { createdAt: -1 }, session }
     )
     const pendingReport = await Report.findOneAndUpdate(
-      { status: 'pending' },
+      { status: 'pending', isDeleted: { $ne: true } },
       {
         productId: createPdt[0]._id,
+        productUUID: createPdt[0].uuid,
         productTitle: createPdt[0].title,
         assetType: createPdt[0].assetType,
-        status: 'successful',
       },
       { new: true, sort: { createdAt: -1 }, session }
     )
@@ -330,6 +331,7 @@ const getAllProduct = asyncHandler(async (req, res) => {
 
     // Status
     applyListingStatusFilters(parseData, req.query)
+    applyEvaluatorPendingFilter(parseData, req.query)
 
     // Title search
     const titleFilter = getSafeTitleRegex(req.query)

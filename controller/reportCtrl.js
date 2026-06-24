@@ -12,6 +12,7 @@ import {
   listingMetaFromApproval,
   clearUnpaidPremiumOnListing,
   modelForAssetType,
+  isPremiumServiceRecordPaid,
 } from '../utils/listingPremiumSync.js'
 
 export const createReport = async (req, res) => {
@@ -116,9 +117,18 @@ export const createReport = async (req, res) => {
 export const getReports = async (req, res) => {
   try {
     const reports = await Report.find({ isDeleted: false })
-      .select('-_id -isDeleted -deletedAt -createdAt -updatedAt')
+      .sort({ createdAt: -1 })
       .populate('reportFile')
-    res.status(200).json(reports)
+      .lean()
+
+    const paidReports = reports.filter(isPremiumServiceRecordPaid)
+
+    const payload = paidReports.map(
+      ({ _id, productId, userId, createdAt, updatedAt, isDeleted, deletedAt, ...rest }) =>
+        rest,
+    )
+
+    res.status(200).json(payload)
   } catch (error) {
     res.status(500).json({ message: 'Error fetching requests', error })
   }

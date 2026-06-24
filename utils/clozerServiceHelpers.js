@@ -153,37 +153,57 @@ export async function fulfillServicePayment({
   payment_details,
   payment_provider = 'clozer',
 }) {
-  const payment_method_status =
-    payment_details?.payment_status === 'succeeded' ||
-      payment_details?.status === 'completed' ||
-      payment_details?.status === 'approved'
-      ? 'succeeded'
-      : 'pending'
+  const payment_method_status = (() => {
+    const paymentStatus = String(
+      payment_details?.payment_status || '',
+    ).toLowerCase()
+    const recordStatus = String(payment_details?.status || '').toLowerCase()
+    if (
+      ['succeeded', 'paid', 'completed'].includes(paymentStatus) ||
+      ['succeeded', 'paid', 'completed'].includes(recordStatus)
+    ) {
+      return 'succeeded'
+    }
+    if (
+      ['active', 'approved'].includes(paymentStatus) ||
+      ['active', 'approved'].includes(recordStatus)
+    ) {
+      return 'active'
+    }
+    return 'pending'
+  })()
 
   let request3dwalkthrough
   let reportTech
 
+  const paymentUpdate = {
+    payment_details,
+    payment_method_status,
+    isDeleted: false,
+    deletedAt: null,
+  }
+
   if (service === 'all') {
     request3dwalkthrough = await Request3D.findByIdAndUpdate(
       request3DId,
-      { status: 'successful', payment_details, payment_method_status },
+      paymentUpdate,
       { new: true },
     )
     reportTech = await ReportTechnical.findByIdAndUpdate(
       reportTechId,
-      { status: 'successful', payment_details, payment_method_status },
+      paymentUpdate,
       { new: true },
     )
   } else if (service === 'surveyor') {
     reportTech = await ReportTechnical.findByIdAndUpdate(
       reportTechId,
-      { status: 'successful', payment_details, payment_method_status },
+      paymentUpdate,
       { new: true },
     )
   } else if (service === '_3dwalkthrough') {
     request3dwalkthrough = await Request3D.findByIdAndUpdate(
       request3DId,
-      { status: 'successful', payment_details, payment_method_status },
+      paymentUpdate,
       { new: true },
     )
   }
