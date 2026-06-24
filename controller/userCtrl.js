@@ -631,6 +631,18 @@ const getEvaluator = asyncHandler(async (req, res) => {
   }
 })
 
+const isParentEvaluatorOf = (requester, user) => {
+  if (!requester || !user?.parentEvaluator) return false
+  const parentRef = String(user.parentEvaluator)
+  return (
+    parentRef === String(requester._id) ||
+    (requester.uuid && parentRef === String(requester.uuid))
+  )
+}
+
+const isSubEvaluatorRole = (role) =>
+  ['Sub-Evaluator', 'SubEvaluator'].includes(String(role || ''))
+
 const updateStatus = asyncHandler(async (req, res) => {
   const { id } = req.params
   const { userState } = req.body
@@ -639,12 +651,6 @@ const updateStatus = asyncHandler(async (req, res) => {
     const requester = req.user
     if (!requester) {
       return res.status(401).json({ message: 'Unauthorized' })
-    }
-
-    if (requester.role !== 'Admin') {
-      return res.status(403).json({
-        message: 'Forbidden: Only Admin can change user status',
-      })
     }
 
     const sanitizedId = sanitizeUUID(id)
@@ -666,6 +672,21 @@ const updateStatus = asyncHandler(async (req, res) => {
 
     if (!user) {
       return res.status(400).json({ message: 'User not found' })
+    }
+
+    const isAdmin = isAdminRole(requester?.role)
+    const isParent = isParentEvaluatorOf(requester, user)
+
+    if (!isAdmin && !isParent) {
+      return res.status(403).json({
+        message: 'Forbidden: Only Admin or parent evaluator can change user status',
+      })
+    }
+
+    if (!isAdmin && isParent && !isSubEvaluatorRole(user.role)) {
+      return res.status(403).json({
+        message: 'Forbidden: Can only change status for sub-evaluators',
+      })
     }
 
     const updatedUser = await User.findByIdAndUpdate(
@@ -1017,6 +1038,20 @@ const deleteUser = asyncHandler(async (req, res) => {
       return res
         .status(404)
         .json({ message: 'User not found or already deleted' })
+    }
+
+    const isParent = isParentEvaluatorOf(requester, user)
+
+    if (!isParent) {
+      return res.status(403).json({
+        message: 'Forbidden: Not allowed to delete this user',
+      })
+    }
+
+    if (!isSubEvaluatorRole(user.role)) {
+      return res.status(403).json({
+        message: 'Forbidden: Can only delete sub-evaluators',
+      })
     }
 
     user.isDeleted = true

@@ -13,8 +13,11 @@ import {
   updateSeletedSlotService,
   getBookingByIdAssetValue,
   deleteBookingByIdService,
+  getSlotsByDateService,
+  roleToSlotCategory,
+  VIEWING_SLOT_CATEGORY,
+  SERVICE_SLOT_CATEGORY,
 } from '../services/bookingServices.js'
-import moment from 'moment'
 import { createNotification } from './notifications.controller.js'
 import Property from '../models/propertyModel.js'
 import Car from '../models/carModel.js'
@@ -59,6 +62,7 @@ export const createBooking = async (req, res) => {
       'Time slot not found',
       'Broker not found',
       'Asset holder not found',
+      'This time slot is not available for property viewing',
     ]
     const statusCode = knownClientErrors.includes(error?.message) ? 400 : 500
     res.status(statusCode).json({ message: error.message })
@@ -68,9 +72,14 @@ export const createBooking = async (req, res) => {
 // Add slot
 export const addSlot = async (req, res) => {
   try {
-    const { date, timeSlots, userUUID } = req.body
+    const { date, timeSlots, userUUID, slotCategory } = req.body
+    const resolvedCategory =
+      slotCategory || roleToSlotCategory(req.user?.role)
 
-    const slot = await addSlotService(date, timeSlots, userUUID)
+    const slot = await addSlotService(date, timeSlots, userUUID, {
+      slotCategory: resolvedCategory,
+      creatorRole: req.user?.role || '',
+    })
     res.status(201).json({ message: 'Slot added', slot })
   } catch (error) {
     res.status(500).json({ message: error.message })
@@ -79,33 +88,14 @@ export const addSlot = async (req, res) => {
 
 export const getSlotsByDate = async (req, res) => {
   try {
-    const { date, userUUID } = req.query
-    console.log(date, userUUID)
+    const { date, userUUID, slotCategory } = req.query
 
     if (!date) {
       return res.status(400).json({ error: 'Date is required.' })
     }
 
-    // Validate and parse the date
-    const parsedDate = moment(date) // Strict ISO 8601 parsing
-    if (!parsedDate.isValid()) {
-      return res.status(400).json({ error: 'Invalid date format.' })
-    }
-
-    // Generate start and end of the day for the given date
-    const startOfDay = parsedDate.startOf('day').toISOString()
-    const endOfDay = parsedDate.endOf('day').toISOString()
-
-    // Query for slots within the day's range and role
-    const slots = await Slot.find(
-      {
-        date: { $gte: startOfDay, $lte: endOfDay },
-        userUUID: userUUID,
-        isDeleted: false,
-        // userId,
-      },
-      { 'times._id': 0 }
-    ).select('-_id -createdAt -isDeleted -deletedAt')
+    const resolvedCategory = slotCategory || SERVICE_SLOT_CATEGORY
+    const slots = await getSlotsByDateService(date, userUUID, resolvedCategory)
 
     res.status(200).json(slots)
   } catch (error) {
@@ -340,9 +330,15 @@ export const deleteBookingById = async (req, res) => {
 // Get available slots by date
 export const getAvailableSlotsByDate = async (req, res) => {
   try {
-    const { date, userId } = req.query
+    const { date, userUUID, userId, slotCategory } = req.query
+    const ownerUUID = userUUID || userId
+    const resolvedCategory = slotCategory || VIEWING_SLOT_CATEGORY
 
-    const availableSlots = await getAvailableSlotsByDateService(date, userId)
+    const availableSlots = await getAvailableSlotsByDateService(
+      date,
+      ownerUUID,
+      resolvedCategory,
+    )
     res.status(200).json(availableSlots)
   } catch (error) {
     res.status(500).json({ message: error.message })

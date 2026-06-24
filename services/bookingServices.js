@@ -4,6 +4,58 @@ import { Types } from 'mongoose'
 import User from '../models/userModel.js'
 import { createNotification } from '../controller/notifications.controller.js'
 import { refreshListingMediaSignedUrls } from '../helper/refreshAssetSignedUrls.js'
+import moment from 'moment'
+
+export const VIEWING_SLOT_CATEGORY = 'viewing'
+export const SERVICE_SLOT_CATEGORY = 'service'
+
+export const roleToSlotCategory = (role = '') => {
+  const normalized = String(role).trim().toLowerCase().replace(/[\s_-]/g, '')
+  if (normalized === 'trustee') return VIEWING_SLOT_CATEGORY
+  return SERVICE_SLOT_CATEGORY
+}
+
+const buildDateRange = (date) => {
+  const parsedDate = moment(date)
+  if (!parsedDate.isValid()) return null
+  return {
+    $gte: parsedDate.clone().startOf('day').toDate(),
+    $lte: parsedDate.clone().endOf('day').toDate(),
+  }
+}
+
+const buildSlotCategoryClause = async (userUUID, slotCategory) => {
+  const user = await User.findOne({ uuid: userUUID, isDeleted: false }).select(
+    'role uuid',
+  )
+  if (!user) return null
+
+  const inferred = roleToSlotCategory(user.role)
+
+  if (slotCategory === VIEWING_SLOT_CATEGORY) {
+    if (inferred !== VIEWING_SLOT_CATEGORY) return null
+    return {
+      $or: [
+        { slotCategory: VIEWING_SLOT_CATEGORY },
+        { slotCategory: { $exists: false } },
+      ],
+    }
+  }
+
+  return {
+    $or: [
+      { slotCategory: SERVICE_SLOT_CATEGORY },
+      {
+        slotCategory: { $exists: false },
+        creatorRole: { $ne: 'Trustee' },
+      },
+      {
+        slotCategory: { $exists: false },
+        creatorRole: { $exists: false },
+      },
+    ],
+  }
+}
 
 // Fetch available slots
 export const getAvailableSlotsService = async (date) => {
@@ -49,13 +101,25 @@ export const createBookingService = async (bookingData) => {
     resolveIdentifier(productData?.userUUID) ||
     resolveIdentifier(productData?.userId)
 
-  // Check if the specific time slot is available
   const slot = await Slot.findOne({
     'times.uuid': timeSlotId,
     'times.isBooked': false,
     isDeleted: false,
   })
   if (!slot) throw new Error('Time slot not available')
+
+  if (slot.slotCategory === SERVICE_SLOT_CATEGORY) {
+    throw new Error('This time slot is not available for property viewing')
+  }
+
+  const slotOwner = await User.findOne({
+    uuid: slot.userUUID,
+    isDeleted: false,
+  }).select('role')
+
+  if (roleToSlotCategory(slotOwner?.role) !== VIEWING_SLOT_CATEGORY) {
+    throw new Error('This time slot is not available for property viewing')
+  }
 
   // Ensure broker exists
   const brokerQuery = { isDeleted: false, $or: [{ uuid: normalizedBrokerId }] }
@@ -124,9 +188,16 @@ export const createBookingService = async (bookingData) => {
 }
 
 // Add a new slot with time slots
-export const addSlotService = async (date, timeSlots, userUUID) => {
-  // Check if a slot with the provided date already exists
-  const existingSlot = await Slot.findOne({ date, userUUID, isDeleted: false })
+export const addSlotService = async (date, timeSlots, userUUID, metadata = {}) => {
+  const slotCategory = metadata.slotCategory || SERVICE_SLOT_CATEGORY
+  const creatorRole = metadata.creatorRole || ''
+
+  const existingSlot = await Slot.findOne({
+    date,
+    userUUID,
+    slotCategory,
+    isDeleted: false,
+  })
 
   // If the slot already exists, return an error
   if (existingSlot) {
@@ -137,6 +208,8 @@ export const addSlotService = async (date, timeSlots, userUUID) => {
   const newSlot = new Slot({
     userUUID,
     date,
+    slotCategory,
+    creatorRole,
     times: timeSlots.map((time) => ({ time })),
   })
   return newSlot.save()
@@ -192,13 +265,19 @@ export const deleteSlotService = async (slotId) => {
 
 // Get all slots
 export const getAllSlotsService = async (id, role) => {
+  const slotCategory = roleToSlotCategory(role)
+  const categoryClause = await buildSlotCategoryClause(id, slotCategory)
 
-  if (role === "Admin") {
-    return Slot.find({ isDeleted: false }).sort({ createdAt: -1 })
-  } else {
-    return Slot.find({ userUUID: id, isDeleted: false }).sort({ createdAt: -1 })
-
+  const baseQuery = { isDeleted: false }
+  if (categoryClause) {
+    Object.assign(baseQuery, categoryClause)
   }
+
+  if (role === 'Admin') {
+    return Slot.find({ isDeleted: false }).sort({ createdAt: -1 })
+  }
+
+  return Slot.find({ userUUID: id, ...baseQuery }).sort({ createdAt: -1 })
 }
 
 // Get all bookings
@@ -454,13 +533,47 @@ export const deleteBookingByIdService = async (bookingUUID) => {
   return booking
 }
 
-// Get available slots by date
-export const getAvailableSlotsByDateService = async (date, userId) => {
-  const selectedDate = new Date(date)
+// Get available slots by date (arrange viewing uses slotCategory=viewing)
+export const getAvailableSlotsByDateService = async (
+  date,
+  userUUID,
+  slotCategory = VIEWING_SLOT_CATEGORY,
+) => {
+  if (!userUUID || !date) return []
+
+  const dateRange = buildDateRange(date)
+  if (!dateRange) return []
+
+  const categoryClause = await buildSlotCategoryClause(userUUID, slotCategory)
+  if (!categoryClause) return []
+
   return Slot.find({
-    date: selectedDate,
-    'times.isBooked': false,
-    userId: userId,
+    userUUID,
+    date: dateRange,
     isDeleted: false,
+    ...categoryClause,
+  }).select('-_id -createdAt -isDeleted -deletedAt')
+}
+
+export const getSlotsByDateService = async (
+  date,
+  userUUID,
+  slotCategory = SERVICE_SLOT_CATEGORY,
+) => {
+  if (!userUUID || !date) return []
+
+  const dateRange = buildDateRange(date)
+  if (!dateRange) return []
+
+  const categoryClause = await buildSlotCategoryClause(userUUID, slotCategory)
+  if (!categoryClause) return []
+
+  return Slot.find({
+    userUUID,
+    date: dateRange,
+    isDeleted: false,
+    ...categoryClause,
   })
+    .select('-_id -createdAt -isDeleted -deletedAt')
+    .lean()
 }
