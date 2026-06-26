@@ -109,7 +109,7 @@ const CarAdSchema = new Schema(
       ref: 'User',
     },
     evaluationDateTime: { type: Date, required: false },
-    requestDocument: [{ type: String, required: true }],
+    requestDocument: { type: [mongoose.Schema.Types.Mixed], default: [] },
     trusteeNote: { type: String },
     uploadDocument: [
       {

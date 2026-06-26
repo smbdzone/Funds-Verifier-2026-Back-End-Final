@@ -82,7 +82,7 @@ const BoatAdSchema = new Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'ReportTechnical',
     },
-    requestDocument: [{ type: String, required: true }],
+    requestDocument: { type: [mongoose.Schema.Types.Mixed], default: [] },
     uploadDocument: [
       {
         type: mongoose.Schema.Types.ObjectId,

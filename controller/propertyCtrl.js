@@ -20,6 +20,12 @@ import UserPaymentDetails from '../models/UserPaymentDetails.js'
 import { PUBLIC_PROPERTY_FIELDS } from '../constants/publicFields.js'
 import { attachDocumentSignedUrls } from '../helper/attachDocumentSignedUrls.js'
 import {
+  REQUEST_DOCUMENT_POPULATE,
+  applyRequestDocumentUpdate,
+  attachRequestDocumentSignedUrls,
+  normalizeRequestDocumentList,
+} from '../helper/requestDocumentHelpers.js'
+import {
   stripNullPremiumRefs,
   refreshListingPremiumFieldsForEdit,
   sanitizeUnpaidPremiumServicesForClient,
@@ -195,6 +201,7 @@ const getSingleProperty = asyncHandler(async (req, res) => {
       .populate('pictures')
       .populate('video')
       .populate('uploadDocument')
+      .populate(REQUEST_DOCUMENT_POPULATE)
       .populate('thumbnailImg')
       .populate('video3DWalkthrough')
       .populate('transactionDepositDocument')
@@ -211,6 +218,10 @@ const getSingleProperty = asyncHandler(async (req, res) => {
     if (!property) {
       return res.status(404).json({ message: 'Property not found' })
     }
+
+    property.requestDocument = normalizeRequestDocumentList(
+      property.requestDocument,
+    )
 
     await refreshListingMediaSignedUrls(property)
 
@@ -232,6 +243,7 @@ const getSingleProperty = asyncHandler(async (req, res) => {
     // etc. — attach fresh `signedUrl` so the frontend can render the docs
     // without the URL having expired since they were stored.
     await attachDocumentSignedUrls(property)
+    await attachRequestDocumentSignedUrls(property)
 
     // Strip server-internal S3 metadata (s3Bucket / s3Key / etc.) before
     // responding. The signed URL is everything the client needs.
@@ -665,8 +677,14 @@ const updateProduct = asyncHandler(async (req, res) => {
         req.body.slug = slugify(req.body.title)
       }
 
+      const documentFulfilled = Boolean(req.body.fulfillRequestDocument)
+      applyRequestDocumentUpdate(product, req.body)
+
+      const requestedDocumentsUpdated =
+        Boolean(req.body.requestDocument) && !documentFulfilled
+
       // Handle uploadDocument IDs (from frontend)
-      if (req.body.uploadDocument) {
+      if (req.body.uploadDocument && !documentFulfilled) {
         const newDocumentIds = Array.isArray(req.body.uploadDocument)
           ? req.body.uploadDocument // If multiple IDs are passed as an array
           : [req.body.uploadDocument] // If only a single ID is passed as a string
@@ -704,6 +722,15 @@ const updateProduct = asyncHandler(async (req, res) => {
           message: `Property (${updatedProduct?.title}) has been updated.`,
           RelateRoute: `property`,
           RelatedId: updatedProduct?._id,
+        }
+        if (requestedDocumentsUpdated && !documentFulfilled) {
+          NotificationData.message = `Evaluator requested documents for your property (${updatedProduct?.title}). Please upload them in Documents Storage.`
+          NotificationData.RelateRoute = 'documents-storage'
+        } else if (documentFulfilled) {
+          NotificationData.UserRole = 'Evaluator'
+          NotificationData.userUUID = updatedProduct?.evaluatorUUID
+          NotificationData.message = `Seller uploaded a requested document for property (${updatedProduct?.title}).`
+          NotificationData.RelateRoute = 'evaluation'
         }
         await createNotification({ data: NotificationData })
       } catch (error) {

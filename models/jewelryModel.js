@@ -91,7 +91,7 @@ const JewelryAdSchema = new Schema(
     },
     trusteeNote: { type: String },
     evaluationDateTime: { type: Date, required: false },
-    requestDocument: [{ type: String, required: true }],
+    requestDocument: { type: [mongoose.Schema.Types.Mixed], default: [] },
     phoneNumber: { type: Number, required: true },
     uploadDocument: [
       {

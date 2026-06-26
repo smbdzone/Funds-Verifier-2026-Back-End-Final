@@ -25,6 +25,12 @@ import {
 } from '../helper/sanitizeListingResponse.js'
 import { attachDocumentSignedUrls } from '../helper/attachDocumentSignedUrls.js'
 import {
+  REQUEST_DOCUMENT_POPULATE,
+  applyRequestDocumentUpdate,
+  attachRequestDocumentSignedUrls,
+  normalizeRequestDocumentList,
+} from '../helper/requestDocumentHelpers.js'
+import {
   stripNullPremiumRefs,
   refreshListingPremiumFieldsForEdit,
   sanitizeUnpaidPremiumServicesForClient,
@@ -217,6 +223,7 @@ const getSingleProduct = asyncHandler(async (req, res) => {
       .populate('pictures')
       .populate('video')
       .populate('uploadDocument')
+      .populate(REQUEST_DOCUMENT_POPULATE)
       .populate('thumbnailImg')
       .populate('video3DWalkthrough')
       .populate('transactionDepositDocument')
@@ -235,6 +242,8 @@ const getSingleProduct = asyncHandler(async (req, res) => {
       return res.status(404).json({ message: 'Boat not found' })
     }
 
+    boat.requestDocument = normalizeRequestDocumentList(boat.requestDocument)
+
     await refreshListingMediaSignedUrls(boat)
 
     const isPrivilegedUser =
@@ -252,6 +261,7 @@ const getSingleProduct = asyncHandler(async (req, res) => {
     }
 
     await attachDocumentSignedUrls(boat)
+    await attachRequestDocumentSignedUrls(boat)
     sanitizeListingMediaResponse(boat)
     await refreshListingPremiumFieldsForEdit(boat)
     res.json(boat)
@@ -662,7 +672,9 @@ const updateProduct = asyncHandler(async (req, res) => {
     try {
       // validateMongoId(id)
       // Find the existing product
-      const product = await Boat.findOne(buildListingIdQuery(moduleId))
+      const product = await Boat.findOne(buildListingIdQuery(moduleId)).populate(
+        'uploadDocument',
+      )
       if (!product) {
         return res.status(404).json({ message: 'boat not found' })
       }
@@ -671,6 +683,12 @@ const updateProduct = asyncHandler(async (req, res) => {
       if (req.body.title) {
         req.body.slug = slugify(req.body.title)
       }
+
+      const documentFulfilled = Boolean(req.body.fulfillRequestDocument)
+      applyRequestDocumentUpdate(product, req.body)
+
+      const requestedDocumentsUpdated =
+        Boolean(req.body.requestDocument) && !documentFulfilled
 
       // Handle technicalReport upload
       if (req.files && req.files.technicalReport) {
@@ -683,7 +701,7 @@ const updateProduct = asyncHandler(async (req, res) => {
       // }
 
       // Handle uploadDocument IDs (from frontend)
-      if (req.body.uploadDocument) {
+      if (req.body.uploadDocument && !documentFulfilled) {
         const newDocumentIds = Array.isArray(req.body.uploadDocument)
           ? req.body.uploadDocument // If multiple IDs are passed as an array
           : [req.body.uploadDocument] // If only a single ID is passed as a string
@@ -711,6 +729,15 @@ const updateProduct = asyncHandler(async (req, res) => {
           message: `Your boat (${updatedProduct?.title}) has been updated.`,
           RelateRoute: 'boat',
           RelatedId: updatedProduct?._id,
+        }
+        if (requestedDocumentsUpdated) {
+          NotificationData.message = `Evaluator requested documents for your boat (${updatedProduct?.title}). Please upload them in Documents Storage.`
+          NotificationData.RelateRoute = 'documents-storage'
+        } else if (documentFulfilled) {
+          NotificationData.UserRole = 'Evaluator'
+          NotificationData.userUUID = updatedProduct?.evaluatorUUID
+          NotificationData.message = `Seller uploaded a requested document for boat (${updatedProduct?.title}).`
+          NotificationData.RelateRoute = 'evaluation'
         }
         await createNotification({ data: NotificationData })
       } catch (error) {

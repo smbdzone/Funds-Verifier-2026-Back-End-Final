@@ -25,6 +25,12 @@ import {
 } from '../helper/sanitizeListingResponse.js'
 import { attachDocumentSignedUrls } from '../helper/attachDocumentSignedUrls.js'
 import {
+  REQUEST_DOCUMENT_POPULATE,
+  applyRequestDocumentUpdate,
+  attachRequestDocumentSignedUrls,
+  normalizeRequestDocumentList,
+} from '../helper/requestDocumentHelpers.js'
+import {
   stripNullPremiumRefs,
   refreshListingPremiumFieldsForEdit,
   sanitizeUnpaidPremiumServicesForClient,
@@ -207,6 +213,7 @@ const getSingleProduct = asyncHandler(async (req, res) => {
       .populate('thumbnailImg')
       .populate('video3DWalkthrough')
       .populate('uploadDocument')
+      .populate(REQUEST_DOCUMENT_POPULATE)
       .populate('transactionDepositDocument')
       .populate('transactionId')
       .populate('userId')
@@ -222,6 +229,10 @@ const getSingleProduct = asyncHandler(async (req, res) => {
     if (!jewelry) {
       return res.status(404).json({ message: 'Jewelry not found' })
     }
+
+    jewelry.requestDocument = normalizeRequestDocumentList(
+      jewelry.requestDocument,
+    )
 
     await refreshListingMediaSignedUrls(jewelry)
 
@@ -243,6 +254,7 @@ const getSingleProduct = asyncHandler(async (req, res) => {
     }
 
     await attachDocumentSignedUrls(jewelry)
+    await attachRequestDocumentSignedUrls(jewelry)
     sanitizeListingMediaResponse(jewelry)
     await refreshListingPremiumFieldsForEdit(jewelry)
     res.json(jewelry)
@@ -593,7 +605,9 @@ const updateProduct = asyncHandler(async (req, res) => {
 
     try {
       // Find the existing product
-      const product = await Jewelry.findOne(buildListingIdQuery(moduleId))
+      const product = await Jewelry.findOne(
+        buildListingIdQuery(moduleId),
+      ).populate('uploadDocument')
       if (!product) {
         return res.status(404).json({ message: 'jwellery not found' })
       }
@@ -603,12 +617,18 @@ const updateProduct = asyncHandler(async (req, res) => {
         req.body.slug = slugify(req.body.title)
       }
 
+      const documentFulfilled = Boolean(req.body.fulfillRequestDocument)
+      applyRequestDocumentUpdate(product, req.body)
+
+      const requestedDocumentsUpdated =
+        Boolean(req.body.requestDocument) && !documentFulfilled
+
       // Handle technicalReport upload
       if (req.files && req.files.technicalReport) {
         req.body.technicalReport = req.files.technicalReport[0].path
       }
       // Handle uploadDocument IDs (from frontend)
-      if (req.body.uploadDocument) {
+      if (req.body.uploadDocument && !documentFulfilled) {
         const newDocumentIds = Array.isArray(req.body.uploadDocument)
           ? req.body.uploadDocument // If multiple IDs are passed as an array
           : [req.body.uploadDocument] // If only a single ID is passed as a string
@@ -636,6 +656,15 @@ const updateProduct = asyncHandler(async (req, res) => {
           message: `Your asset jewelry (${updatedProduct?.title}) has beed updated.`,
           RelateRoute: 'jewellery',
           RelatedId: updatedProduct?._id,
+        }
+        if (requestedDocumentsUpdated) {
+          NotificationData.message = `Evaluator requested documents for your jewelry (${updatedProduct?.title}). Please upload them in Documents Storage.`
+          NotificationData.RelateRoute = 'documents-storage'
+        } else if (documentFulfilled) {
+          NotificationData.UserRole = 'Evaluator'
+          NotificationData.userUUID = updatedProduct?.evaluatorUUID
+          NotificationData.message = `Seller uploaded a requested document for jewelry (${updatedProduct?.title}).`
+          NotificationData.RelateRoute = 'evaluation'
         }
         await createNotification({ data: NotificationData })
       } catch (error) {

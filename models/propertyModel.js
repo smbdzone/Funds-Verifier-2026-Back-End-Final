@@ -6,7 +6,7 @@ import { attachListingMediaRefreshHook } from '../helper/refreshAssetSignedUrls.
 const propertySchema = new mongoose.Schema({
   assetType: { type: String, required: true },
   country: { type: String, required: true },
-  requestDocument: [{ type: String, required: true }],
+  requestDocument: { type: [mongoose.Schema.Types.Mixed], default: [] },
   uuid: {
     type: String,
     default: uuidv4,
