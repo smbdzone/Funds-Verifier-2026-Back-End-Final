@@ -296,6 +296,31 @@ function processBlogImages(blog) {
   return processed
 }
 
+function isSuperAdmin(req) {
+  return String(req.user?.role || '').trim() === 'Admin'
+}
+
+/** Public reads only Active blogs; Super Admin may pass includeInactive=true with auth. */
+function shouldIncludeInactive(req) {
+  return (
+    isSuperAdmin(req) &&
+    (req.query.includeInactive === 'true' || req.query.includeInactive === '1')
+  )
+}
+
+/** Hide blogs explicitly marked inactive; legacy rows without status stay visible. */
+function applyPublicBlogVisibilityFilter(queryCondition) {
+  queryCondition.status = { $not: /^inactive$/i }
+}
+
+function setPublicBlogCacheHeaders(res) {
+  res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
+  res.set('Pragma', 'no-cache')
+  res.set('Expires', '0')
+}
+
+const BLOG_LIST_SORT = { isFeatured: -1, featuredAt: -1, createdAt: -1 }
+
 const addInsightHub = async (req, res) => {
   const {
     title,
@@ -305,10 +330,10 @@ const addInsightHub = async (req, res) => {
     date,
     slug,
     services,
-    faqs,
     SEO,
     schemas,
     status = 'Active',
+    isFeatured = false,
   } = req.body
 
   try {
@@ -324,6 +349,8 @@ const addInsightHub = async (req, res) => {
     const bannerStoredValue = normalizeBlogImageForDb(banner)
     const seoImageStoredValue = normalizeBlogImageForDb(SEO?.image)
 
+    const featured = Boolean(isFeatured)
+
     const newInsightHub = new Blog({
       title,
       banner: bannerStoredValue,
@@ -332,7 +359,6 @@ const addInsightHub = async (req, res) => {
       date,
       slug,
       services,
-      faqs,
       SEO: {
         title: SEO?.title,
         description: SEO?.description,
@@ -341,6 +367,8 @@ const addInsightHub = async (req, res) => {
       },
       schemas,
       status,
+      isFeatured: featured,
+      featuredAt: featured ? new Date() : null,
     })
 
     await newInsightHub.save()
@@ -358,29 +386,21 @@ const addInsightHub = async (req, res) => {
 
 const deleteInsightHub = async (req, res) => {
   const { insightId } = req.params
-  console.log('Deleting InsightHub ID:', insightId)
+  console.log('Permanently deleting InsightHub ID:', insightId)
 
   try {
-    // Find the InsightHub that is not already deleted
     const insightHub = await Blog.findOne({ uuid: insightId })
 
     if (!insightHub) {
       return res.status(404).json({ message: 'InsightHub not found' })
     }
 
-    // Note: Files are stored in S3, so we don't delete them on soft delete
-    // If you want to delete from S3, you can add that logic here using deleteFileFromS3
-    // For now, we only do soft delete (mark as deleted)
-
-    // Soft delete: mark as deleted
-    insightHub.isDeleted = true
-    insightHub.deletedAt = new Date()
-
-    await insightHub.save()
+    // Permanent delete — removes the blog document from the database.
+    // Banner/SEO images remain in S3 (same as previous soft-delete behaviour).
+    await Blog.deleteOne({ uuid: insightId })
 
     return res.status(200).json({
       message: 'Blog deleted successfully',
-      insightHub,
     })
   } catch (error) {
     console.error('Error deleting InsightHub:', error)
@@ -397,12 +417,12 @@ const updateInsightHub = async (req, res) => {
     imagealttext,
     banner,
     services,
-    faqs,
     SEO,
     schemas,
     status,
     category,
     isDeleted,
+    isFeatured,
   } = req.body
 
   try {
@@ -418,11 +438,20 @@ const updateInsightHub = async (req, res) => {
       insightHub.imagealttext = imagealttext
       insightHub.services = services
       insightHub.category = category
-      if (faqs !== undefined) {
-        insightHub.faqs = faqs
-      }
       insightHub.schemas = schemas
-      insightHub.status = status || insightHub.status
+      if (typeof status === 'string' && status.trim()) {
+        insightHub.status = status.trim()
+      }
+
+      if (typeof isFeatured === 'boolean') {
+        const wasFeatured = Boolean(insightHub.isFeatured)
+        insightHub.isFeatured = isFeatured
+        if (isFeatured && !wasFeatured) {
+          insightHub.featuredAt = new Date()
+        } else if (!isFeatured) {
+          insightHub.featuredAt = null
+        }
+      }
 
       // Store only key/path for banner if it's updated
       if (banner !== undefined && banner !== null) {
@@ -485,6 +514,8 @@ const updateInsightHub = async (req, res) => {
 
 const getAllInsightHub = async (req, res) => {
   try {
+    setPublicBlogCacheHeaders(res)
+
     const page = parseInt(req.query.page) || 1
     const limit = parseInt(req.query.limit) || 10
     const startIndex = (page - 1) * limit
@@ -514,10 +545,15 @@ const getAllInsightHub = async (req, res) => {
       isDeleted: false,
     }
 
+    if (!shouldIncludeInactive(req)) {
+      applyPublicBlogVisibilityFilter(queryCondition)
+    }
+
     const totalDocuments = await Blog.countDocuments(queryCondition)
 
     const insights = await Blog.find(queryCondition)
-      .select('-_id')
+      .select('-_id -isDeleted -deletedAt')
+      .sort(BLOG_LIST_SORT)
       .skip(startIndex)
       .limit(limit)
 
@@ -579,12 +615,22 @@ const getInsightHubByStatus = async (req, res) => {
 
 const getInsightHubByCategory = async (req, res) => {
   try {
+    setPublicBlogCacheHeaders(res)
+
     const categories = req.params.category.split(',')
 
-    const insights = await Blog.find({
+    const queryCondition = {
       category: { $in: categories },
       isDeleted: false,
-    }).select('-_id  -isDeleted -deletedAt')
+    }
+
+    if (!shouldIncludeInactive(req)) {
+      applyPublicBlogVisibilityFilter(queryCondition)
+    }
+
+    const insights = await Blog.find(queryCondition)
+      .select('-_id  -isDeleted -deletedAt')
+      .sort(BLOG_LIST_SORT)
 
     if (insights.length > 0) {
       // Process images to generate CloudFront signed URLs
@@ -607,12 +653,20 @@ const getInsightHubByCategory = async (req, res) => {
 
 const getInsightHubBySlug = async (req, res) => {
   try {
+    setPublicBlogCacheHeaders(res)
+
     const { slug } = req.params
 
-    const insightHub = await Blog.findOne({
+    const slugQuery = {
       slug,
       $or: [{ isDeleted: false }, { isDeleted: { $exists: false } }],
-    })
+    }
+
+    if (!shouldIncludeInactive(req)) {
+      applyPublicBlogVisibilityFilter(slugQuery)
+    }
+
+    const insightHub = await Blog.findOne(slugQuery)
 
     if (!insightHub) {
       return res

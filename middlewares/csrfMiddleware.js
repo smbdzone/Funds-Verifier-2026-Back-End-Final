@@ -60,6 +60,11 @@ function isClozerServerRoute(req) {
   )
 }
 
+function isListingMediaDownloadRoute(req) {
+  const path = req.originalUrl || req.path || ''
+  return path.includes('/listing-media-download')
+}
+
 export function issueCsrfToken(req, res) {
   const token = crypto.randomBytes(32).toString('hex')
   res.cookie(CSRF_COOKIE_NAME, token, csrfCookieOptions())
@@ -81,6 +86,10 @@ export function csrfProtection(req, res, next) {
   }
 
   if (isClozerServerRoute(req) && hasClozerApiKey(req)) {
+    return next()
+  }
+
+  if (isListingMediaDownloadRoute(req)) {
     return next()
   }
 

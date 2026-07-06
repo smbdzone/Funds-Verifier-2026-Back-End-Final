@@ -1,5 +1,13 @@
 import Price from '../models/priceModel.js'
 
+function parsePositivePrice(price) {
+  const num = Number(price)
+  if (!Number.isFinite(num) || num <= 0) {
+    return null
+  }
+  return num
+}
+
 export const createPrice = async (req, res) => {
   try {
     const { assetType, value, price, subCategory, category, userUUID } =
@@ -12,11 +20,16 @@ export const createPrice = async (req, res) => {
         .json({ message: 'All required fields must be provided' })
     }
 
+    const validPrice = parsePositivePrice(price)
+    if (validPrice === null) {
+      return res.status(400).json({ message: 'Price must be a positive number' })
+    }
+
     // Create the new report with assetType, productTitle, and productId initially set to null
     const newReport = new Price({
       assetType,
       value,
-      price,
+      price: String(validPrice),
       category,
       subCategory,
       userUUID,
@@ -47,17 +60,16 @@ export const getPrices = async (req, res) => {
 }
 
 export const filterPrice = async (req, res) => {
-  const { userUUID, category, subCategory, value } = req.query
+  const { userUUID, category, subCategory, value, assetType } = req.query
 
   try {
-    // Construct the filter query dynamically
-    const query = {}
+    const query = { isDeleted: false }
 
     if (userUUID) query.userUUID = userUUID
     if (category) query.category = category
     if (subCategory) query.subCategory = subCategory
     if (value) query.value = value
-    query.isDeleted = false
+    if (assetType) query.assetType = assetType
     // Fetch data based on the query object
     const reports = await Price.find(query).select('-_id -isDeleted -deletedAt')
 
@@ -92,6 +104,14 @@ export const getPriceById = async (req, res) => {
 export const updatePrice = async (req, res) => {
   try {
     const { id } = req.params
+
+    if (req.body?.price !== undefined) {
+      const validPrice = parsePositivePrice(req.body.price)
+      if (validPrice === null) {
+        return res.status(400).json({ message: 'Price must be a positive number' })
+      }
+      req.body.price = String(validPrice)
+    }
 
     const updatedReport = await Price.findOneAndUpdate({ uuid: id }, req.body, {
       new: true,

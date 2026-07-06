@@ -36,3 +36,27 @@ export function parseUaePassName(fullnameEN, lastnameEN) {
 export function hasMalformedUaePassName(name) {
   return typeof name === 'string' && name.includes(',')
 }
+
+/** Clean display / Clozer full name from UAE Pass comma blobs or name + lastname. */
+export function normalizePersonFullName(name, lastname = '') {
+  const raw = String(name ?? '').trim()
+  const last = String(lastname ?? '').trim()
+
+  if (hasMalformedUaePassName(raw)) {
+    return parseUaePassName(raw, last).fullName
+  }
+
+  if (!raw && !last) return ''
+  if (!raw) return last
+  if (!last) return raw
+
+  const rawLower = raw.toLowerCase()
+  const lastLower = last.toLowerCase()
+
+  if (rawLower === lastLower) return raw
+  if (rawLower.endsWith(lastLower) || rawLower.includes(` ${lastLower}`)) {
+    return raw
+  }
+
+  return `${raw} ${last}`.trim()
+}

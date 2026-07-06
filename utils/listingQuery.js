@@ -9,6 +9,7 @@ export const LISTING_QUERY_PARAMS = new Set([
   'date',
   'minPrice',
   'maxPrice',
+  'roi',
   'statusFilter',
   'status',
   'title',
@@ -155,6 +156,23 @@ export function pickScalarFilters(query, allowedFields = LISTING_FILTER_FIELDS) 
     }
   }
   return filters
+}
+
+const ROI_BRACKET_TOLERANCE_PERCENT = 20
+
+/** Filter listings within ±20% of the target ROI (e.g. roi=5 → 4–6). */
+export function applyRoiRangeFilter(parseData, query) {
+  const roiRaw = query?.roi
+  if (roiRaw === undefined || roiRaw === null || roiRaw === '') return
+
+  const center = Number(roiRaw)
+  if (!Number.isFinite(center) || center < 0) return
+
+  const delta = (center * ROI_BRACKET_TOLERANCE_PERCENT) / 100
+  parseData.roi = {
+    $gte: Math.max(0, center - delta),
+    $lte: center + delta,
+  }
 }
 
 export { escapeRegexString as escapeRegex }

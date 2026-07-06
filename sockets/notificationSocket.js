@@ -59,6 +59,12 @@ export const initNotificationSocket = () => {
 
     // Join user to their room (named after their UUID)
     socket.join(userUUID)
+    if (userRole) {
+      socket.join(`role:${userRole}`)
+      if (userRole === 'Evaluator' || userRole === 'Sub-Evaluator' || userRole === 'SubEvaluator') {
+        socket.join('role:Evaluator')
+      }
+    }
     console.log(`User ${userUUID} joined room: ${userUUID}`)
 
     // Emit connection success event to client

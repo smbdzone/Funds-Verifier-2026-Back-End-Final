@@ -1,6 +1,7 @@
 import User from '../models/userModel.js'
 import { checkPermission } from '../utils/checkPermission.js'
 import { sanitizeUUID, sanitizeMongoId } from '../utils/nosqlSanitizer.js'
+import { isParentEvaluatorOf } from '../utils/parentEvaluator.js'
 
 const findSubjectUser = async (id) => {
   if (!id) return null
@@ -20,15 +21,6 @@ const findSubjectUser = async (id) => {
   }
 
   return null
-}
-
-const isParentEvaluatorOf = (requester, subject) => {
-  if (!requester?._id || !subject?.parentEvaluator) return false
-  const parentRef = String(subject.parentEvaluator)
-  return (
-    parentRef === String(requester._id) ||
-    (requester.uuid && parentRef === String(requester.uuid))
-  )
 }
 
 const PARENT_MANAGED_PERMISSIONS = [

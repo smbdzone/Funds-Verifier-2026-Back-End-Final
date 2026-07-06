@@ -15,6 +15,7 @@ import { verifyToken } from '../middlewares/JwtAuth.js'
 import UserModel from '../models/userModel.js'
 import { AssetsListingsPricing } from '../utils/AssetsListingsPricing.js'
 import { createNotification } from './notifications.controller.js'
+import { notifyEvaluatorsNewListing } from '../helper/notificationHelpers.js'
 import { AddPaymentJob } from '../utils/jobs/index.js'
 import UserPaymentDetails from '../models/UserPaymentDetails.js'
 import { PUBLIC_PROPERTY_FIELDS } from '../constants/publicFields.js'
@@ -44,8 +45,13 @@ import {
   pickScalarFilters,
   applyListingStatusFilters,
   applyEvaluatorPendingFilter,
+  applyRoiRangeFilter,
 } from '../utils/listingQuery.js'
 import { buildListingIdQuery } from '../utils/listingIdLookup.js'
+import {
+  blockPriceChangeIfUnderProcess,
+  stripUnderProcessFromListingPayload,
+} from '../utils/listingUnderProcess.js'
 
 const app = express()
 
@@ -154,17 +160,12 @@ const createProduct = asyncHandler(async (req, res) => {
     }
 
     try {
-      const NotificationData = {
-        userId: user._id,
-        userUUID: user.uuid,
-        UserRole: 'Evaluator',
-        title: 'Evaluation',
+      await notifyEvaluatorsNewListing({
         message: `New property (${createPdt[0]?.title}) added for evaluation.`,
-        RelateRoute: `evaluation`,
-        RelatedId: createPdt[0]._id,
-      }
-
-      await createNotification({ data: NotificationData })
+        assetType: createPdt[0]?.assetType || 'property',
+        relatedId: createPdt[0]._id,
+        relatedUUID: createPdt[0]?.uuid,
+      })
     } catch (error) {
       console.log({ error: error?.message })
     }
@@ -283,6 +284,8 @@ const getAllProduct = asyncHandler(async (req, res) => {
       if (req.query.maxPrice) parseData.price.$lte = +req.query.maxPrice
     }
 
+    applyRoiRangeFilter(parseData, req.query)
+
     applyListingStatusFilters(parseData, req.query)
     applyEvaluatorPendingFilter(parseData, req.query)
 
@@ -399,6 +402,9 @@ const getAllProduct = asyncHandler(async (req, res) => {
     if (isAuthenticated) {
       query = query
         .populate({ path: 'evaluationCertificate', select: '-_id' })
+        .populate({ path: 'uploadDocument', select: '-_id' })
+        .populate({ path: 'invoice', select: '-_id' })
+        .populate({ path: 'evaluator', select: 'name displayName uuid' })
         .populate({ path: 'video3DWalkthrough', select: '-_id' })
         .populate({
           path: 'technicalReport',
@@ -409,6 +415,10 @@ const getAllProduct = asyncHandler(async (req, res) => {
 
     query = query.populate({
       path: 'reviews',
+      match: {
+        isDeleted: false,
+        $or: [{ status: 'approved' }, { status: { $exists: false } }],
+      },
       select: isAuthenticated
         ? 'ratingNumber review -_id'
         : 'ratingNumber -_id',
@@ -672,6 +682,12 @@ const updateProduct = asyncHandler(async (req, res) => {
         return res.status(404).json({ message: 'Property not found' })
       }
 
+      stripUnderProcessFromListingPayload(req.body)
+      const priceBlock = blockPriceChangeIfUnderProcess(product, req.body)
+      if (priceBlock) {
+        return res.status(403).json({ message: priceBlock })
+      }
+
       // Update slug if title is provided
       if (req.body.title) {
         req.body.slug = slugify(req.body.title)
@@ -725,7 +741,8 @@ const updateProduct = asyncHandler(async (req, res) => {
         }
         if (requestedDocumentsUpdated && !documentFulfilled) {
           NotificationData.message = `Evaluator requested documents for your property (${updatedProduct?.title}). Please upload them in Documents Storage.`
-          NotificationData.RelateRoute = 'documents-storage'
+          NotificationData.RelateRoute = 'pending-evaluation'
+          NotificationData.RelatedUUID = updatedProduct?.uuid
         } else if (documentFulfilled) {
           NotificationData.UserRole = 'Evaluator'
           NotificationData.userUUID = updatedProduct?.evaluatorUUID

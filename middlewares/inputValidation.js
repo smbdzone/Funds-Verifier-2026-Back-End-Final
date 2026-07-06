@@ -41,6 +41,30 @@ export const validateUUID = asyncHandler(async (req, res, next) => {
   next()
 })
 
+export const validateUserRouteId = asyncHandler(async (req, res, next) => {
+  const id = req.params?.id
+
+  if (!id) {
+    return res.status(400).json({
+      success: false,
+      message: 'ID is required',
+    })
+  }
+
+  const sanitizedUuid = sanitizeUUID(id)
+  const sanitizedMongoId = sanitizeMongoId(id)
+
+  if (!sanitizedUuid && !sanitizedMongoId) {
+    return res.status(400).json({
+      success: false,
+      message: 'Invalid ID format',
+    })
+  }
+
+  req.params.id = sanitizedUuid || String(sanitizedMongoId)
+  next()
+})
+
 export const validateMongoIdParam = asyncHandler(async (req, res, next) => {
   const id = req.params?.id
 

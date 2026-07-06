@@ -11,9 +11,12 @@ import {
   unblockUser,
   getAllEvaluatorsByParentId,
   AllAssignedAssetstoEvaluator,
+  updateSubEvaluatorStatus,
+  deleteSubEvaluatorByParent,
 } from "../controller/evaluatorCtrl.js";
 import { authMiddleware, isAdmin } from "../middlewares/authMiddleware.js";
 import { authorizeUserByUUID } from "../middlewares/authorizeUser.js";
+import { validateUUID, validateUserRouteId } from "../middlewares/inputValidation.js";
 ;
 // import { uploadPhoto, productImgResize } from '../middlewares/uploadImgs.js';
 
@@ -32,6 +35,21 @@ router.get(
   authorizeUserByUUID,
   getAllEvaluatorsByParentId
 )
+
+router.put(
+  '/sub-evaluator/:id/status',
+  authMiddleware,
+  validateUUID,
+  updateSubEvaluatorStatus,
+)
+
+router.delete(
+  '/sub-evaluator/:id',
+  authMiddleware,
+  validateUserRouteId,
+  deleteSubEvaluatorByParent,
+)
+
 router.get(
   '/assigned/:id',
   authMiddleware,

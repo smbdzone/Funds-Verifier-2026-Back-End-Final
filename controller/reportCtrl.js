@@ -272,7 +272,13 @@ export const updateReport = async (req, res) => {
       return res.status(404).json({ message: 'Report not found' })
     }
 
-    await linkTechnicalReportToListing(updatedReport)
+    const reportForLink = await Report.findOne({
+      uuid: sanitizedUUID,
+      isDeleted: false,
+    })
+    if (reportForLink) {
+      await linkTechnicalReportToListing(reportForLink)
+    }
 
     try {
       const NotificationData = {

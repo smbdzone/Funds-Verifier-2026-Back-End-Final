@@ -42,12 +42,6 @@ const blogSchema = new mongoose.Schema(
         message: 'Category must be a string or an array of strings.',
       },
     }, // Allow both string and array
-    faqs: [
-      {
-        question: { type: String, required: false },
-        answer: { type: String, required: false },
-      },
-    ],
     SEO: {
       title: { type: String, required: true },
       description: { type: String, required: true },
@@ -56,13 +50,22 @@ const blogSchema = new mongoose.Schema(
     },
     schemas: {
       article: { type: String },
-      FAQ: { type: String },
       localBusiness: { type: String },
       product: { type: String },
     },
     status: {
       type: String,
       default: 'Active',
+    },
+    isFeatured: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+    featuredAt: {
+      type: Date,
+      default: null,
+      index: true,
     },
   },
   { timestamps: true } // Ensure this is placed as part of the schema options

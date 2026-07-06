@@ -26,6 +26,10 @@ import {
   parseUaePassName,
   hasMalformedUaePassName,
 } from '../utils/parseUaePassName.js'
+import {
+  isParentEvaluatorOf,
+  isSubEvaluatorRole,
+} from '../utils/parentEvaluator.js'
 
 // Base cookie options object
 const isProd = process.env.NODE_ENV === 'production'
@@ -131,7 +135,7 @@ const getSignupCreatorFromRequest = async (req) => {
     const creator = await User.findOne({
       _id: decoded.id,
       isDeleted: false,
-    }).select('role _id name lastname')
+    }).select('role _id uuid name lastname')
 
     return { creator: creator || null, tokenPresent: true }
   } catch {
@@ -496,7 +500,7 @@ const createUser = asyncHandler(async (req, res) => {
       country,
       parentEvaluator:
         creator?.role === 'Evaluator' && roleDecision.role === 'Sub-Evaluator'
-          ? String(creator._id)
+          ? String(creator.uuid || creator._id)
           : parentEvaluator,
       userType,
       uuid: resolvedUuid,
@@ -630,18 +634,6 @@ const getEvaluator = asyncHandler(async (req, res) => {
       .json({ message: err?.message || 'Something went wrong!' })
   }
 })
-
-const isParentEvaluatorOf = (requester, user) => {
-  if (!requester || !user?.parentEvaluator) return false
-  const parentRef = String(user.parentEvaluator)
-  return (
-    parentRef === String(requester._id) ||
-    (requester.uuid && parentRef === String(requester.uuid))
-  )
-}
-
-const isSubEvaluatorRole = (role) =>
-  ['Sub-Evaluator', 'SubEvaluator'].includes(String(role || ''))
 
 const updateStatus = asyncHandler(async (req, res) => {
   const { id } = req.params
@@ -1054,23 +1046,21 @@ const deleteUser = asyncHandler(async (req, res) => {
       })
     }
 
-    user.isDeleted = true
-    user.deletedAt = new Date()
-    await user.save()
+    await User.deleteOne({ _id: user._id })
 
     try {
       const NotificationData = {
         UserRole: 'Admin',
         userUUID: req.user.uuid,
         title: 'User Deleted',
-        message: `User (${user.email}) has been deleted.`,
+        message: `Sub-evaluator (${user.email}) has been permanently deleted.`,
       }
       await createNotification({ data: NotificationData })
     } catch (error) {
       console.log({ error: error?.message })
     }
 
-    return res.json({ user, message: 'User soft-deleted successfully' })
+    return res.json({ message: 'User permanently deleted' })
   } catch (error) {
     return res
       .status(500)

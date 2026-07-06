@@ -42,6 +42,7 @@ import publicRoutes from './publicToken.js'
 import testRoute from './testRoute.js'
 import { createPaymentIntent } from '../controller/createPaymentIntentCtrl.js'
 import { pdfPreviewProxy } from '../controller/pdfPreviewCtrl.js'
+import { listingMediaDownloadProxy } from '../controller/listingMediaDownloadCtrl.js'
 import { issueCsrfToken } from '../middlewares/csrfMiddleware.js'
 
 const router = express.Router()
@@ -49,6 +50,8 @@ const router = express.Router()
 router.get('/csrf-token', issueCsrfToken)
 
 router.get('/pdf-preview', pdfPreviewProxy)
+router.get('/listing-media-download', listingMediaDownloadProxy)
+router.post('/listing-media-download', listingMediaDownloadProxy)
 router.post('/create-payment-intent', createPaymentIntent)
 
 router.use('/user', userRouter)

@@ -52,6 +52,7 @@ const propertySchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'EvaluationCertificate',
   },
+  evaluationCertificateDate: { type: Date, required: false },
   invoice: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'EvaluationCertificate',
@@ -87,6 +88,7 @@ const propertySchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'ReportTechnical',
   },
+  isRecommendedAsset: { type: Boolean, default: false },
   userId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
@@ -101,8 +103,11 @@ const propertySchema = new mongoose.Schema({
   price: { type: Number, required: true },
   evaluationPrices: { type: Number },
   status: { type: Number, enum: [0, 1], default: 0 },
+  underProcess: { type: Boolean, default: false },
   roi: { type: Number },
   sizeSQFT: { type: Number, default: 0 },
+  sizeSQM: { type: Number, default: 0 },
+  sizeUnit: { type: String, enum: ['SQFT', 'SQM'], default: 'SQFT' },
   propertyDescription: { type: String, maxlength: 300 },
   description: { type: String, maxlength: 300 },
   additionalDescription: { type: String, maxlength: 1000 },

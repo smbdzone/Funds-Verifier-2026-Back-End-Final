@@ -10,6 +10,8 @@ export const PUBLIC_PROPERTY_FIELDS = `
   evaluationPrices
   roi
   sizeSQFT
+  sizeSQM
+  sizeUnit
   propertyDescription
   description
   additionalDescription
@@ -23,6 +25,7 @@ export const PUBLIC_PROPERTY_FIELDS = `
   ratings
   totalrating
   status
+  underProcess
   createdAt
   assetType
   propertyType
@@ -72,6 +75,7 @@ export const PUBLIC_CAR_FIELDS = `
   extras
   evaluationPrices
   status
+  underProcess
   userUUID
   video
   pictures
@@ -147,6 +151,7 @@ export const PUBLIC_JEWELRY_FIELDS = `
   video3DWalkthrough
   ratings
   status
+  underProcess
   grams
   materials
   userUUID

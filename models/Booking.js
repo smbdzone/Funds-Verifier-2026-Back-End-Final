@@ -41,6 +41,16 @@ const bookingSchema = new Schema({
   sellerAttended: { type: String },
   buyerAttended: { type: String },
   comment: { type: String },
+  viewAssignedTo: {
+    type: String,
+    enum: ['myself', 'fv_admin'],
+    default: 'myself',
+  },
+  status: {
+    type: String,
+    enum: ['open', 'under_process', 'completed'],
+    default: 'open',
+  },
   // Soft delete fields
   isDeleted: { type: Boolean, default: false },
   deletedAt: { type: Date, default: null },

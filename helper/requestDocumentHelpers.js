@@ -15,7 +15,12 @@ export function normalizeRequestDocumentEntry(entry) {
     if (!name) return null
     const document =
       entry.document?._id || entry.document || entry.documentId || null
-    return { name, document: document || null }
+    const date = entry.date ? new Date(entry.date) : null
+    return {
+      name,
+      document: document || null,
+      ...(date && !Number.isNaN(date.getTime()) ? { date } : {}),
+    }
   }
   return null
 }
@@ -84,6 +89,7 @@ export function applyRequestDocumentUpdate(product, body) {
       return {
         name: item.name,
         document: item.document || match?.document || null,
+        date: item.date || match?.date || null,
       }
     })
   }

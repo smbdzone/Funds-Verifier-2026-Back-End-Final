@@ -36,6 +36,10 @@ import {
   sanitizeUnpaidPremiumServicesForClient,
 } from '../utils/listingPremiumSync.js'
 import { buildListingIdQuery } from '../utils/listingIdLookup.js'
+import {
+  blockPriceChangeIfUnderProcess,
+  stripUnderProcessFromListingPayload,
+} from '../utils/listingUnderProcess.js'
 import upload from '../middlewares/Multer.js'
 
 import express from 'express'
@@ -56,6 +60,7 @@ import Boat from '../models/boatModel.js'
 import { verifyToken } from '../middlewares/JwtAuth.js'
 import { AssetsListingsPricing } from '../utils/AssetsListingsPricing.js'
 import { createNotification } from './notifications.controller.js'
+import { notifyEvaluatorsNewListing } from '../helper/notificationHelpers.js'
 import UserPaymentDetails from '../models/UserPaymentDetails.js'
 import { AddPaymentJob } from '../utils/jobs/index.js'
 import { PUBLIC_JEWELRY_FIELDS } from '../constants/publicFields.js'
@@ -140,16 +145,12 @@ const createProduct = asyncHandler(async (req, res) => {
     )
 
     try {
-      const NotificationData = {
-        userId: user._id,
-        userUUID: user.uuid,
-        UserRole: 'Evaluator',
-        title: 'Evaluation',
+      await notifyEvaluatorsNewListing({
         message: `New asset jewelry (${createPdt[0]?.title}) added for evaluation.`,
-        RelateRoute: 'jewellery',
-        RelatedId: createPdt[0]?._id,
-      }
-      await createNotification({ data: NotificationData })
+        assetType: createPdt[0]?.assetType || 'jewelry',
+        relatedId: createPdt[0]?._id,
+        relatedUUID: createPdt[0]?.uuid,
+      })
     } catch (error) {
       console.log({ error: error?.message })
     }
@@ -367,8 +368,13 @@ const getAllProduct = asyncHandler(async (req, res) => {
     query = query
       .populate({ path: 'uploadDocument', select: '-_id' })
       .populate({ path: 'invoice', select: '-_id' })
+      .populate({ path: 'evaluator', select: 'name displayName uuid' })
       .populate({
         path: 'reviews',
+        match: {
+          isDeleted: false,
+          $or: [{ status: 'approved' }, { status: { $exists: false } }],
+        },
         select: 'ratingNumber review -_id',
       })
   }
@@ -612,6 +618,12 @@ const updateProduct = asyncHandler(async (req, res) => {
         return res.status(404).json({ message: 'jwellery not found' })
       }
 
+      stripUnderProcessFromListingPayload(req.body)
+      const priceBlock = blockPriceChangeIfUnderProcess(product, req.body)
+      if (priceBlock) {
+        return res.status(403).json({ message: priceBlock })
+      }
+
       // Update slug if title is provided
       if (req.body.title) {
         req.body.slug = slugify(req.body.title)
@@ -659,7 +671,8 @@ const updateProduct = asyncHandler(async (req, res) => {
         }
         if (requestedDocumentsUpdated) {
           NotificationData.message = `Evaluator requested documents for your jewelry (${updatedProduct?.title}). Please upload them in Documents Storage.`
-          NotificationData.RelateRoute = 'documents-storage'
+          NotificationData.RelateRoute = 'pending-evaluation'
+          NotificationData.RelatedUUID = updatedProduct?.uuid
         } else if (documentFulfilled) {
           NotificationData.UserRole = 'Evaluator'
           NotificationData.userUUID = updatedProduct?.evaluatorUUID

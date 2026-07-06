@@ -52,6 +52,7 @@ const JewelryAdSchema = new Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'EvaluationCertificate',
     },
+    evaluationCertificateDate: { type: Date, required: false },
     invoice: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'EvaluationCertificate',
@@ -77,6 +78,7 @@ const JewelryAdSchema = new Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'ReportTechnical',
     },
+    isRecommendedAsset: { type: Boolean, default: false },
     userId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
@@ -104,6 +106,7 @@ const JewelryAdSchema = new Schema(
       enum: [0, 1],
       default: 0, // Default to "pending"
     },
+    underProcess: { type: Boolean, default: false },
     roi: {
       type: Number,
     },

@@ -23,6 +23,11 @@ const reviewSchema = new mongoose.Schema(
       type: String,
       default: null,
     },
+    status: {
+      type: String,
+      enum: ['pending', 'approved', 'rejected'],
+      default: 'pending',
+    },
     // Soft delete fields
     isDeleted: { type: Boolean, default: false },
     deletedAt: { type: Date, default: null },

@@ -8,7 +8,14 @@ export default async function SendAssetTransferingMail({
   broker,
 }) {
   try {
-    if (!broker?.email) throw new Error('Broker email is required@')
+    const recipient = AssetHolder?.email
+      ? AssetHolder
+      : broker?.email
+        ? broker
+        : null
+    if (!recipient?.email) {
+      throw new Error('Asset holder email is required for success fee payment.')
+    }
 
     const transporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST,
@@ -22,13 +29,12 @@ export default async function SendAssetTransferingMail({
 
     const mailOptions = {
       from: process.env.EMAIL_USER,
-      to: broker?.email,
-      // to: "ranazain3431@gmail.com",
-      subject: 'Asset Transfer Payment',
+      to: recipient.email,
+      subject: 'Success Fee Payment — Asset Transfer',
       html: SendMailTemplate({
         assetLink,
         assetName: assetName,
-        brokerName: broker?.name || '',
+        recipientName: recipient?.name || AssetHolder?.name || broker?.name || '',
         PaymentUrl,
       }),
     }
@@ -41,7 +47,8 @@ export default async function SendAssetTransferingMail({
   }
 }
 
-const SendMailTemplate = ({ PaymentUrl, brokerName, assetLink, assetName }) => {
+const SendMailTemplate = ({ PaymentUrl, recipientName, assetLink, assetName }) => {
+  const name = recipientName || 'User'
   return `<!DOCTYPE html>
 <html lang="en">
   <head>
@@ -68,7 +75,7 @@ const SendMailTemplate = ({ PaymentUrl, brokerName, assetLink, assetName }) => {
       <tr>
         <td>
           <p style="font-size: 16px; line-height: 26px; margin: 16px 0">
-            Hi ${cleans(brokerName) || 'User'},
+            Hi ${name},
           </p>
 
           <p style="font-size: 16px; line-height: 26px; margin: 16px 0">
@@ -78,7 +85,7 @@ const SendMailTemplate = ({ PaymentUrl, brokerName, assetLink, assetName }) => {
               target="_blank"
               style="color: #000; text-decoration: none; font-weight: bold"
             >
-              ${clean(assetName) || 'Asset'} </a
+              ${assetName || 'Asset'} </a
             >, please note that the <strong>success fee</strong> must be settled
             before the transfer can proceed. This fee may either be:
           </p>

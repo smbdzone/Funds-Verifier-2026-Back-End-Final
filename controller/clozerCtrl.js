@@ -17,6 +17,11 @@ import {
 } from '../utils/clozerServiceHelpers.js'
 import { isEmiratesIdComplete } from '../utils/emiratesIdValidator.js'
 import { logClozerEvent } from '../utils/clozerAuditLog.js'
+import {
+  hasMalformedUaePassName,
+  normalizePersonFullName,
+  parseUaePassName,
+} from '../utils/parseUaePassName.js'
 
 function formatCif(user) {
   const uuid = String(user?.uuid || '').replace(/-/g, '').toUpperCase()
@@ -47,13 +52,20 @@ function formatDateOnly(value) {
   return d.toISOString().slice(0, 10)
 }
 
+function resolveClozerFullName(user) {
+  const eidName = String(user?.emiratesId?.fullName || '').trim()
+  if (eidName) {
+    return hasMalformedUaePassName(eidName)
+      ? parseUaePassName(eidName, user?.lastname).fullName
+      : eidName
+  }
+
+  return normalizePersonFullName(user?.name, user?.lastname)
+}
+
 function buildClozerPayload(transaction, user) {
   const meta = transaction.service_metadata || {}
-  const fullName =
-    user?.emiratesId?.fullName ||
-    [user?.name, user?.lastname].filter(Boolean).join(' ').trim() ||
-    user?.name ||
-    ''
+  const fullName = resolveClozerFullName(user)
 
   return {
     transaction_id: transaction.fvTransactionId,
@@ -102,7 +114,7 @@ export const initiateClozerPayment = async (req, res) => {
     }
 
     const actor = await User.findById(req.user._id, { isDeleted: false }).select(
-      'role uuid name email phone emiratesId',
+      'role uuid name lastname email phone emiratesId',
     )
     if (!actor) {
       return res.status(404).json({ success: false, message: 'User not found' })

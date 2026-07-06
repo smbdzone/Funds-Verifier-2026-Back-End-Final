@@ -17,6 +17,9 @@ import {
   MarkAssetAsTransfered,
   AssetTransferProof,
   deleteBookingById,
+  toggleBookingUnderProcess,
+  getTransactionBookings,
+  updateTrusteeDeposit,
 } from "../controller/bookingController.js";
 import { authMiddleware } from "../middlewares/authMiddleware.js";
 import { authorizeUserByUUID } from '../middlewares/authorizeUser.js';
@@ -65,9 +68,20 @@ router.put('/mark-as-transfer', authMiddleware, MarkAssetAsTransfered)
 
 // Define the new route
 router.get('/bookings', authMiddleware, getAllBookings)
+router.get('/transactions', authMiddleware, getTransactionBookings)
+router.put(
+  '/trustee/transaction/:bookingId/deposit',
+  authMiddleware,
+  updateTrusteeDeposit,
+)
 
 // Define the new route for getting a booking by ID (requires auth, ownership check in controller)
 router.get("/bookings/:bookingId", authMiddleware, getBookingById);
+router.patch(
+  '/bookings/:bookingId/under-process',
+  authMiddleware,
+  toggleBookingUnderProcess,
+)
 router.delete("/bookings/:bookingId", authMiddleware, deleteBookingById);
 
 router.get('/booking/:assetId', authMiddleware, getBookingByAssetId)

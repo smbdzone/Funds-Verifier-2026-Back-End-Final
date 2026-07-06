@@ -57,6 +57,8 @@ const corsOptions = {
     'x-public-token',
     'x-api-key',
     'X-API-Key',
+    'Cache-Control',
+    'Pragma',
   ],
 }
 const app = express()

@@ -1,11 +1,13 @@
 import {
   LISTING_QUERY_PARAMS,
+  applyRoiRangeFilter,
   getSafeStringParam,
 } from './listingQuery.js'
 
 const RESERVED_KEYS = new Set([
   'minPrice',
   'maxPrice',
+  'roi',
   'page',
   'limit',
   'statusFilter',
@@ -40,6 +42,8 @@ function processQuery(query) {
   if (query?.maxPrice !== undefined && !Number.isNaN(parsedMax)) {
     modifiedQuery.price = { ...(modifiedQuery.price || {}), $lte: parsedMax }
   }
+
+  applyRoiRangeFilter(modifiedQuery, query)
 
   return modifiedQuery
 }

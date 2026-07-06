@@ -59,7 +59,13 @@ export async function linkTechnicalReportToListing(report) {
   const Model = modelForAssetType(report.assetType)
   const query = listingQueryFromPremiumRecord(report)
   if (!Model || !query) return
-  await Model.updateOne(query, { $set: { technicalReport: report._id } })
+
+  const update = { technicalReport: report._id }
+  if (typeof report.IsRecommended === 'boolean') {
+    update.isRecommendedAsset = report.IsRecommended
+  }
+
+  await Model.updateOne(query, { $set: update })
 }
 
 /** Keep listing → video3DWalkthrough ObjectId in sync. */

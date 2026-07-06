@@ -40,6 +40,7 @@ import { authorizeUserByUUID } from '../middlewares/authorizeUser.js'
 import {
   validateEmail,
   validateUUID,
+  validateUserRouteId,
   validateUserInputs,
 } from '../middlewares/inputValidation.js'
 
@@ -79,7 +80,7 @@ router.get('/verify-email', validateUUID, verifyEmail)
 router.delete(
   '/:id',
   authMiddleware,
-  validateUUID,
+  validateUserRouteId,
   authorize('deleteOthersAccount'),
   deleteUser,
 )
