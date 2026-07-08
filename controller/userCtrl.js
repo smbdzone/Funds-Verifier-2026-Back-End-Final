@@ -93,6 +93,9 @@ const PRIVILEGED_ROLES = [
 /** Public signup: missing role defaults to DealHunter; only public roles are allowed unauthenticated */
 const DEFAULT_PUBLIC_ROLE = 'DealHunter'
 const PUBLIC_SIGNUP_ROLES = ['DealHunter', 'AssetHolder']
+// Roles a member of the public may self-assign at signup (UAE Pass / email).
+// Kept separate from PUBLIC_SIGNUP_ROLES so the buyer/seller role-switch stays limited.
+const SELF_SIGNUP_ROLES = ['DealHunter', 'AssetHolder', 'Advertiser']
 
 /**
  * Same token sources as authMiddleware: Bearer header or accessToken cookie.
@@ -152,11 +155,12 @@ const resolveSignupRole = ({ requestedRole, creator, tokenPresent }) => {
         message: 'Public signup cannot assign privileged roles',
       }
     }
-    if (!PUBLIC_SIGNUP_ROLES.includes(normalizedRequestedRole)) {
+    if (!SELF_SIGNUP_ROLES.includes(normalizedRequestedRole)) {
       return {
         ok: false,
         status: 400,
-        message: 'Public signup is only available for DealHunter or AssetHolder',
+        message:
+          'Public signup is only available for DealHunter, AssetHolder or Advertiser',
       }
     }
     return { ok: true, role: normalizedRequestedRole }
@@ -312,7 +316,18 @@ const verifyEmail = asyncHandler(async (req, res) => {
 })
 
 const storeUserThroughUaePass = asyncHandler(async (req, res) => {
-  const { name, email, phone, role, uuid, userType, lastname } = req.body
+  const {
+    name,
+    email,
+    phone,
+    role,
+    uuid,
+    userType,
+    lastname,
+    gender,
+    city,
+    dateOfBirth,
+  } = req.body
 
   try {
     const sanitizedEmail = sanitizeEmail(email)
@@ -345,6 +360,10 @@ const storeUserThroughUaePass = asyncHandler(async (req, res) => {
         uuid: resolveUserUuid(uuid),
         userType,
         lastname,
+        // Ad-targeting attributes from UAE Pass when available.
+        gender: gender ? String(gender).toLowerCase() : undefined,
+        city: city || undefined,
+        dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : undefined,
         isEmailVerified: true,
         userState: 'active',
       })
@@ -1230,11 +1249,48 @@ const resetPassword = async (req, res) => {
   }
 }
 
+// Set the requesting user's ad-targeting attributes (city / gender / ageGroup).
+// Used by the advertiser onboarding fallback when UAE Pass didn't supply them.
+const updateTargetingProfile = asyncHandler(async (req, res) => {
+  if (!req.user) {
+    return res.status(401).json({ success: false, message: 'Unauthorized' })
+  }
+
+  const { city, gender, dateOfBirth } = req.body
+  const update = {}
+  if (typeof city === 'string' && city.trim()) update.city = city.trim()
+  if (typeof gender === 'string' && gender.trim())
+    update.gender = gender.trim().toLowerCase()
+  if (dateOfBirth) {
+    const dob = new Date(dateOfBirth)
+    if (!isNaN(dob.getTime())) update.dateOfBirth = dob
+  }
+
+  if (Object.keys(update).length === 0) {
+    return res
+      .status(400)
+      .json({ success: false, message: 'No targeting fields provided' })
+  }
+
+  const updated = await User.findByIdAndUpdate(
+    req.user._id,
+    { $set: update },
+    { new: true },
+  ).select('-password')
+
+  return res.status(200).json({
+    success: true,
+    message: 'Targeting profile updated',
+    user: updated,
+  })
+})
+
 export {
   createUser,
   loginUser,
   getEvaluator,
   updateStatus,
+  updateTargetingProfile,
   uaePassLogin,
   storeUserThroughUaePass,
   getCurrentUser,

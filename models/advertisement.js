@@ -39,6 +39,8 @@ const schema = new Schema({
   targetedAudience: {
     country: [mongoose.Schema.Types.Mixed],
     city: [mongoose.Schema.Types.Mixed],
+    gender: { type: String, default: '' },
+    ageGroup: { type: String, default: '' },
     startAt: [{ type: String, required: true }],
     endAt: [{ type: String, required: true }],
   },

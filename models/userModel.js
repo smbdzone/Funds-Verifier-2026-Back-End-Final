@@ -72,6 +72,7 @@ const userSchema = new Schema(
         'DealHunter',
         'TechnicalReport',
         '3dWalkthrough',
+        'Advertiser',
       ],
       required: true,
     },

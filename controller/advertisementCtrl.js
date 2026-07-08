@@ -10,6 +10,24 @@ import { generateCloudFrontSignedUrl } from '../services/cloudFrontSignedUrlServ
 
 const AD_IMG_SIGNED_URL_EXPIRES_IN_SECONDS = 60 * 60 // 1 hour
 
+// Map a date of birth to one of the targeting age buckets (derived live, so it
+// stays correct as the person ages). Returns '' when unknown / under 21.
+function ageGroupFromDob(dob) {
+  if (!dob) return ''
+  const birth = new Date(dob)
+  if (isNaN(birth.getTime())) return ''
+  const now = new Date()
+  let age = now.getFullYear() - birth.getFullYear()
+  const m = now.getMonth() - birth.getMonth()
+  if (m < 0 || (m === 0 && now.getDate() < birth.getDate())) age--
+  if (age >= 21 && age <= 30) return '21-30'
+  if (age >= 31 && age <= 40) return '31-40'
+  if (age >= 41 && age <= 50) return '41-50'
+  if (age >= 51 && age <= 60) return '51-60'
+  if (age > 60) return '60+'
+  return ''
+}
+
 function extractS3KeyFromCloudFrontUrl(url) {
   if (!url || typeof url !== 'string') return null
   const trimmed = url.trim()
@@ -304,13 +322,17 @@ const getAllLargeBanners = async (req, res) => {
   const userId = verifyToken(bearerToken)
 
   try {
-    const result = await Advertisement.aggregate([
-      {
-        $match: { userId: { $ne: userId } },
-      },
-      {
-        $unwind: '$creatives',
-      },
+    // Viewer attributes for strict targeting (from UAE Pass / onboarding).
+    // Age-group is derived live from date of birth so it never goes stale.
+    const viewer = await User.findById(userId).select('city gender dateOfBirth')
+    const viewerCity = (viewer?.city || '').toString().trim()
+    const viewerGender = (viewer?.gender || '').toString().trim().toLowerCase()
+    const viewerAge = ageGroupFromDob(viewer?.dateOfBirth)
+
+    // Candidate approved Quarter-Page ads (excluding the viewer's own).
+    const candidates = await Advertisement.aggregate([
+      { $match: { userId: { $ne: userId }, isDeleted: { $ne: true } } },
+      { $unwind: '$creatives' },
       {
         $match: {
           Approval: 'Approved',
@@ -331,17 +353,43 @@ const getAllLargeBanners = async (req, res) => {
           createdAt: { $first: '$createdAt' },
         },
       },
-      {
-        $sample: { size: 1 },
-      },
     ])
-    return res
-      .status(200)
-      .json({
-        success: true,
-        message: 'Data retrieved',
-        data: withSignedCreativesArray(result),
-      })
+
+    // Strict targeting: the viewer must match every dimension an ad constrains.
+    // An unconstrained dimension (empty / 'all') is open; unknown viewer attribute = no match.
+    const matches = candidates.filter((ad) => {
+      const ta = ad.targetedAudience || {}
+
+      const cities = (Array.isArray(ta.city) ? ta.city : [])
+        .flat(Infinity)
+        .filter(Boolean)
+        .map((c) => c.toString().trim())
+      if (cities.length > 0) {
+        if (!viewerCity || !cities.includes(viewerCity)) return false
+      }
+
+      const adGender = (ta.gender || '').toString().trim().toLowerCase()
+      if (adGender && adGender !== 'all') {
+        if (!viewerGender || viewerGender !== adGender) return false
+      }
+
+      const adAge = (ta.ageGroup || '').toString().trim()
+      if (adAge) {
+        if (!viewerAge || viewerAge !== adAge) return false
+      }
+
+      return true
+    })
+
+    const chosen = matches.length
+      ? [matches[Math.floor(Math.random() * matches.length)]]
+      : []
+
+    return res.status(200).json({
+      success: true,
+      message: 'Data retrieved',
+      data: withSignedCreativesArray(chosen),
+    })
   } catch (error) {
     console.error(error)
     return res
@@ -410,12 +458,30 @@ const getById = async (req, res) => {
   const bearerToken = authorizationHeader.split(' ')[1]
 
   try {
+    const requesterId = verifyToken(bearerToken)
+    if (!requesterId || requesterId?.status === 401) {
+      return res
+        .status(401)
+        .json({ success: false, message: 'Invalid or expired token' })
+    }
+
     const result = await Advertisement.findById(id, { isDeleted: false })
 
     if (!result) {
       return res
         .status(404)
         .json({ success: false, message: 'Advertisement not found' })
+    }
+
+    // Only the ad's owner or an Admin may view a specific advertisement.
+    const requester = await User.findById(requesterId).select('role')
+    const isOwner = result.userId?.toString() === String(requesterId)
+    const isAdmin = requester?.role === 'Admin'
+    if (!isOwner && !isAdmin) {
+      return res.status(403).json({
+        success: false,
+        message: 'You are not allowed to view this advertisement',
+      })
     }
 
     return res
@@ -539,6 +605,7 @@ const create = async (req, res) => {
       }
 
       const userIdFromToken = tokenVerification
+
       const response = await Advertisement.create({
         ...body,
         userId: userIdFromToken,
@@ -581,39 +648,8 @@ const create = async (req, res) => {
 }
 
 function getCurrentPrice() {
-  const prices = [0.11, 0.115, 0.12, 0.13]
-
-  const currentTime = new Date()
-  const currentHour = currentTime.getHours()
-  const currentMinute = currentTime.getMinutes()
-  const currentTimeString = `${currentHour}:${
-    currentMinute < 10 ? '0' : ''
-  }${currentMinute}`
-
-  const currentDay = currentTime.getDay()
-
-  let selectedPrice
-
-  if (currentTimeString >= '02:00' && currentTimeString < '08:00') {
-    selectedPrice = prices[0]
-  } else if (currentTimeString >= '08:00' && currentTimeString < '14:00') {
-    selectedPrice = prices[1]
-  } else if (currentTimeString >= '14:00' && currentTimeString < '20:00') {
-    selectedPrice = prices[2]
-  } else if (currentTimeString >= '20:00' || currentTimeString < '02:00') {
-    selectedPrice = prices[3]
-  }
-
-  // Add adjustments for specific days
-  if (currentDay === 0) {
-    // Sunday
-    selectedPrice += 0.025
-  } else if (currentDay === 2 || currentDay === 5) {
-    // Tuesday or Saturday
-    selectedPrice += 0.5
-  }
-
-  return selectedPrice
+  // Flat click fee: $0.3 per click
+  return 0.3
 }
 
 const updatedClicks = async (req, res) => {
@@ -723,39 +759,8 @@ const updatedClicks = async (req, res) => {
 }
 
 function getCurrentPriceForImpression() {
-  const prices = [0.00001, 0.000015, 0.00002, 0.00003]
-
-  const currentTime = new Date()
-  const currentHour = currentTime.getHours()
-  const currentMinute = currentTime.getMinutes()
-  const currentTimeString = `${currentHour}:${
-    currentMinute < 10 ? '0' : ''
-  }${currentMinute}`
-
-  const currentDay = currentTime.getDay()
-
-  let selectedPrice
-
-  if (currentTimeString >= '02:00' && currentTimeString < '08:00') {
-    selectedPrice = prices[0]
-  } else if (currentTimeString >= '08:00' && currentTimeString < '14:00') {
-    selectedPrice = prices[1]
-  } else if (currentTimeString >= '14:00' && currentTimeString < '20:00') {
-    selectedPrice = prices[2]
-  } else if (currentTimeString >= '20:00' || currentTimeString < '02:00') {
-    selectedPrice = prices[3]
-  }
-
-  // Add adjustments for specific days
-  if (currentDay === 0) {
-    // Sunday
-    selectedPrice += 0.000005
-  } else if (currentDay === 2 || currentDay === 5) {
-    // Tuesday or Saturday
-    selectedPrice += 0.00001
-  }
-
-  return selectedPrice
+  // Flat impression fee: $0.1 per 1000 impressions = $0.0001 per impression
+  return 0.0001
 }
 
 const updatedImpressions = async (req, res) => {
@@ -815,37 +820,9 @@ const updatedImpressions = async (req, res) => {
         })
       }
 
-      // Check if userId is already present in the advertisement's impressions within the last 24 hours
-      const isUserIdPresent = advertisementFound.creatives.some((creative) =>
-        creative.impressions.some(
-          (impression) =>
-            impression.userId.toString() === userIdFromToken.toString() &&
-            new Date(impression.date).getTime() >
-              currentDate.getTime() - 24 * 60 * 60 * 1000,
-        ),
-      )
-
-      if (isUserIdPresent) {
-        return res.status(400).json({
-          success: false,
-          message:
-            'User has already viewed this advertisement within the last 24 hours',
-        })
-      }
-
+      // Flat impression fee: $0.1 per 1000 impressions = $0.0001 per impression
       const currentPriceForImpression = getCurrentPriceForImpression()
-      let amountToAdd = 0
-      if (body.type === 'Side Banner') {
-        amountToAdd = 0.0012
-      }
-
-      if (body.type === 'Footer Banner') {
-        amountToAdd = 0.0015
-      }
-
-      if (body.type === 'Large Quarter Page Banner') {
-        amountToAdd = 0.002
-      }
+      const amountToAdd = 0
 
       if (
         Number(advertisementFound?.totalBudgetUsed) >=
