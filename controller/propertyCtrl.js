@@ -52,6 +52,10 @@ import {
   blockPriceChangeIfUnderProcess,
   stripUnderProcessFromListingPayload,
 } from '../utils/listingUnderProcess.js'
+import {
+  applyOffPlanAutoApproval,
+  isOffPlanAssetType,
+} from '../utils/offPlanAsset.js'
 
 const app = express()
 
@@ -89,14 +93,17 @@ const createProduct = asyncHandler(async (req, res) => {
 
     stripNullPremiumRefs(req.body)
 
+    const isOffPlan = isOffPlanAssetType(req.body.assetType)
+    applyOffPlanAutoApproval(req.body)
+
     const createPdt = await Property.create([req.body], { session })
 
-    // Deferred Stripe evaluation fee — skip when customer pays via Clozer installments
+    // Deferred Stripe evaluation fee — skip for off-plan and Clozer installments
     const paidViaClozer =
       req.body?.payment_provider === 'clozer' ||
       Boolean(req.body?.clozer_transaction_id)
 
-    if (!paidViaClozer) {
+    if (!paidViaClozer && !isOffPlan) {
       try {
         const PaymentDetails = await UserPaymentDetails.create({
           userId: user?._id,
@@ -160,12 +167,14 @@ const createProduct = asyncHandler(async (req, res) => {
     }
 
     try {
-      await notifyEvaluatorsNewListing({
-        message: `New property (${createPdt[0]?.title}) added for evaluation.`,
-        assetType: createPdt[0]?.assetType || 'property',
-        relatedId: createPdt[0]._id,
-        relatedUUID: createPdt[0]?.uuid,
-      })
+      if (!isOffPlan) {
+        await notifyEvaluatorsNewListing({
+          message: `New property (${createPdt[0]?.title}) added for evaluation.`,
+          assetType: createPdt[0]?.assetType || 'property',
+          relatedId: createPdt[0]._id,
+          relatedUUID: createPdt[0]?.uuid,
+        })
+      }
     } catch (error) {
       console.log({ error: error?.message })
     }
