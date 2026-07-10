@@ -21,6 +21,7 @@ import {
   verifyEmail,
   forgotPassword,
   resetPassword,
+  updateTargetingProfile,
 } from '../controller/userCtrl.js'
 import {
   authMiddleware,
@@ -122,6 +123,7 @@ router.get('/verify-token', verifyUserToken)
 
 // get current user (me) - uses token to identify user, no UUID needed
 router.get('/me', authMiddleware, getCurrentUser)
+router.put('/targeting-profile', authMiddleware, updateTargetingProfile)
 
 // single user - requires auth, only admin can view any user, users can only view themselves
 router.get(

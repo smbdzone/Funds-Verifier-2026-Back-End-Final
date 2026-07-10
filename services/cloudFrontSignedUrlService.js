@@ -7,23 +7,50 @@ export function cloudFrontUrlForKey(s3Key) {
   return `https://${domain}/${trimmed}`
 }
 
-export function generateCloudFrontSignedUrl(s3Key, expiresInSeconds = 3600) {
-  const { keyPairId } = getCloudFrontConfig()
-  const privateKey = getCloudFrontPrivateKey()
+let warnedMissingKey = false
 
+export function generateCloudFrontSignedUrl(s3Key, expiresInSeconds = 3600) {
   const url = cloudFrontUrlForKey(s3Key)
   const expireTime = Date.now() + expiresInSeconds * 1000
 
-  const signedUrl = getSignedUrl(url, {
-    keypairId: keyPairId,
-    privateKeyString: privateKey,
-    expireTime,
-  })
+  try {
+    const { keyPairId } = getCloudFrontConfig()
+    const privateKey = getCloudFrontPrivateKey()
 
-  return {
-    signedUrl,
-    expiresAt: new Date(expireTime),
-    expiresInSeconds,
+    const signedUrl = getSignedUrl(url, {
+      keypairId: keyPairId,
+      privateKeyString: privateKey,
+      expireTime,
+    })
+
+    return {
+      signedUrl,
+      expiresAt: new Date(expireTime),
+      expiresInSeconds,
+    }
+  } catch (error) {
+    // In production, preserve the original behaviour: surface signing failures
+    // loudly (a missing/invalid key is a real misconfig that must be noticed).
+    if (process.env.NODE_ENV === 'production') {
+      throw error
+    }
+
+    // Non-production only: CloudFront signing isn't configured (e.g. missing
+    // private key in local dev). Fall back to the unsigned CloudFront URL so
+    // uploads and ad serving don't hard-fail during local testing.
+    if (!warnedMissingKey) {
+      console.warn(
+        'CloudFront signed URLs unavailable (dev) — falling back to unsigned URLs:',
+        error?.message,
+      )
+      warnedMissingKey = true
+    }
+    return {
+      signedUrl: url,
+      expiresAt: null,
+      expiresInSeconds: null,
+      unsigned: true,
+    }
   }
 }
 
