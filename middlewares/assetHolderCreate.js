@@ -140,6 +140,10 @@ const assetTypeKeyMap = {
   property: 'Property',
   'Property For Sale': 'Property',
   'property for sale': 'Property',
+  'Property For Lease': 'Property',
+  'property for lease': 'Property',
+  'Property Off Plan For Sale': 'Property',
+  'property off plan for sale': 'Property',
 
   properties: 'Property',
 
@@ -262,7 +266,11 @@ export const assetHolderCreate = async (req, res, next) => {
       return res.status(400).json({ message: 'assetType is required' })
 
     const normalizedKey = assetType.toLowerCase().trim()
-    const mappedType = assetTypeKeyMap[normalizedKey]
+    let mappedType = assetTypeKeyMap[normalizedKey]
+
+    if (!mappedType && normalizedKey.startsWith('property')) {
+      mappedType = 'Property'
+    }
 
     if (!mappedType || !assetModels[mappedType]) {
       return res.status(400).json({
