@@ -20,10 +20,12 @@ const propertySchema = new mongoose.Schema({
       ref: 'EvaluationCertificate',
     },
   ],
-  transferDocuments: {
-    assetTransferDocument: { type: String },
-    PaymentProof: { type: String },
-  },
+    transferDocuments: {
+      assetTransferDocument: { type: String },
+      PaymentProof: { type: String },
+      successFee: { type: Number },
+      paymentUrl: { type: String },
+    },
   dealClosed: { type: Boolean },
   successFeePaymentStatus: {
     type: String,

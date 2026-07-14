@@ -4,16 +4,14 @@ import { getIO } from '../utils/socket.js'
 // Create a new Notification
 const createNotification = async ({ data }) => {
   try {
-    const { UserRole, title } = data
+    const { UserRole, title } = data || {}
 
-    if (!UserRole)
-      return res
-        .status(400)
-        .json({ error: true, message: 'User role is required!' })
-    if (!title)
-      return res
-        .status(400)
-        .json({ error: true, message: 'Title is required!' })
+    if (!UserRole) {
+      throw new Error('User role is required!')
+    }
+    if (!title) {
+      throw new Error('Title is required!')
+    }
 
     const Notify = new Notifications(data)
     await Notify.save()

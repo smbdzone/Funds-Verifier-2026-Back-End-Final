@@ -1,5 +1,6 @@
-import nodemailer from 'nodemailer'
+import sendEmail from '../nodeMailer.js'
 import { safeURL } from '../../controller/emailCtrl.js'
+
 export default async function SendAssetTransferingMail({
   PaymentUrl,
   assetName,
@@ -7,43 +8,52 @@ export default async function SendAssetTransferingMail({
   AssetHolder,
   broker,
 }) {
-  try {
-    const recipient = AssetHolder?.email
-      ? AssetHolder
-      : broker?.email
-        ? broker
-        : null
-    if (!recipient?.email) {
-      throw new Error('Asset holder email is required for success fee payment.')
+  const recipient = AssetHolder?.email
+    ? AssetHolder
+    : broker?.email
+      ? broker
+      : null
+
+  if (!recipient?.email) {
+    return {
+      success: false,
+      message: 'Asset holder email is required for success fee payment.',
+      recipientEmail: null,
     }
+  }
 
-    const transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST,
-      port: 465,
-      secure: true,
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
-      },
-    })
-
-    const mailOptions = {
-      from: process.env.EMAIL_USER,
-      to: recipient.email,
-      subject: 'Success Fee Payment — Asset Transfer',
-      html: SendMailTemplate({
-        assetLink,
-        assetName: assetName,
-        recipientName: recipient?.name || AssetHolder?.name || broker?.name || '',
-        PaymentUrl,
-      }),
+  if (!process.env.SMTP_HOST || !process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+    return {
+      success: false,
+      message: 'Email is not configured on the server (SMTP). Share the payment link manually.',
+      recipientEmail: recipient.email,
     }
+  }
 
-    await transporter.sendMail(mailOptions)
-    return { success: true, message: 'Asset transfer email sent successfully.' }
-  } catch (error) {
-    console.error('Error sending asset transfer email:', error)
-    return { success: false, message: 'Failed to send asset transfer email.' }
+  const result = await sendEmail({
+    to: recipient.email,
+    subject: 'Success Fee Payment — Asset Transfer',
+    text: `Pay the success fee for ${assetName || 'your asset'}: ${PaymentUrl}`,
+    html: SendMailTemplate({
+      assetLink,
+      assetName: assetName,
+      recipientName: recipient?.name || AssetHolder?.name || broker?.name || '',
+      PaymentUrl,
+    }),
+  })
+
+  if (!result.success) {
+    return {
+      success: false,
+      message: result.error || 'Failed to send asset transfer email.',
+      recipientEmail: recipient.email,
+    }
+  }
+
+  return {
+    success: true,
+    message: 'Asset transfer email sent successfully.',
+    recipientEmail: recipient.email,
   }
 }
 

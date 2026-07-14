@@ -14,6 +14,8 @@ import {
   getBookingByAssetId,
   updateViewingById,
   ReadyToTranferAsset,
+  cancelTransferSubmission,
+  resendTransferPaymentEmail,
   MarkAssetAsTransfered,
   AssetTransferProof,
   deleteBookingById,
@@ -63,6 +65,8 @@ router.get('/slot-by-date', authMiddleware, getSlotsByDate)
 
 // transfer asset
 router.post('/ready-to-transfer', authMiddleware, ReadyToTranferAsset)
+router.post('/cancel-transfer', authMiddleware, cancelTransferSubmission)
+router.post('/transfer-payment/resend', authMiddleware, resendTransferPaymentEmail)
 router.post('/transfer-proof', authMiddleware, AssetTransferProof)
 router.put('/mark-as-transfer', authMiddleware, MarkAssetAsTransfered)
 

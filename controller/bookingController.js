@@ -27,6 +27,10 @@ import SendAssetTransferingMail from '../utils/asset-transfer/SendAssetTransferi
 import {
   findAssetForBooking,
   getAssetModelForType,
+  patchBookingTransferDocuments,
+  patchBookingProductData,
+  resolveBookingAssetHolder,
+  resolveTransferDocumentsForBooking,
   syncAssetTransactionOnPaymentProof,
   syncAssetTransactionOnTransferComplete,
 } from '../utils/transactionBooking.js'
@@ -176,15 +180,19 @@ export const updateSlot = async (req, res) => {
 
 // Delete slot
 export const deleteSlot = async (req, res) => {
-
   try {
     const { slotId } = req.params
-    console.log(slotId);
+    const { slot, alreadyDeleted } = await deleteSlotService(slotId)
 
-    await deleteSlotService(slotId)
-    res.status(200).json({ message: 'Slot deleted' })
+    res.status(200).json({
+      success: true,
+      message: alreadyDeleted ? 'Slot already deleted' : 'Slot deleted',
+      slotId: slot?.uuid,
+    })
   } catch (error) {
-    res.status(500).json({ message: error.message })
+    const message = error?.message || 'Failed to delete slot'
+    const status = /not found/i.test(message) ? 404 : 500
+    res.status(status).json({ success: false, message })
   }
 }
 
@@ -498,81 +506,260 @@ export const ReadyToTranferAsset = async (req, res) => {
     if (!asset.transferDocuments) asset.transferDocuments = {}
     asset.transferDocuments.assetTransferDocument =
       updates?.assetTransferDocument
+    asset.transferDocuments.successFee = updates.fees
     await asset.save()
-    // save in bookings
-    booking.productData = booking.productData || {}
-    booking.productData.transferDocuments =
-      booking.productData.transferDocuments || {}
 
-    booking.productData.transferDocuments.assetTransferDocument =
-      updates?.assetTransferDocument
-    booking.productData.transferDocuments.successFee = updates.fees
+    patchBookingTransferDocuments(booking, {
+      assetTransferDocument: updates?.assetTransferDocument,
+      successFee: updates.fees,
+    })
 
     await booking.save()
 
-    const session = await stripe.checkout.sessions.create({
-      payment_method_types: ['card'],
-      line_items: [
-        {
-          price_data: {
-            currency: 'aed',
-            product_data: {
-              name: `Asset Transfer fees for ${booking?.productData?.assetType}`,
-              description:
-                booking?.productData?.title ||
-                booking?.productData?.assetType ||
-                'Asset',
-              images: [booking?.productData?.thumbnailImg?.images?.[0]?.url],
-            },
-            unit_amount: Math.round(updates.fees * 100),
-          },
-          quantity: 1,
-        },
-      ],
-      mode: 'payment',
-      success_url: `${success_url}?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: success_url,
-      metadata: {
-        assetType: booking?.productData?.assetType || '',
-        assetId: asset?._id?.toString() || booking?.productData?.uuid || '',
-      },
-    })
+    const session = await createSuccessFeeCheckoutSession(
+      booking,
+      asset,
+      updates.fees,
+      success_url,
+    )
 
     const PaymentUrl = session?.url
 
-    await SendAssetTransferingMail({
+    asset.transferDocuments.paymentUrl = PaymentUrl
+    asset.markModified('transferDocuments')
+    await asset.save()
+
+    patchBookingTransferDocuments(booking, {
+      paymentUrl: PaymentUrl,
+    })
+    await booking.save()
+
+    const assetHolder = await resolveBookingAssetHolder(booking)
+    const mailResult = await SendAssetTransferingMail({
       PaymentUrl,
       assetName:
         booking?.productData?.title ||
         booking?.productData?.assetType ||
         'Asset',
-      AssetHolder: booking?.assetHolderId,
+      AssetHolder: assetHolder,
       broker: booking?.brokerId,
     })
 
-    // try {
-    //   const NotificationData = {
-    //     userId: updatedBooking?.brokerId,
-    //     UserRole: "Trustee",
-    //     title: "Booking",
-    //     message: `A booking has been updated.`,
-    //     RelateRoute: "Trustee",
-    //     RelatedId: updatedBooking?._id
-    //   }
-    //   await createNotification({ data: NotificationData })
-    // } catch (error) {
-    //   console.log({ error: error?.message });
-    // }
-
     res.status(200).json({
-      message: 'Ready to transfer asset document updated successfully',
+      success: true,
+      message: mailResult?.success
+        ? 'Ready to transfer asset document updated successfully'
+        : 'Transfer document saved, but the payment email could not be sent.',
+      emailSent: Boolean(mailResult?.success),
+      mailError: mailResult?.success ? undefined : mailResult?.message,
+      recipientEmail: mailResult?.recipientEmail || assetHolder?.email || null,
       PaymentUrl,
     })
     return
   } catch (error) {
     console.log({ error })
-    res.status(500).json({ message: 'Server error', error })
+    res.status(500).json({ message: 'Server error', error: error?.message })
     return
+  }
+}
+
+async function loadTrusteeTransferBooking(bookingId, requester) {
+  if (!isTrusteeRole(requester?.role)) {
+    const err = new Error('Only trustees can manage transfer submissions.')
+    err.statusCode = 403
+    throw err
+  }
+
+  const { sanitizeUUID } = await import('../utils/nosqlSanitizer.js')
+  const sanitizedId = sanitizeUUID(bookingId)
+  if (!sanitizedId) {
+    const err = new Error('Invalid booking id.')
+    err.statusCode = 400
+    throw err
+  }
+
+  const booking = await Booking.findOne({ uuid: sanitizedId, isDeleted: false })
+    .populate({ path: 'brokerId', select: 'email name' })
+    .populate({ path: 'assetHolderId', select: 'email name' })
+
+  if (!booking) {
+    const err = new Error('Booking not found')
+    err.statusCode = 404
+    throw err
+  }
+
+  const { asset } = await findAssetForBooking(booking)
+  if (!asset) {
+    const err = new Error('Asset not found')
+    err.statusCode = 404
+    throw err
+  }
+
+  return { booking, asset }
+}
+
+async function createSuccessFeeCheckoutSession(booking, asset, fees, success_url) {
+  return stripe.checkout.sessions.create({
+    payment_method_types: ['card'],
+    line_items: [
+      {
+        price_data: {
+          currency: 'aed',
+          product_data: {
+            name: `Asset Transfer fees for ${booking?.productData?.assetType}`,
+            description:
+              booking?.productData?.title ||
+              booking?.productData?.assetType ||
+              'Asset',
+            images: [booking?.productData?.thumbnailImg?.images?.[0]?.url],
+          },
+          unit_amount: Math.round(fees * 100),
+        },
+        quantity: 1,
+      },
+    ],
+    mode: 'payment',
+    success_url: `${success_url}?session_id={CHECKOUT_SESSION_ID}`,
+    cancel_url: success_url,
+    metadata: {
+      assetType: booking?.productData?.assetType || '',
+      assetId: asset?._id?.toString() || booking?.productData?.uuid || '',
+    },
+  })
+}
+
+export const cancelTransferSubmission = async (req, res) => {
+  try {
+    const id = req.query.id
+    if (!id) {
+      return res.status(400).json({ message: 'Booking id is required in query params.' })
+    }
+
+    const { booking, asset } = await loadTrusteeTransferBooking(id, req.user)
+    const transferDocuments = await resolveTransferDocumentsForBooking(booking)
+
+    if (!transferDocuments?.assetTransferDocument) {
+      return res.status(400).json({ message: 'No transfer submission to cancel.' })
+    }
+
+    if (transferDocuments?.PaymentProof) {
+      return res.status(400).json({
+        message: 'Cannot cancel after the seller has uploaded payment proof.',
+      })
+    }
+
+    if (!asset.transferDocuments) asset.transferDocuments = {}
+    asset.transferDocuments.assetTransferDocument = undefined
+    asset.transferDocuments.successFee = undefined
+    asset.transferDocuments.paymentUrl = undefined
+    asset.markModified('transferDocuments')
+    asset.successFeePaymentStatus = 'Pending'
+    await asset.save()
+
+    patchBookingTransferDocuments(booking, {
+      assetTransferDocument: null,
+      successFee: null,
+      paymentUrl: null,
+      PaymentProof: null,
+    })
+    patchBookingProductData(booking, { successFeePaymentStatus: 'Pending' })
+    await booking.save()
+
+    return res.status(200).json({
+      success: true,
+      message: 'Transfer submission cancelled. You can upload again.',
+    })
+  } catch (error) {
+    const status = error?.statusCode || 500
+    return res.status(status).json({
+      success: false,
+      message: error?.message || 'Server error',
+    })
+  }
+}
+
+export const resendTransferPaymentEmail = async (req, res) => {
+  try {
+    const id = req.query.id
+    const success_url = req.body?.success_url || req.query.success_url
+
+    if (!id) {
+      return res.status(400).json({ message: 'Booking id is required in query params.' })
+    }
+    if (!success_url) {
+      return res.status(400).json({ message: 'success_url is required.' })
+    }
+
+    const { booking, asset } = await loadTrusteeTransferBooking(id, req.user)
+    const transferDocuments = await resolveTransferDocumentsForBooking(booking)
+
+    if (!transferDocuments?.assetTransferDocument) {
+      return res.status(400).json({
+        message: 'Submit transfer documents and success fee before resending.',
+      })
+    }
+
+    if (transferDocuments?.PaymentProof) {
+      return res.status(400).json({
+        message: 'Payment proof already received — resend is not available.',
+      })
+    }
+
+    const fees = Number(transferDocuments.successFee)
+    if (!Number.isFinite(fees) || fees <= 0) {
+      return res.status(400).json({
+        message:
+          'Success fee is missing on this submission. Cancel and submit again with a valid fee.',
+      })
+    }
+
+    const session = await createSuccessFeeCheckoutSession(
+      booking,
+      asset,
+      fees,
+      success_url,
+    )
+    const PaymentUrl = session?.url
+
+    if (!asset.transferDocuments) asset.transferDocuments = {}
+    asset.transferDocuments.paymentUrl = PaymentUrl
+    asset.transferDocuments.successFee = fees
+    asset.markModified('transferDocuments')
+    await asset.save()
+
+    patchBookingTransferDocuments(booking, {
+      paymentUrl: PaymentUrl,
+      successFee: fees,
+    })
+    await booking.save()
+
+    const assetHolder = await resolveBookingAssetHolder(booking)
+    const mailResult = await SendAssetTransferingMail({
+      PaymentUrl,
+      assetName:
+        booking?.productData?.title ||
+        booking?.productData?.assetType ||
+        'Asset',
+      AssetHolder: assetHolder,
+      broker: booking?.brokerId,
+    })
+
+    return res.status(200).json({
+      success: true,
+      emailSent: Boolean(mailResult?.success),
+      message: mailResult?.success
+        ? 'Payment link resent to the seller by email.'
+        : 'Could not send payment email. Copy the payment link manually.',
+      mailError: mailResult?.success ? undefined : mailResult?.message,
+      recipientEmail: mailResult?.recipientEmail || assetHolder?.email || null,
+      PaymentUrl,
+    })
+  } catch (error) {
+    const status = error?.statusCode || 500
+    return res.status(status).json({
+      success: false,
+      message: error?.message || 'Server error',
+    })
   }
 }
 
@@ -633,11 +820,12 @@ export const AssetTransferProof = async (req, res) => {
     syncAssetTransactionOnPaymentProof(asset)
     await asset.save()
 
-    if (!booking.productData.transferDocuments)
-      booking.productData.transferDocuments = {}
-
-    booking.productData.transferDocuments.PaymentProof = PaymentProof
-    booking.productData.successFeePaymentStatus = 'Paid'
+    patchBookingTransferDocuments(booking, {
+      PaymentProof,
+    })
+    patchBookingProductData(booking, {
+      successFeePaymentStatus: 'Paid',
+    })
     await booking.save()
 
     try {
@@ -706,9 +894,11 @@ export const MarkAssetAsTransfered = async (req, res) => {
     )
     await asset.save()
 
-    booking.productData.dealClosed = true
-    booking.productData.dealer = booking?.brokerId?._id
-    booking.productData.successFeePaymentStatus = 'Paid'
+    patchBookingProductData(booking, {
+      dealClosed: true,
+      dealer: booking?.brokerId?._id,
+      successFeePaymentStatus: 'Paid',
+    })
     booking.status = 'completed'
     await booking.save()
 

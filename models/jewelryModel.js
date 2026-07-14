@@ -37,6 +37,8 @@ const JewelryAdSchema = new Schema(
     transferDocuments: {
       assetTransferDocument: { type: String },
       PaymentProof: { type: String },
+      successFee: { type: Number },
+      paymentUrl: { type: String },
     },
     dealClosed: { type: Boolean },
     successFeePaymentStatus: {

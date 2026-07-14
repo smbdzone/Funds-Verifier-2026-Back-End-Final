@@ -12,6 +12,7 @@ import {
   deriveTransactionPhase,
   findAssetForBooking,
   isTransactionBooking,
+  resolveTransferDocumentsForBooking,
 } from '../utils/transactionBooking.js'
 
 export const VIEWING_SLOT_CATEGORY = 'viewing'
@@ -241,20 +242,27 @@ export const updateSeletedSlotService = async (slotId, newTimeSlot) => {
   )
 }
 
-// Delete slot
+// Delete slot (idempotent — deleting an already-deleted slot still succeeds)
 export const deleteSlotService = async (slotId) => {
-  const slot = await Slot.findOne({ uuid: slotId, isDeleted: false })
-
-  if (!slot || slot.isDeleted) {
-    throw new Error('Slot not found or already deleted')
+  if (!slotId || typeof slotId !== 'string') {
+    throw new Error('Slot id is required')
   }
 
-  // Soft delete
+  const slot = await Slot.findOne({ uuid: slotId.trim() })
+
+  if (!slot) {
+    throw new Error('Slot not found')
+  }
+
+  if (slot.isDeleted) {
+    return { slot, alreadyDeleted: true }
+  }
+
   slot.isDeleted = true
   slot.deletedAt = new Date()
   await slot.save()
 
-  // Send notification
+  // Send notification (non-blocking — must not fail the delete)
   try {
     const NotificationData = {
       userId: slot.userId,
@@ -266,10 +274,10 @@ export const deleteSlotService = async (slotId) => {
     }
     await createNotification({ data: NotificationData })
   } catch (error) {
-    console.log({ error: error?.message })
+    console.log({ error: error?.message || error })
   }
 
-  return slot
+  return { slot, alreadyDeleted: false }
 }
 
 // Get all slots
@@ -429,6 +437,9 @@ export const getBookingByIdService = async (bookingId) => {
   )
 
   // Extract common fields
+  const transferDocuments = await resolveTransferDocumentsForBooking(booking)
+  const { asset } = await findAssetForBooking(booking)
+
   const productCommon = {
     uuid: booking.productData?.uuid,
     title: booking.productData?.title,
@@ -438,9 +449,22 @@ export const getBookingByIdService = async (bookingId) => {
     price: booking.productData?.price,
     pictures: booking.productData?.pictures,
     thumbnailImg: booking.productData?.thumbnailImg,
-    dealClosed: booking.productData?.dealClosed,
-    successFeePaymentStatus: booking.productData?.successFeePaymentStatus,
+    dealClosed:
+      booking.productData?.dealClosed ?? Boolean(asset?.dealClosed),
+    successFeePaymentStatus:
+      booking.productData?.successFeePaymentStatus ||
+      asset?.successFeePaymentStatus,
     hasDepositReceipt: booking.productData?.hasDepositReceipt,
+    transferDocuments,
+    transactionPhase: deriveTransactionPhase({
+      ...booking,
+      productData: {
+        ...(booking.productData || {}),
+        transferDocuments,
+        dealClosed:
+          booking.productData?.dealClosed ?? Boolean(asset?.dealClosed),
+      },
+    }),
   }
 
   // Extract asset-specific fields
@@ -528,7 +552,6 @@ export const getBookingByIdService = async (bookingId) => {
     productData: {
       ...productCommon,
       fields: assetFields,
-      transferDocuments: booking.productData?.transferDocuments,
     },
   }
 }

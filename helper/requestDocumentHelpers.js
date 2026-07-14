@@ -16,10 +16,14 @@ export function normalizeRequestDocumentEntry(entry) {
     const document =
       entry.document?._id || entry.document || entry.documentId || null
     const date = entry.date ? new Date(entry.date) : null
+    const uploadedAt = entry.uploadedAt ? new Date(entry.uploadedAt) : null
     return {
       name,
       document: document || null,
       ...(date && !Number.isNaN(date.getTime()) ? { date } : {}),
+      ...(uploadedAt && !Number.isNaN(uploadedAt.getTime())
+        ? { uploadedAt }
+        : {}),
     }
   }
   return null
@@ -61,6 +65,7 @@ export function applyRequestDocumentUpdate(product, body) {
 
     if (targetIndex >= 0) {
       docs[targetIndex].document = documentId
+      docs[targetIndex].uploadedAt = new Date()
       body.requestDocument = docs
 
       const existingUploadIds = (product.uploadDocument || []).map((doc) =>
@@ -90,6 +95,7 @@ export function applyRequestDocumentUpdate(product, body) {
         name: item.name,
         document: item.document || match?.document || null,
         date: item.date || match?.date || null,
+        uploadedAt: item.uploadedAt || match?.uploadedAt || null,
       }
     })
   }

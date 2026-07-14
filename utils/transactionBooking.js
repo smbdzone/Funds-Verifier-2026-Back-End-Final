@@ -2,6 +2,7 @@ import Property from '../models/propertyModel.js'
 import Car from '../models/carModel.js'
 import Jewelry from '../models/jewelryModel.js'
 import Boat from '../models/boatModel.js'
+import User from '../models/userModel.js'
 
 export const getAssetModelForType = (assetType = '') => {
   const type = assetType.toLowerCase()
@@ -66,4 +67,74 @@ export const syncAssetTransactionOnTransferComplete = (asset, brokerId, assetTyp
   if (brokerId) asset.dealhunterId = brokerId
   asset.successFeePaymentStatus = 'Paid'
   asset.transactionStatus = completedTransactionStatusForAssetType(assetType)
+}
+
+/** Mixed `productData` on bookings must be explicitly marked modified after nested edits. */
+export const patchBookingProductData = (booking, patch) => {
+  if (!booking || typeof booking !== 'object') return booking
+  booking.productData = {
+    ...(booking.productData || {}),
+    ...(patch || {}),
+  }
+  if (typeof booking.markModified === 'function') {
+    booking.markModified('productData')
+  }
+  return booking
+}
+
+export const patchBookingTransferDocuments = (booking, patch) => {
+  if (!booking || typeof booking !== 'object') return booking
+  const current = booking.productData?.transferDocuments || {}
+  return patchBookingProductData(booking, {
+    transferDocuments: {
+      ...current,
+      ...(patch || {}),
+    },
+  })
+}
+
+export const mergeTransferDocuments = (bookingDocs = {}, assetDocs = {}) => {
+  const booking = bookingDocs || {}
+  const asset = assetDocs || {}
+  const pickFee = (...values) => {
+    for (const value of values) {
+      const num = Number(value)
+      if (Number.isFinite(num) && num > 0) return num
+    }
+    return null
+  }
+
+  return {
+    assetTransferDocument:
+      booking.assetTransferDocument || asset.assetTransferDocument || null,
+    successFee: pickFee(booking.successFee, asset.successFee),
+    PaymentProof: booking.PaymentProof || asset.PaymentProof || null,
+    paymentUrl: booking.paymentUrl || asset.paymentUrl || null,
+  }
+}
+
+export const resolveTransferDocumentsForBooking = async (booking) => {
+  const snapshot = booking?.productData?.transferDocuments || {}
+  try {
+    const { asset } = await findAssetForBooking(booking)
+    const assetDocs = asset?.transferDocuments?.toObject?.()
+      ? asset.transferDocuments.toObject()
+      : asset?.transferDocuments || {}
+    return mergeTransferDocuments(snapshot, assetDocs)
+  } catch {
+    return mergeTransferDocuments(snapshot, {})
+  }
+}
+
+export async function resolveBookingAssetHolder(booking) {
+  if (booking?.assetHolderId?.email) {
+    return booking.assetHolderId
+  }
+
+  const holderUuid = booking?.assetHolderUUID
+  if (!holderUuid) return null
+
+  return User.findOne({ uuid: holderUuid, isDeleted: false }).select(
+    'email name uuid',
+  )
 }
