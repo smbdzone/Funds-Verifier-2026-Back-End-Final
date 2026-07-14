@@ -223,6 +223,8 @@ const getSingleProperty = asyncHandler(async (req, res) => {
         populate: { path: 'reportFile' },
       })
       .populate('evaluationCertificate')
+      .populate('unitLayout')
+      .populate('floorPlan')
       .lean()
 
     if (!property) {
@@ -407,6 +409,8 @@ const getAllProduct = asyncHandler(async (req, res) => {
       .populate({ path: 'pictures', select: '-_id' })
       .populate({ path: 'video', select: '-_id' })
       .populate({ path: 'thumbnailImg', select: '-_id' })
+      .populate({ path: 'unitLayout', select: '-_id' })
+      .populate({ path: 'floorPlan', select: '-_id' })
 
     if (isAuthenticated) {
       query = query
@@ -562,6 +566,8 @@ const getAllProductByFilter = asyncHandler(async (req, res) => {
     .populate('thumbnailImg')
     .populate('evaluationCertificate')
     .populate('video3DWalkthrough')
+    .populate('unitLayout')
+    .populate('floorPlan')
     .populate({
       path: 'technicalReport',
       populate: { path: 'reportFile' },

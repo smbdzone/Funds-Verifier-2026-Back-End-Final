@@ -47,12 +47,27 @@ function sanitizeDocumentWrapper(doc) {
  * Safe on partial/lean docs and on populated subdocs that haven't yet been
  * filled in (the helper just walks what's there).
  */
+const OFF_PLAN_LAYOUT_MEDIA_KEYS = [
+  'unitLayout',
+  'floorPlan',
+  'studioLayout',
+  'oneBhkLayout',
+  'twoBhkLayout',
+  'twoBhkDuplexLayout',
+  'threeBhkDuplexLayout',
+  'penthouseLayout',
+]
+
 export function sanitizeListingMediaResponse(doc) {
   if (!doc || typeof doc !== 'object') return doc
 
   sanitizeMediaArray(doc?.pictures?.images)
   sanitizeMediaArray(doc?.thumbnailImg?.images)
   sanitizeMediaArray(doc?.video?.videos)
+
+  for (const key of OFF_PLAN_LAYOUT_MEDIA_KEYS) {
+    sanitizeMediaArray(doc?.[key]?.images)
+  }
 
   sanitizeDocumentWrapper(doc.evaluationCertificate)
   sanitizeDocumentWrapper(doc.technicalReport)

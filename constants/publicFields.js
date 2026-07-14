@@ -7,11 +7,14 @@ export const PUBLIC_PROPERTY_FIELDS = `
   video
   video3DWalkthrough
   price
+  priceFrom
+  priceTo
   evaluationPrices
   roi
   sizeSQFT
   sizeSQM
   sizeUnit
+  sizeType
   propertyDescription
   description
   additionalDescription
@@ -36,9 +39,17 @@ export const PUBLIC_PROPERTY_FIELDS = `
   country
   city
   userUUID
-    video
+  video
   pictures
   thumbnailImg
+  deliveryQuarter
+  deliveryYear
+  layout
+  numberOfFloors
+  paymentPlan
+  unitLayout
+  floorPlan
+  advertisementId
 `
 
 export const PUBLIC_CAR_FIELDS = `

@@ -80,12 +80,26 @@ async function signArray(arr, expiresInSeconds, signers) {
   await Promise.all(arr.map((item) => signOne(item, expiresInSeconds, signers)))
 }
 
+const OFF_PLAN_LAYOUT_MEDIA_KEYS = [
+  'unitLayout',
+  'floorPlan',
+  'studioLayout',
+  'oneBhkLayout',
+  'twoBhkLayout',
+  'twoBhkDuplexLayout',
+  'threeBhkDuplexLayout',
+  'penthouseLayout',
+]
+
 async function refreshListingMediaSignedUrlsImpl(doc, expiresInSeconds, signers) {
   if (!doc || typeof doc !== 'object') return doc
   await Promise.all([
     signArray(doc?.pictures?.images, expiresInSeconds, signers),
     signArray(doc?.thumbnailImg?.images, expiresInSeconds, signers),
     signArray(doc?.video?.videos, expiresInSeconds, signers),
+    ...OFF_PLAN_LAYOUT_MEDIA_KEYS.map((key) =>
+      signArray(doc?.[key]?.images, expiresInSeconds, signers),
+    ),
   ])
   return doc
 }
