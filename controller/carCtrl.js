@@ -51,6 +51,7 @@ import UserModel from '../models/userModel.js'
 import { AssetsListingsPricing } from '../utils/AssetsListingsPricing.js'
 import { createNotification } from './notifications.controller.js'
 import { notifyEvaluatorsNewListing } from '../helper/notificationHelpers.js'
+import { notifyAssetHolderDocumentRequested } from '../helper/notifyDocumentRequested.js'
 import { AddPaymentJob } from '../utils/jobs/index.js'
 import UserPaymentDetails from '../models/UserPaymentDetails.js'
 import { PUBLIC_CAR_FIELDS } from '../constants/publicFields.js'
@@ -374,6 +375,7 @@ const getAllProduct = asyncHandler(async (req, res) => {
   if (isAuthenticated) {
     query = query
       .populate({ path: 'uploadDocument', select: '-_id' })
+      .populate(REQUEST_DOCUMENT_POPULATE)
       .populate({ path: 'invoice', select: '-_id' })
       .populate({ path: 'evaluator', select: 'name displayName uuid' })
       .populate({ path: 'ratings.postedBy', select: '-_id' })
@@ -688,25 +690,30 @@ const updateProduct = asyncHandler(async (req, res) => {
       ).select('-_id')
 
       try {
-        const NotificationData = {
-          userUUID: updatedProduct?.userUUID,
-          UserRole: 'AssetHolder',
-          title: 'Assets Car',
-          message: `Your car (${updatedProduct?.title}) has been updated.`,
-          RelateRoute: 'cars',
-          RelatedId: updatedProduct?._id,
-        }
         if (requestedDocumentsUpdated) {
-          NotificationData.message = `Evaluator requested documents for your car (${updatedProduct?.title}). Please upload them in Documents Storage.`
-          NotificationData.RelateRoute = 'pending-evaluation'
-          NotificationData.RelatedUUID = updatedProduct?.uuid
-        } else if (documentFulfilled) {
-          NotificationData.UserRole = 'Evaluator'
-          NotificationData.userUUID = updatedProduct?.evaluatorUUID
-          NotificationData.message = `Seller uploaded a requested document for car (${updatedProduct?.title}).`
-          NotificationData.RelateRoute = 'evaluation'
+          await notifyAssetHolderDocumentRequested({
+            listing: updatedProduct,
+            assetType: 'car',
+            requesterRole: req.user?.role,
+            title: 'Document Request',
+          })
+        } else {
+          const NotificationData = {
+            userUUID: updatedProduct?.userUUID,
+            UserRole: 'AssetHolder',
+            title: 'Assets Car',
+            message: `Your car (${updatedProduct?.title}) has been updated.`,
+            RelateRoute: 'cars',
+            RelatedId: updatedProduct?._id,
+          }
+          if (documentFulfilled) {
+            NotificationData.UserRole = 'Evaluator'
+            NotificationData.userUUID = updatedProduct?.evaluatorUUID
+            NotificationData.message = `Seller uploaded a requested document for car (${updatedProduct?.title}).`
+            NotificationData.RelateRoute = 'evaluation'
+          }
+          await createNotification({ data: NotificationData })
         }
-        await createNotification({ data: NotificationData })
       } catch (error) {
         console.log({ error: error?.message })
       }

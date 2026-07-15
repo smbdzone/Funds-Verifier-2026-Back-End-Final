@@ -68,6 +68,13 @@ export const assetHolderUpdate = async (req, res, next) => {
       return next()
     }
 
+    // Trustees may request documents on any listing.
+    if (user.role === 'Trustee') {
+      req.user = user
+      req.asset = asset
+      return next()
+    }
+
     const isEvaluator = user.role === 'Evaluator'
     const isSubEvaluator = ['Sub-Evaluator', 'SubEvaluator'].includes(user.role)
 

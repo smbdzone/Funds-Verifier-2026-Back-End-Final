@@ -46,7 +46,22 @@ export async function attachDocumentSignedUrls(obj, options = {}) {
   ]
   await Promise.all(
     pdfFields.map(async (field) => {
-      const signed = await getDocumentSignedUrl(obj[field])
+      const value = obj[field]
+      if (Array.isArray(value)) {
+        await Promise.all(
+          value.map(async (doc) => {
+            if (!doc || typeof doc !== 'object') return
+            const signed = await getDocumentSignedUrl(doc)
+            if (signed) {
+              doc.signedUrl = signed
+              if (doc.Certificate) doc.Certificate.signedUrl = signed
+            }
+          }),
+        )
+        return
+      }
+
+      const signed = await getDocumentSignedUrl(value)
       if (signed) {
         if (!obj[field]) obj[field] = {}
         obj[field].signedUrl = signed

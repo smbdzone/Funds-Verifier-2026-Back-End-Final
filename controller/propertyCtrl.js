@@ -16,6 +16,7 @@ import UserModel from '../models/userModel.js'
 import { AssetsListingsPricing } from '../utils/AssetsListingsPricing.js'
 import { createNotification } from './notifications.controller.js'
 import { notifyEvaluatorsNewListing } from '../helper/notificationHelpers.js'
+import { notifyAssetHolderDocumentRequested } from '../helper/notifyDocumentRequested.js'
 import { AddPaymentJob } from '../utils/jobs/index.js'
 import UserPaymentDetails from '../models/UserPaymentDetails.js'
 import { PUBLIC_PROPERTY_FIELDS } from '../constants/publicFields.js'
@@ -416,6 +417,7 @@ const getAllProduct = asyncHandler(async (req, res) => {
       query = query
         .populate({ path: 'evaluationCertificate', select: '-_id' })
         .populate({ path: 'uploadDocument', select: '-_id' })
+        .populate(REQUEST_DOCUMENT_POPULATE)
         .populate({ path: 'invoice', select: '-_id' })
         .populate({ path: 'evaluator', select: 'name displayName uuid' })
         .populate({ path: 'video3DWalkthrough', select: '-_id' })
@@ -487,6 +489,8 @@ const getAllProduct = asyncHandler(async (req, res) => {
         // 🔐 SIGNED URLS ONLY FOR AUTH USERS (S3/CloudFront; legacy docs use stored url)
         if (isAuthenticated) {
           await attachDocumentSignedUrls(obj)
+          obj.requestDocument = normalizeRequestDocumentList(obj.requestDocument)
+          await attachRequestDocumentSignedUrls(obj)
         }
 
         // Drop internal S3 fields before serializing (signedUrl is enough).
@@ -746,25 +750,30 @@ const updateProduct = asyncHandler(async (req, res) => {
       // }
 
       try {
-        const NotificationData = {
-          UserRole: 'AssetHolder',
-          userUUID: updatedProduct?.userUUID,
-          title: 'Assets Property',
-          message: `Property (${updatedProduct?.title}) has been updated.`,
-          RelateRoute: `property`,
-          RelatedId: updatedProduct?._id,
+        if (requestedDocumentsUpdated) {
+          await notifyAssetHolderDocumentRequested({
+            listing: updatedProduct,
+            assetType: 'property',
+            requesterRole: req.user?.role,
+            title: 'Document Request',
+          })
+        } else {
+          const NotificationData = {
+            UserRole: 'AssetHolder',
+            userUUID: updatedProduct?.userUUID,
+            title: 'Assets Property',
+            message: `Property (${updatedProduct?.title}) has been updated.`,
+            RelateRoute: `property`,
+            RelatedId: updatedProduct?._id,
+          }
+          if (documentFulfilled) {
+            NotificationData.UserRole = 'Evaluator'
+            NotificationData.userUUID = updatedProduct?.evaluatorUUID
+            NotificationData.message = `Seller uploaded a requested document for property (${updatedProduct?.title}).`
+            NotificationData.RelateRoute = 'evaluation'
+          }
+          await createNotification({ data: NotificationData })
         }
-        if (requestedDocumentsUpdated && !documentFulfilled) {
-          NotificationData.message = `Evaluator requested documents for your property (${updatedProduct?.title}). Please upload them in Documents Storage.`
-          NotificationData.RelateRoute = 'pending-evaluation'
-          NotificationData.RelatedUUID = updatedProduct?.uuid
-        } else if (documentFulfilled) {
-          NotificationData.UserRole = 'Evaluator'
-          NotificationData.userUUID = updatedProduct?.evaluatorUUID
-          NotificationData.message = `Seller uploaded a requested document for property (${updatedProduct?.title}).`
-          NotificationData.RelateRoute = 'evaluation'
-        }
-        await createNotification({ data: NotificationData })
       } catch (error) {
         console.log({ error: error?.message })
       }
