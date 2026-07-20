@@ -13,6 +13,10 @@ import {
   getPrice,
   getAllProductByFilter,
   getApprovedListingsMetrics,
+  getOffPlanRequests,
+  updateOffPlanRequestStatus,
+  requestOffPlanDocuments,
+  requestOffPlanApprovalFee,
 } from '../controller/propertyCtrl.js'
 import {
   authMiddleware,
@@ -33,6 +37,30 @@ router.get(
 router.get('/filter', ...listingReadAccess, getAllProductByFilter)
 router.get('/price', ...listingReadAccess, getPrice)
 router.get('/related-property', ...listingReadAccess, getRelatedProduct)
+router.get(
+  '/admin/offplan-requests',
+  authMiddleware,
+  isAdmin,
+  getOffPlanRequests,
+)
+router.patch(
+  '/admin/offplan/:moduleId/status',
+  authMiddleware,
+  isAdmin,
+  updateOffPlanRequestStatus,
+)
+router.patch(
+  '/admin/offplan/:moduleId/request-documents',
+  authMiddleware,
+  isAdmin,
+  requestOffPlanDocuments,
+)
+router.patch(
+  '/admin/offplan/:moduleId/request-approval-fee',
+  authMiddleware,
+  isAdmin,
+  requestOffPlanApprovalFee,
+)
 router.put('/rating', ...listingReadAccess, addRating)
 router.put('/:moduleId', authMiddleware, assetHolderUpdate, updateProduct)
 router.delete('/:deleteId', authMiddleware, assetHolderCreate, deleteProduct)

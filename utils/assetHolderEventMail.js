@@ -2,40 +2,22 @@ import sendEmail from './nodeMailer.js'
 import User from '../models/userModel.js'
 import { safeURL } from '../controller/emailCtrl.js'
 
-function getRequesterLabel(role) {
-  const r = String(role || '').toLowerCase()
-  if (r === 'trustee') return 'Trustee'
-  if (r === 'admin') return 'Super Admin'
-  if (r === 'sub-evaluator' || r === 'subevaluator') return 'Sub-Evaluator'
-  return 'Evaluator'
-}
-
-function buildDocumentsListHtml(documentNames = []) {
-  if (!documentNames.length) {
-    return '<p style="margin:0 0 16px;color:#374151;">Additional documents were requested for your listing.</p>'
-  }
-  const items = documentNames
-    .map(
-      (name) =>
-        `<li style="margin:0 0 6px;color:#374151;">${String(name)}</li>`,
-    )
-    .join('')
-  return `
-    <p style="margin:0 0 8px;color:#374151;">Requested documents:</p>
-    <ul style="margin:0 0 16px;padding-left:20px;">${items}</ul>
-  `
-}
-
 function buildEmailHtml({
   recipientName,
-  assetTitle,
-  assetLabel,
-  requesterLabel,
-  documentNames,
-  documentsUrl,
+  headline,
+  bodyLines = [],
+  ctaLabel,
+  ctaUrl,
 }) {
   const name = recipientName || 'Asset Holder'
-  const safeDocsUrl = safeURL(documentsUrl)
+  const safeCta = safeURL(ctaUrl)
+  const linesHtml = bodyLines
+    .filter(Boolean)
+    .map(
+      (line) =>
+        `<p style="margin:0 0 12px;color:#374151;font-size:15px;line-height:1.5;">${line}</p>`,
+    )
+    .join('')
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -56,17 +38,11 @@ function buildEmailHtml({
             <tr>
               <td style="padding:28px 24px;">
                 <p style="margin:0 0 16px;color:#111827;font-size:16px;">Hi ${name},</p>
-                <p style="margin:0 0 16px;color:#374151;font-size:15px;line-height:1.5;">
-                  A <strong>${requesterLabel}</strong> has requested document(s) for your
-                  ${assetLabel} <strong>${assetTitle || 'listing'}</strong>.
-                </p>
-                ${buildDocumentsListHtml(documentNames)}
-                <p style="margin:0 0 20px;color:#374151;font-size:15px;line-height:1.5;">
-                  Please upload the requested files in Documents Storage on your dashboard.
-                </p>
-                <a href="${safeDocsUrl}"
+                <p style="margin:0 0 16px;color:#111827;font-size:16px;font-weight:600;">${headline}</p>
+                ${linesHtml}
+                <a href="${safeCta}"
                   style="display:inline-block;background:#eab308;color:#111827;text-decoration:none;font-weight:600;font-size:14px;padding:12px 20px;border-radius:6px;">
-                  Upload Documents
+                  ${ctaLabel || 'Open Dashboard'}
                 </a>
               </td>
             </tr>
@@ -84,15 +60,16 @@ function buildEmailHtml({
 }
 
 /**
- * Email the asset holder when an evaluator/trustee requests documents.
- * Never throws — safe to call from update controllers.
+ * Generic asset-holder event email. Never throws.
  */
-export default async function sendDocumentRequestedEmail({
+export default async function sendAssetHolderEventEmail({
   userUUID,
-  assetTitle,
-  assetType = 'property',
-  requesterRole,
-  documentNames = [],
+  subject,
+  headline,
+  bodyLines = [],
+  ctaLabel = 'View My Listings',
+  ctaPath = '/seller-profile/my-listing',
+  ctaUrl: ctaUrlOverride,
 }) {
   try {
     if (!userUUID) {
@@ -116,50 +93,42 @@ export default async function sendDocumentRequestedEmail({
       return { success: false, message: 'Email is not configured on the server' }
     }
 
-    const requesterLabel = getRequesterLabel(requesterRole)
     const frontendBase = String(
       process.env.FRONTEND_URL || 'https://fundsverifier.com',
     ).replace(/\/$/, '')
-    const documentsUrl = `${frontendBase}/seller-profile/documents-storage`
-    const assetLabel = String(assetType || 'property').toLowerCase()
+    const ctaUrl =
+      (typeof ctaUrlOverride === 'string' && ctaUrlOverride.trim()) ||
+      `${frontendBase}${ctaPath.startsWith('/') ? ctaPath : `/${ctaPath}`}`
     const recipientName = assetHolder.name || ''
-
-    const namesText =
-      documentNames.length > 0
-        ? documentNames.map((n) => `- ${n}`).join('\n')
-        : '- (see Documents Storage)'
 
     const result = await sendEmail({
       to: assetHolder.email,
-      subject: `Document requested for your ${assetLabel} — Funds Verifier`,
-      text: `Hi ${recipientName || 'Asset Holder'},\n\nA ${requesterLabel} requested document(s) for your ${assetLabel} "${assetTitle || 'listing'}".\n\nRequested documents:\n${namesText}\n\nPlease upload them here:\n${documentsUrl}\n`,
+      subject,
+      text: `Hi ${recipientName || 'Asset Holder'},\n\n${headline}\n\n${bodyLines
+        .filter(Boolean)
+        .join('\n')
+        .replace(/<[^>]+>/g, '')}\n\n${ctaLabel}:\n${ctaUrl}\n`,
       html: buildEmailHtml({
         recipientName,
-        assetTitle,
-        assetLabel,
-        requesterLabel,
-        documentNames,
-        documentsUrl,
+        headline,
+        bodyLines,
+        ctaLabel,
+        ctaUrl,
       }),
     })
 
     return {
       success: Boolean(result?.success),
       message: result?.success
-        ? 'Document request email sent'
+        ? 'Email sent'
         : result?.error || 'Failed to send email',
       recipientEmail: assetHolder.email,
     }
   } catch (error) {
-    console.error(
-      'sendDocumentRequestedEmail error:',
-      error?.message || error,
-    )
+    console.error('sendAssetHolderEventEmail error:', error?.message || error)
     return {
       success: false,
-      message: error?.message || 'Failed to send document request email',
+      message: error?.message || 'Failed to send email',
     }
   }
 }
-
-export { getRequesterLabel }

@@ -14,6 +14,10 @@ import {
   modelForAssetType,
   isPremiumServiceRecordPaid,
 } from '../utils/listingPremiumSync.js'
+import {
+  notifyAssetHolderTechnicalReportCompleted,
+  resolveListingFromPremiumRecord,
+} from '../helper/notifyAssetHolderListingEvents.js'
 
 export const createReport = async (req, res) => {
   try {
@@ -260,6 +264,14 @@ export const updateReport = async (req, res) => {
       delete data.assetId
     }
 
+    const existingReport = await Report.findOne({
+      uuid: sanitizedUUID,
+      isDeleted: false,
+    })
+    if (!existingReport) {
+      return res.status(404).json({ message: 'Report not found' })
+    }
+
     const updatedReport = await Report.findOneAndUpdate(
       { uuid: sanitizedUUID },
       data,
@@ -280,18 +292,41 @@ export const updateReport = async (req, res) => {
       await linkTechnicalReportToListing(reportForLink)
     }
 
+    const becameSuccessful =
+      existingReport.status !== 'successful' &&
+      updatedReport.status === 'successful'
+
     try {
-      const NotificationData = {
-        userId: updatedReport?.userId,
-        userUUID: updatedReport?.userUUID,
-        UserRole: 'AssetHolder',
-        title: 'Technical Report',
-        message: `report for technical report is updated.`,
-        RelateRoute: 'TechnicalReport',
-        RelatedId: updatedReport?.productId,
-        RelatedUUID: updatedReport?.productUUID,
+      if (becameSuccessful) {
+        const listing =
+          (await resolveListingFromPremiumRecord(
+            reportForLink || updatedReport,
+          )) || null
+        await notifyAssetHolderTechnicalReportCompleted({
+          listing: listing || {
+            userUUID: updatedReport?.userUUID || existingReport.userUUID,
+            title:
+              updatedReport?.productTitle || existingReport.productTitle,
+            uuid: updatedReport?.productUUID || existingReport.productUUID,
+            _id: updatedReport?.productId || existingReport.productId,
+            assetType: updatedReport?.assetType || existingReport.assetType,
+          },
+          assetType: updatedReport?.assetType || existingReport.assetType,
+          provider: req.user || { name: updatedReport?.name },
+        })
+      } else {
+        const NotificationData = {
+          userId: updatedReport?.userId,
+          userUUID: updatedReport?.userUUID,
+          UserRole: 'AssetHolder',
+          title: 'Technical Report',
+          message: `report for technical report is updated.`,
+          RelateRoute: 'TechnicalReport',
+          RelatedId: updatedReport?.productId,
+          RelatedUUID: updatedReport?.productUUID,
+        }
+        await createNotification({ data: NotificationData })
       }
-      await createNotification({ data: NotificationData })
     } catch (error) {
       console.log({ error: error?.message })
     }

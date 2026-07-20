@@ -20,12 +20,12 @@ const propertySchema = new mongoose.Schema({
       ref: 'EvaluationCertificate',
     },
   ],
-    transferDocuments: {
-      assetTransferDocument: { type: String },
-      PaymentProof: { type: String },
-      successFee: { type: Number },
-      paymentUrl: { type: String },
-    },
+  transferDocuments: {
+    assetTransferDocument: { type: String },
+    PaymentProof: { type: String },
+    successFee: { type: Number },
+    paymentUrl: { type: String },
+  },
   dealClosed: { type: Boolean },
   successFeePaymentStatus: {
     type: String,
@@ -82,6 +82,16 @@ const propertySchema = new mongoose.Schema({
     default: 'pending',
     enum: ['approved', 'pending'],
   },
+  /** Optional Super Admin off-plan approval fee (Stripe Checkout). */
+  offPlanApprovalFee: { type: Number, default: null },
+  offPlanApprovalFeeStatus: {
+    type: String,
+    enum: ['none', 'requested', 'paid'],
+    default: 'none',
+  },
+  offPlanApprovalFeePaymentUrl: { type: String, default: null },
+  offPlanApprovalFeeSessionId: { type: String, default: null },
+  offPlanApprovalFeePaidAt: { type: Date, default: null },
   video3DWalkthrough: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Request3D',

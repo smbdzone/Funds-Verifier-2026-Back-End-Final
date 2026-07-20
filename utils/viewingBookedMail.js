@@ -2,40 +2,24 @@ import sendEmail from './nodeMailer.js'
 import User from '../models/userModel.js'
 import { safeURL } from '../controller/emailCtrl.js'
 
-function getRequesterLabel(role) {
-  const r = String(role || '').toLowerCase()
-  if (r === 'trustee') return 'Trustee'
-  if (r === 'admin') return 'Super Admin'
-  if (r === 'sub-evaluator' || r === 'subevaluator') return 'Sub-Evaluator'
-  return 'Evaluator'
-}
-
-function buildDocumentsListHtml(documentNames = []) {
-  if (!documentNames.length) {
-    return '<p style="margin:0 0 16px;color:#374151;">Additional documents were requested for your listing.</p>'
-  }
-  const items = documentNames
-    .map(
-      (name) =>
-        `<li style="margin:0 0 6px;color:#374151;">${String(name)}</li>`,
-    )
-    .join('')
-  return `
-    <p style="margin:0 0 8px;color:#374151;">Requested documents:</p>
-    <ul style="margin:0 0 16px;padding-left:20px;">${items}</ul>
-  `
-}
-
 function buildEmailHtml({
   recipientName,
-  assetTitle,
+  buyerName,
+  listingTitle,
   assetLabel,
-  requesterLabel,
-  documentNames,
-  documentsUrl,
+  viewingUrl,
+  slotDate,
+  slotTime,
 }) {
   const name = recipientName || 'Asset Holder'
-  const safeDocsUrl = safeURL(documentsUrl)
+  const safeViewUrl = safeURL(viewingUrl)
+  const whenLine =
+    slotDate || slotTime
+      ? `<p style="margin:0 0 16px;color:#374151;font-size:15px;line-height:1.5;">
+          Scheduled:${slotDate ? ` <strong>${slotDate}</strong>` : ''}${slotTime ? ` at <strong>${slotTime}</strong>` : ''
+      }
+        </p>`
+      : ''
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -57,16 +41,16 @@ function buildEmailHtml({
               <td style="padding:28px 24px;">
                 <p style="margin:0 0 16px;color:#111827;font-size:16px;">Hi ${name},</p>
                 <p style="margin:0 0 16px;color:#374151;font-size:15px;line-height:1.5;">
-                  A <strong>${requesterLabel}</strong> has requested document(s) for your
-                  ${assetLabel} <strong>${assetTitle || 'listing'}</strong>.
+                  <strong>${buyerName || 'A buyer'}</strong> booked a viewing for your
+                  ${assetLabel} <strong>${listingTitle || 'listing'}</strong>.
                 </p>
-                ${buildDocumentsListHtml(documentNames)}
+                ${whenLine}
                 <p style="margin:0 0 20px;color:#374151;font-size:15px;line-height:1.5;">
-                  Please upload the requested files in Documents Storage on your dashboard.
+                  Open Arrange Viewing on your dashboard to review the booking.
                 </p>
-                <a href="${safeDocsUrl}"
+                <a href="${safeViewUrl}"
                   style="display:inline-block;background:#eab308;color:#111827;text-decoration:none;font-weight:600;font-size:14px;padding:12px 20px;border-radius:6px;">
-                  Upload Documents
+                  View Bookings
                 </a>
               </td>
             </tr>
@@ -84,15 +68,16 @@ function buildEmailHtml({
 }
 
 /**
- * Email the asset holder when an evaluator/trustee requests documents.
- * Never throws — safe to call from update controllers.
+ * Email the asset holder when someone books a viewing for their listing.
+ * Never throws — safe to call from booking services.
  */
-export default async function sendDocumentRequestedEmail({
+export default async function sendViewingBookedEmail({
   userUUID,
-  assetTitle,
+  buyerName,
+  listingTitle,
   assetType = 'property',
-  requesterRole,
-  documentNames = [],
+  slotDate,
+  slotTime,
 }) {
   try {
     if (!userUUID) {
@@ -116,50 +101,45 @@ export default async function sendDocumentRequestedEmail({
       return { success: false, message: 'Email is not configured on the server' }
     }
 
-    const requesterLabel = getRequesterLabel(requesterRole)
     const frontendBase = String(
       process.env.FRONTEND_URL || 'https://fundsverifier.com',
     ).replace(/\/$/, '')
-    const documentsUrl = `${frontendBase}/seller-profile/documents-storage`
+    const viewingUrl = `${frontendBase}/seller-profile/all-slot`
     const assetLabel = String(assetType || 'property').toLowerCase()
     const recipientName = assetHolder.name || ''
-
-    const namesText =
-      documentNames.length > 0
-        ? documentNames.map((n) => `- ${n}`).join('\n')
-        : '- (see Documents Storage)'
+    const title = listingTitle || 'listing'
+    const buyer = buyerName || 'A buyer'
 
     const result = await sendEmail({
       to: assetHolder.email,
-      subject: `Document requested for your ${assetLabel} — Funds Verifier`,
-      text: `Hi ${recipientName || 'Asset Holder'},\n\nA ${requesterLabel} requested document(s) for your ${assetLabel} "${assetTitle || 'listing'}".\n\nRequested documents:\n${namesText}\n\nPlease upload them here:\n${documentsUrl}\n`,
+      subject: `Viewing booked for your ${assetLabel} — Funds Verifier`,
+      text: `Hi ${recipientName || 'Asset Holder'},\n\n${buyer} booked a viewing for your ${assetLabel} "${title}".${slotDate || slotTime
+          ? `\n\nScheduled: ${[slotDate, slotTime].filter(Boolean).join(' at ')}`
+          : ''
+        }\n\nReview bookings here:\n${viewingUrl}\n`,
       html: buildEmailHtml({
         recipientName,
-        assetTitle,
+        buyerName: buyer,
+        listingTitle: title,
         assetLabel,
-        requesterLabel,
-        documentNames,
-        documentsUrl,
+        viewingUrl,
+        slotDate,
+        slotTime,
       }),
     })
 
     return {
       success: Boolean(result?.success),
       message: result?.success
-        ? 'Document request email sent'
+        ? 'Viewing booked email sent'
         : result?.error || 'Failed to send email',
       recipientEmail: assetHolder.email,
     }
   } catch (error) {
-    console.error(
-      'sendDocumentRequestedEmail error:',
-      error?.message || error,
-    )
+    console.error('sendViewingBookedEmail error:', error?.message || error)
     return {
       success: false,
-      message: error?.message || 'Failed to send document request email',
+      message: error?.message || 'Failed to send viewing booked email',
     }
   }
 }
-
-export { getRequesterLabel }

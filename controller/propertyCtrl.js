@@ -17,6 +17,13 @@ import { AssetsListingsPricing } from '../utils/AssetsListingsPricing.js'
 import { createNotification } from './notifications.controller.js'
 import { notifyEvaluatorsNewListing } from '../helper/notificationHelpers.js'
 import { notifyAssetHolderDocumentRequested } from '../helper/notifyDocumentRequested.js'
+import {
+  listingBecameEvaluatorApproved,
+  notifyAssetHolderListingApproved,
+  notifyAssetHolderOffPlanApproved,
+  notifyAssetHolderOffPlanFeeRequested,
+} from '../helper/notifyAssetHolderListingEvents.js'
+import { stripe } from '../libs/stripe.js'
 import { AddPaymentJob } from '../utils/jobs/index.js'
 import UserPaymentDetails from '../models/UserPaymentDetails.js'
 import { PUBLIC_PROPERTY_FIELDS } from '../constants/publicFields.js'
@@ -174,6 +181,17 @@ const createProduct = asyncHandler(async (req, res) => {
           assetType: createPdt[0]?.assetType || 'property',
           relatedId: createPdt[0]._id,
           relatedUUID: createPdt[0]?.uuid,
+        })
+      } else {
+        await createNotification({
+          data: {
+            UserRole: 'Admin',
+            title: 'Off-Plan Request',
+            message: `New off-plan listing (${createPdt[0]?.title}) is pending Super Admin approval.`,
+            RelateRoute: 'offplan-requests',
+            RelatedId: createPdt[0]._id,
+            RelatedUUID: createPdt[0]?.uuid,
+          },
         })
       }
     } catch (error) {
@@ -757,6 +775,18 @@ const updateProduct = asyncHandler(async (req, res) => {
             requesterRole: req.user?.role,
             title: 'Document Request',
           })
+        } else if (
+          listingBecameEvaluatorApproved(product, updatedProduct)
+        ) {
+          await notifyAssetHolderListingApproved({
+            listing: {
+              ...(updatedProduct?.toObject?.() || updatedProduct),
+              _id: product._id,
+              userUUID: updatedProduct?.userUUID || product.userUUID,
+            },
+            assetType: 'property',
+            evaluator: req.user,
+          })
         } else {
           const NotificationData = {
             UserRole: 'AssetHolder',
@@ -1021,6 +1051,290 @@ const getApprovedListingsMetrics = async (req, res) => {
   }
 }
 
+/** Super Admin: list off-plan listings awaiting / past approval. */
+const getOffPlanRequests = asyncHandler(async (req, res) => {
+  try {
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1)
+    const limit = Math.min(50, Math.max(1, parseInt(req.query.limit, 10) || 10))
+    const skip = (page - 1) * limit
+    const statusParam = String(req.query.status || 'pending').toLowerCase()
+
+    const query = {
+      isDeleted: false,
+      assetType: { $regex: /off\s*plan/i },
+    }
+
+    if (statusParam === 'pending' || statusParam === '0') {
+      query.status = 0
+    } else if (statusParam === 'approved' || statusParam === '1') {
+      query.status = 1
+    }
+
+    const [products, total] = await Promise.all([
+      Property.find(query)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .populate({ path: 'pictures', select: '-_id' })
+        .populate({ path: 'thumbnailImg', select: '-_id' })
+        .populate(REQUEST_DOCUMENT_POPULATE)
+        .select('-__v')
+        .lean(),
+      Property.countDocuments(query),
+    ])
+
+    await refreshListingsMediaSignedUrls(products)
+
+    for (const product of products) {
+      product.requestDocument = normalizeRequestDocumentList(
+        product.requestDocument,
+      )
+      await attachRequestDocumentSignedUrls(product)
+    }
+
+    res.json({
+      products,
+      currentPage: page,
+      totalPages: Math.max(1, Math.ceil(total / limit)),
+      total,
+    })
+  } catch (error) {
+    res.status(500).json({
+      message: 'Could not load off-plan requests',
+      error: error.message,
+    })
+  }
+})
+
+/** Super Admin only: approve or set pending an off-plan listing. */
+const updateOffPlanRequestStatus = asyncHandler(async (req, res) => {
+  try {
+    const { moduleId } = req.params
+    const nextStatus = Number(req.body?.status)
+
+    if (![0, 1].includes(nextStatus)) {
+      return res
+        .status(400)
+        .json({ message: 'status must be 0 (pending) or 1 (approved)' })
+    }
+
+    const product = await Property.findOne(buildListingIdQuery(moduleId))
+    if (!product) {
+      return res.status(404).json({ message: 'Off-plan listing not found' })
+    }
+
+    if (!isOffPlanAssetType(product.assetType)) {
+      return res
+        .status(400)
+        .json({ message: 'Only off-plan listings can be updated here' })
+    }
+
+    product.status = nextStatus
+    product.evaluationStatus = nextStatus === 1 ? 'approved' : 'pending'
+    await product.save()
+
+    try {
+      if (product.userUUID && nextStatus === 1) {
+        await notifyAssetHolderOffPlanApproved({ listing: product })
+      } else if (product.userUUID) {
+        await createNotification({
+          data: {
+            UserRole: 'AssetHolder',
+            userUUID: product.userUUID,
+            title: 'Off-Plan Listing',
+            message: `Your off-plan listing (${product.title}) was set back to pending.`,
+            RelateRoute: 'property',
+            RelatedId: product._id,
+            RelatedUUID: product.uuid,
+          },
+        })
+      }
+    } catch (notifyErr) {
+      console.log({ error: notifyErr?.message })
+    }
+
+    res.json(product)
+  } catch (error) {
+    res.status(500).json({
+      message: 'Could not update off-plan status',
+      error: error.message,
+    })
+  }
+})
+
+/** Super Admin: request documents on an off-plan listing (optional before approve). */
+const requestOffPlanDocuments = asyncHandler(async (req, res) => {
+  try {
+    const { moduleId } = req.params
+    const product = await Property.findOne(buildListingIdQuery(moduleId))
+
+    if (!product) {
+      return res.status(404).json({ message: 'Off-plan listing not found' })
+    }
+
+    if (!isOffPlanAssetType(product.assetType)) {
+      return res
+        .status(400)
+        .json({ message: 'Only off-plan listings can be updated here' })
+    }
+
+    if (!Object.prototype.hasOwnProperty.call(req.body || {}, 'requestDocument')) {
+      return res.status(400).json({ message: 'requestDocument is required' })
+    }
+
+    const body = { requestDocument: req.body.requestDocument }
+    applyRequestDocumentUpdate(product, body)
+
+    const nextDocs = normalizeRequestDocumentList(body.requestDocument)
+    if (!nextDocs.length) {
+      return res.status(400).json({
+        message: 'Add at least one document name before requesting.',
+      })
+    }
+
+    const missingDate = nextDocs.some((doc) => !doc.date)
+    if (missingDate) {
+      return res.status(400).json({
+        message: 'Each requested document must have a date.',
+      })
+    }
+
+    product.requestDocument = nextDocs
+    await product.save()
+
+    const updated = await Property.findById(product._id)
+      .populate(REQUEST_DOCUMENT_POPULATE)
+      .lean()
+
+    if (updated) {
+      updated.requestDocument = normalizeRequestDocumentList(
+        updated.requestDocument,
+      )
+      await attachRequestDocumentSignedUrls(updated)
+    }
+
+    try {
+      await notifyAssetHolderDocumentRequested({
+        listing: updated || product,
+        assetType: 'off-plan',
+        requesterRole: req.user?.role || 'Admin',
+        title: 'Document Request',
+      })
+    } catch (notifyErr) {
+      console.log({ error: notifyErr?.message })
+    }
+
+    res.json(updated || product)
+  } catch (error) {
+    res.status(500).json({
+      message: 'Could not request documents for off-plan listing',
+      error: error.message,
+    })
+  }
+})
+
+/** Super Admin: optional off-plan approval fee payment request (Stripe + notify/email). */
+const requestOffPlanApprovalFee = asyncHandler(async (req, res) => {
+  try {
+    const { moduleId } = req.params
+    const amount = Number(req.body?.amount)
+
+    if (!Number.isFinite(amount) || amount <= 0) {
+      return res.status(400).json({
+        message: 'Enter a valid approval fee amount greater than 0.',
+      })
+    }
+
+    const product = await Property.findOne(buildListingIdQuery(moduleId))
+    if (!product) {
+      return res.status(404).json({ message: 'Off-plan listing not found' })
+    }
+
+    if (!isOffPlanAssetType(product.assetType)) {
+      return res
+        .status(400)
+        .json({ message: 'Only off-plan listings can be updated here' })
+    }
+
+    if (product.offPlanApprovalFeeStatus === 'paid') {
+      return res.status(400).json({
+        message: 'Approval fee is already paid for this listing.',
+      })
+    }
+
+    const holder = await UserModel.findOne(
+      { uuid: product.userUUID, isDeleted: false },
+      { email: 1, name: 1, uuid: 1 },
+    )
+
+    if (!holder?.email) {
+      return res.status(400).json({
+        message: 'Asset holder email was not found for this listing.',
+      })
+    }
+
+    const frontendBase = String(
+      process.env.FRONTEND_URL || 'https://fundsverifier.com',
+    ).replace(/\/$/, '')
+    const successUrl = `${frontendBase}/service-payment-success`
+
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ['card'],
+      line_items: [
+        {
+          price_data: {
+            currency: 'aed',
+            product_data: {
+              name: `Off-plan approval fee — ${product.title || 'Listing'}`,
+              description: 'Optional Super Admin off-plan approval fee',
+            },
+            unit_amount: Math.round(amount * 100),
+          },
+          quantity: 1,
+        },
+      ],
+      mode: 'payment',
+      customer_email: holder.email,
+      success_url: `${successUrl}?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${frontendBase}/seller-profile/invoices`,
+      metadata: {
+        paymentType: 'off_plan_approval_fee',
+        listingId: String(product._id),
+        listingUuid: String(product.uuid || ''),
+        userUUID: String(product.userUUID || ''),
+      },
+    })
+
+    product.offPlanApprovalFee = amount
+    product.offPlanApprovalFeeStatus = 'requested'
+    product.offPlanApprovalFeePaymentUrl = session.url
+    product.offPlanApprovalFeeSessionId = session.id
+    product.offPlanApprovalFeePaidAt = null
+    await product.save()
+
+    try {
+      await notifyAssetHolderOffPlanFeeRequested({
+        listing: product,
+        amount,
+        paymentUrl: session.url,
+      })
+    } catch (notifyErr) {
+      console.log({ error: notifyErr?.message })
+    }
+
+    res.json({
+      message: 'Approval fee payment request sent to asset holder.',
+      paymentUrl: session.url,
+      product,
+    })
+  } catch (error) {
+    res.status(500).json({
+      message: 'Could not request off-plan approval fee',
+      error: error.message,
+    })
+  }
+})
+
 export {
   createProduct,
   //  getSingleProduct,
@@ -1034,4 +1348,8 @@ export {
   getPrice,
   getAllProductByFilter,
   getApprovedListingsMetrics,
+  getOffPlanRequests,
+  updateOffPlanRequestStatus,
+  requestOffPlanDocuments,
+  requestOffPlanApprovalFee,
 }

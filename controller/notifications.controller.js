@@ -297,6 +297,12 @@ export const GetRoutesForNotifications = (notification) => {
     if (route === 'my-listing' && role === 'AssetHolder') {
       return '/seller-profile/my-listing'
     }
+    if (
+      (route === 'all-slot' || route === 'create-slot') &&
+      role === 'AssetHolder'
+    ) {
+      return '/seller-profile/all-slot'
+    }
     if (route === 'evaluation' && role === 'Evaluator') {
       return '/evaluator-profile/property-evaluation'
     }

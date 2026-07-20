@@ -14,6 +14,7 @@ import {
   isTransactionBooking,
   resolveTransferDocumentsForBooking,
 } from '../utils/transactionBooking.js'
+import { notifyAssetHolderViewingBooked } from '../helper/notifyAssetHolderViewingBooked.js'
 
 export const VIEWING_SLOT_CATEGORY = 'viewing'
 export const SERVICE_SLOT_CATEGORY = 'service'
@@ -84,13 +85,14 @@ export const createBookingService = async (bookingData) => {
 
   if (!timeSlotId) throw new Error('timeSlotId is required')
   if (!brokerId) throw new Error('brokerId is required')
-  if (!assetHolderId) throw new Error('assetHolderId is required')
   if (!productData) throw new Error('productData is required')
 
   const resolveIdentifier = (value) => {
     if (!value) return ''
     if (typeof value === 'string' && value !== '[object Object]') {
-      return value.trim()
+      const trimmed = value.trim()
+      if (trimmed === 'undefined' || trimmed === 'null') return ''
+      return trimmed
     }
     if (typeof value === 'object') {
       return (
@@ -105,7 +107,7 @@ export const createBookingService = async (bookingData) => {
   }
 
   const normalizedBrokerId = resolveIdentifier(brokerId)
-  const normalizedAssetHolderId =
+  let normalizedAssetHolderId =
     resolveIdentifier(assetHolderId) ||
     resolveIdentifier(productData?.userUUID) ||
     resolveIdentifier(productData?.userId)
@@ -124,7 +126,7 @@ export const createBookingService = async (bookingData) => {
   const slotOwner = await User.findOne({
     uuid: slot.userUUID,
     isDeleted: false,
-  }).select('role')
+  }).select('role uuid name')
 
   if (roleToSlotCategory(slotOwner?.role) !== VIEWING_SLOT_CATEGORY) {
     throw new Error('This time slot is not available for property viewing')
@@ -138,7 +140,7 @@ export const createBookingService = async (bookingData) => {
   const broker = await User.findOne(brokerQuery)
   if (!broker) throw new Error('Broker not found')
 
-  // Ensure asset holder exists
+  // Ensure asset holder exists — fall back to listing owner from DB when needed.
   let assetHolder = null
   if (normalizedAssetHolderId) {
     const assetHolderQuery = {
@@ -149,6 +151,22 @@ export const createBookingService = async (bookingData) => {
       assetHolderQuery.$or.push({ _id: normalizedAssetHolderId })
     }
     assetHolder = await User.findOne(assetHolderQuery)
+  }
+
+  if (!assetHolder) {
+    const { asset: listing } = await findAssetForBooking({ productData })
+    const ownerUUID = resolveIdentifier(listing?.userUUID)
+    if (ownerUUID) {
+      normalizedAssetHolderId = ownerUUID
+      assetHolder = await User.findOne({
+        uuid: ownerUUID,
+        isDeleted: false,
+      })
+    }
+  }
+
+  if (!assetHolder?.uuid && !normalizedAssetHolderId) {
+    throw new Error('assetHolderId is required')
   }
 
   // Mark the time slot as booked
@@ -171,27 +189,65 @@ export const createBookingService = async (bookingData) => {
     timeSlotId: timeSlotObjectId,
     timeSlotUUID: timeSlotId,
     assetHolderId: assetHolder?._id,
-    assetHolderUUID: normalizedAssetHolderId,
+    assetHolderUUID: assetHolder?.uuid || normalizedAssetHolderId,
     brokerId: broker._id,
     brokerUUID: normalizedBrokerId,
     message,
-    productData,
+    productData: {
+      ...productData,
+      userUUID:
+        productData?.userUUID ||
+        assetHolder?.uuid ||
+        normalizedAssetHolderId,
+    },
     status: 'open',
   })
 
+  const listingTitle = productData?.title || 'listing'
+  const assetType = productData?.assetType || 'property'
+  const buyerName =
+    broker?.name || broker?.displayName || broker?.email || 'A buyer'
+  const slotDate = slot?.date
+    ? moment(slot.date).format('DD MMM YYYY')
+    : ''
+  const slotTime = matchedTimeSlot?.time || ''
+
+  // Notify Trustee (slot owner), not the buyer.
   try {
-    const NotificationData = {
-      userUUID: brokerId,
-      UserRole: 'Trustee',
-      title: 'Booking',
-      message: `A new booking for trustee added.`,
-      RelateRoute: 'Trustee',
-      RelatedId: booking?._id,
-      RelatedUUID: booking?.uuid,
+    const trusteeUUID = slotOwner?.uuid || slot.userUUID
+    if (trusteeUUID) {
+      await createNotification({
+        data: {
+          userUUID: trusteeUUID,
+          UserRole: 'Trustee',
+          title: 'Viewing Booked',
+          message: `${buyerName} booked a viewing for ${listingTitle}.`,
+          RelateRoute: 'Trustee',
+          RelatedId: booking?._id,
+          RelatedUUID: booking?.uuid,
+        },
+      })
     }
-    await createNotification({ data: NotificationData })
   } catch (error) {
     console.log({ error: error?.message })
+  }
+
+  // Notify Asset Holder (dashboard + email) for property / off-plan / car / boat / jewelry.
+  try {
+    const ownerUUID = assetHolder?.uuid || normalizedAssetHolderId
+    await notifyAssetHolderViewingBooked({
+      assetHolderUUID: ownerUUID,
+      buyerName,
+      listingTitle,
+      assetType,
+      listingUUID: productData?.uuid,
+      bookingId: booking?._id,
+      bookingUUID: booking?.uuid,
+      slotDate,
+      slotTime,
+    })
+  } catch (error) {
+    console.log({ assetHolderViewingNotifyError: error?.message })
   }
 
   return { booking, broker }

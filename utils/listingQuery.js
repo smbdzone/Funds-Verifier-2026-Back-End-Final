@@ -49,7 +49,7 @@ export const LISTING_QUERY_PARAMS = new Set([
 export function applyListingStatusFilters(parseData, query) {
   if (query?.statusFilter === '1' || query?.status === '1') {
     parseData.status = 1
-  } else if (query?.status === '0') {
+  } else if (query?.statusFilter === '0' || query?.status === '0') {
     parseData.status = 0
   }
 

@@ -15,6 +15,7 @@ import {
   linkWalkthroughToListing,
   clearUnpaidPremiumOnListing,
 } from '../utils/listingPremiumSync.js'
+import { markOffPlanApprovalFeePaidFromSession } from '../helper/notifyAssetHolderListingEvents.js'
 
 export const sendServiceNotification = async (data) => {
   try {
@@ -327,6 +328,28 @@ const UpdateUserForSubscribeServices = async (req, res) => {
       return res
         .status(400)
         .json({ error: true, message: 'Payment not completed yet.' })
+    }
+
+    if (session?.metadata?.paymentType === 'off_plan_approval_fee') {
+      const listing = await markOffPlanApprovalFeePaidFromSession(session)
+      if (!listing) {
+        return res.status(404).json({
+          error: true,
+          message: 'Off-plan listing not found for this payment.',
+        })
+      }
+
+      return res.status(200).json({
+        message: 'Off-plan approval fee paid successfully.',
+        success: true,
+        payload: {
+          payment_status: 'paid',
+          amount_total: (session?.amount_total || 0) / 100,
+          currency: session?.currency,
+          paymentType: 'off_plan_approval_fee',
+          listingUuid: listing.uuid,
+        },
+      })
     }
 
     // Read metadata from session

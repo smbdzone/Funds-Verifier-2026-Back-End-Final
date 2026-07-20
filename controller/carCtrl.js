@@ -52,6 +52,10 @@ import { AssetsListingsPricing } from '../utils/AssetsListingsPricing.js'
 import { createNotification } from './notifications.controller.js'
 import { notifyEvaluatorsNewListing } from '../helper/notificationHelpers.js'
 import { notifyAssetHolderDocumentRequested } from '../helper/notifyDocumentRequested.js'
+import {
+  listingBecameEvaluatorApproved,
+  notifyAssetHolderListingApproved,
+} from '../helper/notifyAssetHolderListingEvents.js'
 import { AddPaymentJob } from '../utils/jobs/index.js'
 import UserPaymentDetails from '../models/UserPaymentDetails.js'
 import { PUBLIC_CAR_FIELDS } from '../constants/publicFields.js'
@@ -696,6 +700,18 @@ const updateProduct = asyncHandler(async (req, res) => {
             assetType: 'car',
             requesterRole: req.user?.role,
             title: 'Document Request',
+          })
+        } else if (
+          listingBecameEvaluatorApproved(product, updatedProduct)
+        ) {
+          await notifyAssetHolderListingApproved({
+            listing: {
+              ...(updatedProduct?.toObject?.() || updatedProduct),
+              _id: product._id,
+              userUUID: updatedProduct?.userUUID || product.userUUID,
+            },
+            assetType: 'car',
+            evaluator: req.user,
           })
         } else {
           const NotificationData = {

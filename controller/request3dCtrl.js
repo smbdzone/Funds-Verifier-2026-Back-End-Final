@@ -14,6 +14,10 @@ import {
   isPremiumServiceRecordPaid,
   fillListingTitleOnPremiumRecord,
 } from '../utils/listingPremiumSync.js'
+import {
+  notifyAssetHolderWalkthroughCompleted,
+  resolveListingFromPremiumRecord,
+} from '../helper/notifyAssetHolderListingEvents.js'
 
 export const createRequest = async (req, res) => {
   try {
@@ -228,6 +232,14 @@ export const updateRequest = async (req, res) => {
     const { request } = req.params
     const data = { ...req.body }
 
+    const existingRequest = await Request3D.findOne({
+      uuid: request,
+      isDeleted: false,
+    })
+    if (!existingRequest) {
+      return res.status(404).json({ message: 'Request not found' })
+    }
+
     const link =
       typeof data.link === 'string' ? data.link.trim() : ''
     if (
@@ -250,17 +262,38 @@ export const updateRequest = async (req, res) => {
 
     await linkWalkthroughToListing(updatedRequest)
 
+    const becameSuccessful =
+      existingRequest.status !== 'successful' &&
+      updatedRequest.status === 'successful'
+
     try {
-      const NotificationData = {
-        userId: updatedRequest?.userId,
-        userUUID: updatedRequest?.userUUID,
-        UserRole: 'AssetHolder',
-        title: '3D Walkthrough',
-        message: `your request for 3d walkthrough is updated.`,
-        RelateRoute: '3dWalkthrough',
-        RelatedId: updatedRequest?.productId,
+      if (becameSuccessful) {
+        const listing =
+          (await resolveListingFromPremiumRecord(updatedRequest)) || null
+        await notifyAssetHolderWalkthroughCompleted({
+          listing: listing || {
+            userUUID: updatedRequest?.userUUID || existingRequest.userUUID,
+            title:
+              updatedRequest?.productTitle || existingRequest.productTitle,
+            uuid: updatedRequest?.productUUID || existingRequest.productUUID,
+            _id: updatedRequest?.productId || existingRequest.productId,
+            assetType: updatedRequest?.assetType || existingRequest.assetType,
+          },
+          assetType: updatedRequest?.assetType || existingRequest.assetType,
+          provider: req.user || { name: updatedRequest?.name },
+        })
+      } else {
+        const NotificationData = {
+          userId: updatedRequest?.userId,
+          userUUID: updatedRequest?.userUUID,
+          UserRole: 'AssetHolder',
+          title: '3D Walkthrough',
+          message: `your request for 3d walkthrough is updated.`,
+          RelateRoute: '3dWalkthrough',
+          RelatedId: updatedRequest?.productId,
+        }
+        await createNotification({ data: NotificationData })
       }
-      await createNotification({ data: NotificationData })
     } catch (error) {
       console.log({ error: error?.message })
     }
