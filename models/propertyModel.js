@@ -13,6 +13,13 @@ const propertySchema = new mongoose.Schema({
     unique: true,
     index: true,
   },
+  /** Unique listing number issued by the DLD (Dubai Land Department). */
+  dldNumber: { type: String, default: '', trim: true },
+  /** Public visibility counters: impressions = shown on cards, clicks = detail views. */
+  analytics: {
+    impressions: { type: Number, default: 0 },
+    clicks: { type: Number, default: 0 },
+  },
 
   uploadDocument: [
     {
@@ -51,6 +58,11 @@ const propertySchema = new mongoose.Schema({
   video: { type: mongoose.Schema.Types.ObjectId, ref: 'VideoAsset' },
   thumbnailImg: { type: mongoose.Schema.Types.ObjectId, ref: 'ThumbnailImg' },
   evaluationCertificate: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'EvaluationCertificate',
+  },
+  /** Optional off-plan agency agreement PDF. */
+  agencyAgreement: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'EvaluationCertificate',
   },
@@ -145,7 +157,12 @@ const propertySchema = new mongoose.Schema({
   roi: { type: Number },
   sizeSQFT: { type: Number, default: 0 },
   sizeSQM: { type: Number, default: 0 },
+  sizeSQFTFrom: { type: Number },
+  sizeSQFTTo: { type: Number },
+  sizeSQMFrom: { type: Number },
+  sizeSQMTo: { type: Number },
   sizeUnit: { type: String, enum: ['SQFT', 'SQM'], default: 'SQFT' },
+  qrScan: { type: mongoose.Schema.Types.ObjectId, ref: 'ImageAsset' },
   propertyDescription: { type: String, maxlength: 300 },
   description: { type: String, maxlength: 300 },
   additionalDescription: { type: String, maxlength: 1000 },

@@ -12,6 +12,13 @@ const CarAdSchema = new Schema(
       unique: true,
       index: true,
     },
+    /** Unique listing number issued by the DLD (Dubai Land Department). */
+    dldNumber: { type: String, default: '', trim: true },
+    /** Public visibility counters: impressions = shown on cards, clicks = detail views. */
+    analytics: {
+      impressions: { type: Number, default: 0 },
+      clicks: { type: Number, default: 0 },
+    },
     assetType: { type: String, required: true },
     country: { type: String, required: true },
     city: { type: String, required: true },
@@ -53,6 +60,7 @@ const CarAdSchema = new Schema(
     pictures: { type: mongoose.Schema.Types.ObjectId, ref: 'ImageAsset' },
     video: { type: mongoose.Schema.Types.ObjectId, ref: 'VideoAsset' },
     thumbnailImg: { type: mongoose.Schema.Types.ObjectId, ref: 'ThumbnailImg' },
+    qrScan: { type: mongoose.Schema.Types.ObjectId, ref: 'ImageAsset' },
     transferDocuments: {
       assetTransferDocument: { type: String },
       PaymentProof: { type: String },

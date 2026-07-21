@@ -91,6 +91,8 @@ const OFF_PLAN_LAYOUT_MEDIA_KEYS = [
   'penthouseLayout',
 ]
 
+const EXTRA_IMAGE_ASSET_KEYS = ['qrScan']
+
 async function refreshListingMediaSignedUrlsImpl(doc, expiresInSeconds, signers) {
   if (!doc || typeof doc !== 'object') return doc
   await Promise.all([
@@ -98,6 +100,9 @@ async function refreshListingMediaSignedUrlsImpl(doc, expiresInSeconds, signers)
     signArray(doc?.thumbnailImg?.images, expiresInSeconds, signers),
     signArray(doc?.video?.videos, expiresInSeconds, signers),
     ...OFF_PLAN_LAYOUT_MEDIA_KEYS.map((key) =>
+      signArray(doc?.[key]?.images, expiresInSeconds, signers),
+    ),
+    ...EXTRA_IMAGE_ASSET_KEYS.map((key) =>
       signArray(doc?.[key]?.images, expiresInSeconds, signers),
     ),
   ])

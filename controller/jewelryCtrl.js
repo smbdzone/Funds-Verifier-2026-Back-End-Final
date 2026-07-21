@@ -23,6 +23,15 @@ import {
   sanitizeListingMediaResponse,
   sanitizeListingsMediaResponse,
 } from '../helper/sanitizeListingResponse.js'
+import {
+  recordListingClick,
+  recordListingImpressions,
+} from '../helper/listingAnalytics.js'
+import {
+  getListingSellersByUuid,
+  resolveListingSeller,
+  getSellerRef,
+} from '../helper/listingSellerInfo.js'
 import { attachDocumentSignedUrls } from '../helper/attachDocumentSignedUrls.js'
 import {
   REQUEST_DOCUMENT_POPULATE,
@@ -216,7 +225,7 @@ const getSingleProduct = asyncHandler(async (req, res) => {
     const jewelry = await Jewelry.findOne(lookupQuery)
       .populate('pictures')
       .populate('video')
-      .populate('thumbnailImg')
+      .populate('thumbnailImg').populate('qrScan')
       .populate('video3DWalkthrough')
       .populate('uploadDocument')
       .populate(REQUEST_DOCUMENT_POPULATE)
@@ -250,10 +259,16 @@ const getSingleProduct = asyncHandler(async (req, res) => {
 
     // 🔒 Public / non-privileged users
     if (!isPrivilegedUser) {
+      recordListingClick(Jewelry, jewelry)
       const publicJewelry = pickFields(
         jewelry,
         PUBLIC_JEWELRY_FIELDS.trim().split(/\s+/),
       )
+      const sellersByUuid = await getListingSellersByUuid([jewelry])
+      const seller = resolveListingSeller(jewelry, sellersByUuid)
+      if (seller) {
+        publicJewelry.sellerRef = getSellerRef(seller)
+      }
       sanitizeListingMediaResponse(publicJewelry)
       sanitizeUnpaidPremiumServicesForClient(publicJewelry)
       return res.json(publicJewelry)
@@ -360,6 +375,8 @@ const getAllProduct = asyncHandler(async (req, res) => {
     .populate({ path: 'pictures', select: '-_id' })
     .populate({ path: 'video', select: '-_id' })
     .populate({ path: 'thumbnailImg', select: '-_id' })
+    .populate({ path: 'qrScan', select: '-_id' })
+    .populate({ path: 'userId', select: 'profileImage name uuid' })
     .populate({ path: 'ratings.postedBy', select: '-_id' })
     .populate({ path: 'evaluationCertificate', select: '-_id' })
     .populate({ path: 'video3DWalkthrough', select: '-_id' })
@@ -415,9 +432,15 @@ const getAllProduct = asyncHandler(async (req, res) => {
   /* ===================== EXECUTION ===================== */
   const products = await query
 
+  if (isPublicUser) {
+    recordListingImpressions(Jewelry, products)
+  }
+
   // Post-find hook on Jewelry model already refreshed signed URLs on populated
   // media; re-run as a safety net for non-hooked paths (e.g. legacy lean).
   await refreshListingsMediaSignedUrls(products)
+
+  const sellersByUuid = await getListingSellersByUuid(products)
 
   const modifiedProducts = await Promise.all(
     products.map(async (product) => {
@@ -428,6 +451,21 @@ const getAllProduct = asyncHandler(async (req, res) => {
           : 0
 
       const obj = product.toObject()
+
+      // Seller avatar for cards; strip other user fields for public callers
+      const seller = resolveListingSeller(obj, sellersByUuid)
+      if (seller) {
+        obj.sellerAvatar = seller.profileImage || ''
+        obj.sellerName = seller.name || ''
+        obj.sellerRef = getSellerRef(seller)
+        if (isPublicUser) {
+          obj.userId = {
+            profileImage: seller.profileImage || '',
+            name: seller.name || '',
+          }
+        }
+      }
+
       if (isPublicUser) {
         await attachDocumentSignedUrls(obj, {
           fields: ['evaluationCertificate', 'technicalReport'],
@@ -503,7 +541,7 @@ const getAllProductByFilter = asyncHandler(async (req, res) => {
   let query = Jewelry.find(modifiedQuery)
     .populate('pictures')
     .populate('video')
-    .populate('thumbnailImg')
+    .populate('thumbnailImg').populate('qrScan')
     .populate('evaluationCertificate')
     .populate('uploadDocument')
     .populate('invoice')

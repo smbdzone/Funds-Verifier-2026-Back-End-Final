@@ -23,6 +23,15 @@ import {
   sanitizeListingMediaResponse,
   sanitizeListingsMediaResponse,
 } from '../helper/sanitizeListingResponse.js'
+import {
+  recordListingClick,
+  recordListingImpressions,
+} from '../helper/listingAnalytics.js'
+import {
+  getListingSellersByUuid,
+  resolveListingSeller,
+  getSellerRef,
+} from '../helper/listingSellerInfo.js'
 import { attachDocumentSignedUrls } from '../helper/attachDocumentSignedUrls.js'
 import {
   REQUEST_DOCUMENT_POPULATE,
@@ -230,7 +239,7 @@ const getSingleProduct = asyncHandler(async (req, res) => {
       .populate('video')
       .populate('uploadDocument')
       .populate(REQUEST_DOCUMENT_POPULATE)
-      .populate('thumbnailImg')
+      .populate('thumbnailImg').populate('qrScan')
       .populate('video3DWalkthrough')
       .populate('transactionDepositDocument')
       .populate('transactionId')
@@ -260,7 +269,13 @@ const getSingleProduct = asyncHandler(async (req, res) => {
 
     // Public user → return limited fields
     if (!isPrivilegedUser) {
+      recordListingClick(Boat, boat)
       const publicBoat = pickFields(boat, PUBLIC_BOAT_FIELDS.trim().split(/\s+/))
+      const sellersByUuid = await getListingSellersByUuid([boat])
+      const seller = resolveListingSeller(boat, sellersByUuid)
+      if (seller) {
+        publicBoat.sellerRef = getSellerRef(seller)
+      }
       sanitizeListingMediaResponse(publicBoat)
       sanitizeUnpaidPremiumServicesForClient(publicBoat)
       return res.json(publicBoat)
@@ -293,7 +308,7 @@ const getSingleProductBySlug = asyncHandler(async (req, res) => {
       .select(isPrivilegedUser ? '' : PUBLIC_BOAT_FIELDS)
       .populate('pictures')
       .populate('video')
-      .populate('thumbnailImg')
+      .populate('thumbnailImg').populate('qrScan')
       .populate('video3DWalkthrough')
 
     if (!boat) {
@@ -301,6 +316,11 @@ const getSingleProductBySlug = asyncHandler(async (req, res) => {
     }
 
     const boatObj = typeof boat.toObject === 'function' ? boat.toObject() : boat
+    const sellersByUuid = await getListingSellersByUuid([boatObj])
+    const seller = resolveListingSeller(boatObj, sellersByUuid)
+    if (seller) {
+      boatObj.sellerRef = getSellerRef(seller)
+    }
     await refreshListingMediaSignedUrls(boatObj)
     sanitizeListingMediaResponse(boatObj)
 
@@ -427,7 +447,9 @@ const getAllProduct = asyncHandler(async (req, res) => {
       .populate({ path: 'pictures', select: '-_id' })
       .populate({ path: 'video', select: '-_id' })
       .populate({ path: 'thumbnailImg', select: '-_id' })
+      .populate({ path: 'qrScan', select: '-_id' })
       .populate({ path: 'video3DWalkthrough', select: '-_id' })
+      .populate({ path: 'userId', select: 'profileImage name uuid' })
       .populate({ path: 'evaluationCertificate', select: '-_id' })
       .populate({
         path: 'technicalReport',
@@ -469,9 +491,27 @@ const getAllProduct = asyncHandler(async (req, res) => {
     query = query.skip(skip).limit(limit)
 
     const productsRaw = await query
-    const products = productsRaw.map((p) =>
-      typeof p.toObject === 'function' ? p.toObject() : p,
-    )
+    const sellersByUuid = await getListingSellersByUuid(productsRaw)
+    const products = productsRaw.map((p) => {
+      const obj = typeof p.toObject === 'function' ? p.toObject() : p
+      // Seller avatar for cards; strip other user fields for public callers
+      const seller = resolveListingSeller(obj, sellersByUuid)
+      if (seller) {
+        obj.sellerAvatar = seller.profileImage || ''
+        obj.sellerName = seller.name || ''
+        obj.sellerRef = getSellerRef(seller)
+        if (!user) {
+          obj.userId = {
+            profileImage: seller.profileImage || '',
+            name: seller.name || '',
+          }
+        }
+      }
+      return obj
+    })
+    if (!user) {
+      recordListingImpressions(Boat, products)
+    }
     await refreshListingsMediaSignedUrls(products)
     await Promise.all(
       products.map((p) =>
@@ -573,7 +613,7 @@ const getAllProductByFilter = asyncHandler(async (req, res) => {
   let query = Boat.find(modifiedQuery)
     .populate('pictures')
     .populate('video')
-    .populate('thumbnailImg')
+    .populate('thumbnailImg').populate('qrScan')
     .populate('evaluationCertificate')
     .populate('invoice')
     .populate('uploadDocument')

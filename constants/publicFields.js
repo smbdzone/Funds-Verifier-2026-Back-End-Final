@@ -2,6 +2,7 @@ export const PUBLIC_PROPERTY_FIELDS = `
   slug
   title
   uuid
+  dldNumber
   images
   thumbnailImg
   video
@@ -13,8 +14,14 @@ export const PUBLIC_PROPERTY_FIELDS = `
   roi
   sizeSQFT
   sizeSQM
+  sizeSQFTFrom
+  sizeSQFTTo
+  sizeSQMFrom
+  sizeSQMTo
   sizeUnit
   sizeType
+  qrScan
+  userId
   propertyDescription
   description
   additionalDescription
@@ -54,6 +61,8 @@ export const PUBLIC_PROPERTY_FIELDS = `
 
 export const PUBLIC_CAR_FIELDS = `
   uuid
+  dldNumber
+  userId
   assetType
   country
   city
@@ -91,12 +100,15 @@ export const PUBLIC_CAR_FIELDS = `
   video
   pictures
   thumbnailImg
+  qrScan
   evaluationCertificate
   technicalReport
   video3DWalkthrough
 `
 export const PUBLIC_BOAT_FIELDS = `
 uuid 
+dldNumber
+userId
 assetType 
 country 
 city 
@@ -110,6 +122,7 @@ evaluationPrices
 pictures
  video 
  thumbnailImg 
+ qrScan
  video3DWalkthrough
 description 
 ratings
@@ -137,6 +150,8 @@ userUUID
 
 export const PUBLIC_JEWELRY_FIELDS = `
   uuid
+  dldNumber
+  userId
   assetType
   country
   city 
@@ -159,6 +174,7 @@ export const PUBLIC_JEWELRY_FIELDS = `
   pictures
   video
   thumbnailImg
+  qrScan
   video3DWalkthrough
   ratings
   status

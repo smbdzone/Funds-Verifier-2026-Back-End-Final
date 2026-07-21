@@ -22,6 +22,15 @@ import {
   sanitizeListingMediaResponse,
   sanitizeListingsMediaResponse,
 } from '../helper/sanitizeListingResponse.js'
+import {
+  recordListingClick,
+  recordListingImpressions,
+} from '../helper/listingAnalytics.js'
+import {
+  getListingSellersByUuid,
+  resolveListingSeller,
+  getSellerRef,
+} from '../helper/listingSellerInfo.js'
 import { attachDocumentSignedUrls } from '../helper/attachDocumentSignedUrls.js'
 import {
   REQUEST_DOCUMENT_POPULATE,
@@ -213,7 +222,7 @@ const getSingleProduct = asyncHandler(async (req, res) => {
     const car = await Car.findOne(lookupQuery)
       .populate('pictures')
       .populate('video')
-      .populate('thumbnailImg')
+      .populate('thumbnailImg').populate('qrScan')
       .populate('video3DWalkthrough')
       .populate('uploadDocument')
       .populate(REQUEST_DOCUMENT_POPULATE)
@@ -243,7 +252,13 @@ const getSingleProduct = asyncHandler(async (req, res) => {
       )
 
     if (!isPrivilegedUser) {
+      recordListingClick(Car, car)
       const publicCar = pickFields(car, PUBLIC_CAR_FIELDS.trim().split(/\s+/))
+      const sellersByUuid = await getListingSellersByUuid([car])
+      const seller = resolveListingSeller(car, sellersByUuid)
+      if (seller) {
+        publicCar.sellerRef = getSellerRef(seller)
+      }
       sanitizeListingMediaResponse(publicCar)
       sanitizeUnpaidPremiumServicesForClient(publicCar)
       return res.json(publicCar)
@@ -369,8 +384,10 @@ const getAllProduct = asyncHandler(async (req, res) => {
     .populate({ path: 'pictures', select: '-_id' })
     .populate({ path: 'video', select: '-_id' })
     .populate({ path: 'thumbnailImg', select: '-_id' })
+    .populate({ path: 'qrScan', select: '-_id' })
     .populate({ path: 'evaluationCertificate', select: '-_id' })
     .populate({ path: 'video3DWalkthrough', select: '-_id' })
+    .populate({ path: 'userId', select: 'profileImage name uuid' })
     .populate({
       path: 'technicalReport',
       populate: { path: 'reportFile', select: '-_id' },
@@ -400,9 +417,15 @@ const getAllProduct = asyncHandler(async (req, res) => {
   const total = await Car.countDocuments(parseData)
   const products = await query.skip(skip).limit(limit)
 
+  if (!isAuthenticated) {
+    recordListingImpressions(Car, products)
+  }
+
   // Post-find hook on Car model already refreshed signed URLs on populated
   // media; re-run as a safety net for non-hooked paths (e.g. legacy lean).
   await refreshListingsMediaSignedUrls(products)
+
+  const sellersByUuid = await getListingSellersByUuid(products)
 
   // ---------------- RESPONSE SANITIZATION ----------------
   const finalProducts = await Promise.all(
@@ -412,6 +435,20 @@ const getAllProduct = asyncHandler(async (req, res) => {
       // ratings → stars only for public
       if (!isAuthenticated && Array.isArray(obj.ratings)) {
         obj.ratings = obj.ratings.map((r) => ({ star: r.star }))
+      }
+
+      // Seller avatar for cards; strip other user fields for public callers
+      const seller = resolveListingSeller(obj, sellersByUuid)
+      if (seller) {
+        obj.sellerAvatar = seller.profileImage || ''
+        obj.sellerName = seller.name || ''
+        obj.sellerRef = getSellerRef(seller)
+        if (!isAuthenticated) {
+          obj.userId = {
+            profileImage: seller.profileImage || '',
+            name: seller.name || '',
+          }
+        }
       }
 
       if (isAuthenticated) {
@@ -526,7 +563,7 @@ const getAllProductByFilter = asyncHandler(async (req, res) => {
   let query = Car.find(modifiedQuery)
     .populate('pictures')
     .populate('video')
-    .populate('thumbnailImg')
+    .populate('thumbnailImg').populate('qrScan')
     .populate('uploadDocument')
     .populate('evaluationCertificate')
     .populate('invoice')

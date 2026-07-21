@@ -48,6 +48,15 @@ import {
   sanitizeListingsMediaResponse,
 } from '../helper/sanitizeListingResponse.js'
 import {
+  recordListingClick,
+  recordListingImpressions,
+} from '../helper/listingAnalytics.js'
+import {
+  getListingSellersByUuid,
+  resolveListingSeller,
+  getSellerRef,
+} from '../helper/listingSellerInfo.js'
+import {
   getSafeStringParam,
   getSafeTitleRegex,
   pickScalarFilters,
@@ -242,8 +251,10 @@ const getSingleProperty = asyncHandler(async (req, res) => {
         populate: { path: 'reportFile' },
       })
       .populate('evaluationCertificate')
+      .populate('agencyAgreement')
       .populate('unitLayout')
       .populate('floorPlan')
+      .populate('qrScan')
       .lean()
 
     if (!property) {
@@ -263,8 +274,20 @@ const getSingleProperty = asyncHandler(async (req, res) => {
       )
 
     if (!isPrivilegedUser) {
+      recordListingClick(Property, property)
       const publicFields = PUBLIC_PROPERTY_FIELDS.trim().split(/\s+/)
       const publicProperty = filterPublicFields(property, publicFields)
+      const sellersByUuid = await getListingSellersByUuid([property])
+      const seller = resolveListingSeller(property, sellersByUuid)
+      if (seller) {
+        publicProperty.sellerAvatar = seller.profileImage || ''
+        publicProperty.sellerName = seller.name || ''
+        publicProperty.sellerRef = getSellerRef(seller)
+        publicProperty.userId = {
+          profileImage: seller.profileImage || '',
+          name: seller.name || '',
+        }
+      }
       sanitizeListingMediaResponse(publicProperty)
       sanitizeUnpaidPremiumServicesForClient(publicProperty)
       return res.json(publicProperty)
@@ -430,10 +453,13 @@ const getAllProduct = asyncHandler(async (req, res) => {
       .populate({ path: 'thumbnailImg', select: '-_id' })
       .populate({ path: 'unitLayout', select: '-_id' })
       .populate({ path: 'floorPlan', select: '-_id' })
+      .populate({ path: 'qrScan', select: '-_id' })
+      .populate({ path: 'userId', select: 'profileImage name uuid' })
 
     if (isAuthenticated) {
       query = query
         .populate({ path: 'evaluationCertificate', select: '-_id' })
+        .populate({ path: 'agencyAgreement', select: '-_id' })
         .populate({ path: 'uploadDocument', select: '-_id' })
         .populate(REQUEST_DOCUMENT_POPULATE)
         .populate({ path: 'invoice', select: '-_id' })
@@ -472,9 +498,15 @@ const getAllProduct = asyncHandler(async (req, res) => {
     const total = await Property.countDocuments(parseData)
     const products = await query.skip(skip).limit(limit)
 
+    if (!isAuthenticated) {
+      recordListingImpressions(Property, products)
+    }
+
     // Post-find hook on Property model already refreshed signed URLs on
     // populated media; re-run as a safety net for non-hooked paths.
     await refreshListingsMediaSignedUrls(products)
+
+    const sellersByUuid = await getListingSellersByUuid(products)
 
     // ------------------ RESPONSE SANITIZATION ------------------
     // Doc-signing is async (it may hit S3 presign for non-image buckets), so
@@ -490,6 +522,14 @@ const getAllProduct = asyncHandler(async (req, res) => {
             ? obj.reviews.reduce((a, c) => a + c.ratingNumber, 0) / reviewCount
             : 0
 
+        // Seller avatar for cards (populated userId or userUUID fallback)
+        const seller = resolveListingSeller(obj, sellersByUuid)
+        if (seller) {
+          obj.sellerAvatar = seller.profileImage || ''
+          obj.sellerName = seller.name || ''
+          obj.sellerRef = getSellerRef(seller)
+        }
+
         // 🔥 REMOVE SENSITIVE FIELDS FOR PUBLIC
         if (!isAuthenticated) {
           delete obj.evaluationCertificate
@@ -497,6 +537,12 @@ const getAllProduct = asyncHandler(async (req, res) => {
           delete obj.invoice
           delete obj.technicalReport
           delete obj.userUUID
+
+          // Keep seller avatar for cards; strip other user fields
+          obj.userId = {
+            profileImage: seller?.profileImage || '',
+            name: seller?.name || '',
+          }
 
           // ratings → stars only
           if (Array.isArray(obj.ratings)) {
@@ -590,6 +636,8 @@ const getAllProductByFilter = asyncHandler(async (req, res) => {
     .populate('video3DWalkthrough')
     .populate('unitLayout')
     .populate('floorPlan')
+    .populate('qrScan')
+    .populate({ path: 'userId', select: 'profileImage name uuid' })
     .populate({
       path: 'technicalReport',
       populate: { path: 'reportFile' },
@@ -627,10 +675,21 @@ const getAllProductByFilter = asyncHandler(async (req, res) => {
 
   try {
     const allProductRaw = await query
-    const allProduct = allProductRaw.map((p) =>
-      typeof p.toObject === 'function' ? p.toObject() : p,
-    )
+    const sellersByUuid = await getListingSellersByUuid(allProductRaw)
+    const allProduct = allProductRaw.map((p) => {
+      const obj = typeof p.toObject === 'function' ? p.toObject() : p
+      const seller = resolveListingSeller(obj, sellersByUuid)
+      if (seller) {
+        obj.sellerAvatar = seller.profileImage || ''
+        obj.sellerName = seller.name || ''
+        obj.sellerRef = getSellerRef(seller)
+      }
+      return obj
+    })
     await refreshListingsMediaSignedUrls(allProduct)
+    if (!userId) {
+      recordListingImpressions(Property, allProduct)
+    }
     // Listing cards need fresh `signedUrl` on evaluation certificate / technical
     // report. Authenticated users also get uploadDocument + invoice when present.
     await Promise.all(
@@ -1077,6 +1136,7 @@ const getOffPlanRequests = asyncHandler(async (req, res) => {
         .limit(limit)
         .populate({ path: 'pictures', select: '-_id' })
         .populate({ path: 'thumbnailImg', select: '-_id' })
+        .populate({ path: 'agencyAgreement', select: '-_id' })
         .populate(REQUEST_DOCUMENT_POPULATE)
         .select('-__v')
         .lean(),
@@ -1090,6 +1150,8 @@ const getOffPlanRequests = asyncHandler(async (req, res) => {
         product.requestDocument,
       )
       await attachRequestDocumentSignedUrls(product)
+      await attachDocumentSignedUrls(product, { fields: ['agencyAgreement'] })
+      sanitizeListingMediaResponse(product)
     }
 
     res.json({
@@ -1335,6 +1397,55 @@ const requestOffPlanApprovalFee = asyncHandler(async (req, res) => {
   }
 })
 
+/** Super Admin: attach or clear optional agency agreement PDF on an off-plan listing. */
+const updateOffPlanAgencyAgreement = asyncHandler(async (req, res) => {
+  try {
+    const { moduleId } = req.params
+    const product = await Property.findOne(buildListingIdQuery(moduleId))
+
+    if (!product) {
+      return res.status(404).json({ message: 'Off-plan listing not found' })
+    }
+
+    if (!isOffPlanAssetType(product.assetType)) {
+      return res
+        .status(400)
+        .json({ message: 'Only off-plan listings can be updated here' })
+    }
+
+    if (!Object.prototype.hasOwnProperty.call(req.body || {}, 'agencyAgreement')) {
+      return res.status(400).json({ message: 'agencyAgreement is required' })
+    }
+
+    const nextValue = req.body.agencyAgreement
+    product.agencyAgreement =
+      nextValue === null || nextValue === '' || nextValue === undefined
+        ? null
+        : nextValue
+
+    await product.save()
+
+    const updated = await Property.findById(product._id)
+      .populate({ path: 'agencyAgreement', select: '-_id' })
+      .lean()
+
+    await attachDocumentSignedUrls(updated, { fields: ['agencyAgreement'] })
+    sanitizeListingMediaResponse(updated)
+
+    res.json({
+      message: product.agencyAgreement
+        ? 'Agency agreement saved.'
+        : 'Agency agreement removed.',
+      product: updated,
+    })
+  } catch (error) {
+    res.status(500).json({
+      message: 'Could not update agency agreement',
+      error: error.message,
+    })
+  }
+})
+
 export {
   createProduct,
   //  getSingleProduct,
@@ -1352,4 +1463,5 @@ export {
   updateOffPlanRequestStatus,
   requestOffPlanDocuments,
   requestOffPlanApprovalFee,
+  updateOffPlanAgencyAgreement,
 }

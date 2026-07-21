@@ -17,6 +17,7 @@ import {
   updateOffPlanRequestStatus,
   requestOffPlanDocuments,
   requestOffPlanApprovalFee,
+  updateOffPlanAgencyAgreement,
 } from '../controller/propertyCtrl.js'
 import {
   authMiddleware,
@@ -60,6 +61,12 @@ router.patch(
   authMiddleware,
   isAdmin,
   requestOffPlanApprovalFee,
+)
+router.patch(
+  '/admin/offplan/:moduleId/agency-agreement',
+  authMiddleware,
+  isAdmin,
+  updateOffPlanAgencyAgreement,
 )
 router.put('/rating', ...listingReadAccess, addRating)
 router.put('/:moduleId', authMiddleware, assetHolderUpdate, updateProduct)

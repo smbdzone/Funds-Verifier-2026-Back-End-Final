@@ -70,6 +70,7 @@ export function sanitizeListingMediaResponse(doc) {
   }
 
   sanitizeDocumentWrapper(doc.evaluationCertificate)
+  sanitizeDocumentWrapper(doc.agencyAgreement)
   sanitizeDocumentWrapper(doc.technicalReport)
   sanitizeDocumentWrapper(doc.invoice)
 
