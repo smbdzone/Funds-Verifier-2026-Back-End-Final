@@ -28,15 +28,20 @@ function listingQueryFromPremiumRecord(record) {
   return null
 }
 
-/** Do not let PUT /property wipe premium refs when body sends null (legacy frontend). */
+/** Do not let create/update wipe or cast empty ObjectId refs (legacy frontend sends ""). */
 export function stripNullPremiumRefs(body) {
   if (!body || typeof body !== 'object') return body
   for (const key of [
     'technicalReport',
     'video3DWalkthrough',
     'evaluationCertificate',
+    'video',
+    'qrScan',
+    'pictures',
+    'thumbnailImg',
+    'agencyAgreement',
   ]) {
-    if (body[key] === null || body[key] === '') {
+    if (body[key] === null || body[key] === '' || body[key] === undefined) {
       delete body[key]
     }
   }

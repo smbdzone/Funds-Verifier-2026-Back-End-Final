@@ -13,8 +13,27 @@ export function normalizeRequestDocumentEntry(entry) {
   if (typeof entry === 'object') {
     const name = (entry.name || '').trim()
     if (!name) return null
-    const document =
-      entry.document?._id || entry.document || entry.documentId || null
+
+    const rawDoc = entry.document ?? entry.documentId ?? null
+    let document = null
+    if (rawDoc && typeof rawDoc === 'object') {
+      // Keep populated DocumentAsset objects so signed URLs / Certificate stay
+      // available for View/download. Only unwrap bare `{ _id }` refs.
+      if (
+        rawDoc.Certificate ||
+        rawDoc.signedUrl ||
+        rawDoc.url ||
+        rawDoc.s3Key ||
+        rawDoc.uuid
+      ) {
+        document = rawDoc
+      } else {
+        document = rawDoc._id || null
+      }
+    } else {
+      document = rawDoc || null
+    }
+
     const date = entry.date ? new Date(entry.date) : null
     const uploadedAt = entry.uploadedAt ? new Date(entry.uploadedAt) : null
     return {
