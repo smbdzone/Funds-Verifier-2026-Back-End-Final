@@ -24,6 +24,8 @@ const JewelryAdSchema = new Schema(
 
     city: { type: String, required: true },
     neighbourhood: { type: String, required: true },
+    /** Optional Google Maps share/embed URL shown on the listing. */
+    mapUrl: { type: String, default: '', trim: true },
     make: { type: String },
     grams: { type: String },
     priceRange: String,

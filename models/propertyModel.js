@@ -47,6 +47,8 @@ const propertySchema = new mongoose.Schema({
   city: { type: String, required: true },
   phoneNumber: { type: Number, required: true },
   neighbourhood: { type: String, required: true },
+  /** Optional Google Maps share/embed URL shown on the listing. */
+  mapUrl: { type: String, default: '', trim: true },
   propertyType: { type: String, required: true },
   propertyForSale: { type: String },
   evaluationDateTime: { type: Date, required: false },
@@ -130,6 +132,8 @@ const propertySchema = new mongoose.Schema({
   advertisementId: { type: String },
   deliveryQuarter: { type: String },
   deliveryYear: { type: String },
+  /** Off-plan payment split badge, e.g. "20/80". */
+  paymentPlanType: { type: String, default: '', trim: true },
   sizeType: { type: String },
   layout: { type: String },
   numberOfFloors: { type: String },

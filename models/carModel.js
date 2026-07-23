@@ -23,6 +23,8 @@ const CarAdSchema = new Schema(
     country: { type: String, required: true },
     city: { type: String, required: true },
     neighbourhood: { type: String, required: true },
+    /** Optional Google Maps share/embed URL shown on the listing. */
+    mapUrl: { type: String, default: '', trim: true },
     make: { type: String, required: true },
     category: { type: String },
     model: { type: String },

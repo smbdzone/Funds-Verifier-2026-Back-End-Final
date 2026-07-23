@@ -30,6 +30,7 @@ export const PUBLIC_PROPERTY_FIELDS = `
   developer
   bathrooms
   isFurnished
+  occupancyStatus
   isfeatured
   facilities
   ratings
@@ -43,6 +44,7 @@ export const PUBLIC_PROPERTY_FIELDS = `
   propertyForLease
   listing
   neighbourhood
+  mapUrl
   country
   city
   userUUID
@@ -51,8 +53,10 @@ export const PUBLIC_PROPERTY_FIELDS = `
   thumbnailImg
   deliveryQuarter
   deliveryYear
+  paymentPlanType
   layout
   numberOfFloors
+  availableApartment
   paymentPlan
   unitLayout
   floorPlan
@@ -67,6 +71,7 @@ export const PUBLIC_CAR_FIELDS = `
   country
   city
   neighbourhood
+  mapUrl
   make
   category
   model
@@ -113,6 +118,7 @@ assetType
 country 
 city 
 neighbourhood 
+mapUrl
 category 
 model
 title 
@@ -140,6 +146,7 @@ age
 usage
 locateBoat
 seats
+extras
 userUUID
   video
   pictures
@@ -156,6 +163,7 @@ export const PUBLIC_JEWELRY_FIELDS = `
   country
   city 
   neighbourhood
+  mapUrl
   category
   model
   title
