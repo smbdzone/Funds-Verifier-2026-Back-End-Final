@@ -33,6 +33,14 @@ function sanitizeMediaArray(arr) {
   for (const entry of arr) stripFields(entry, RISKY_MEDIA_FIELDS)
 }
 
+/** Keep unsigned `url` as fallback for QR thumbs if signing fails. */
+function sanitizeQrMediaArray(arr) {
+  if (!Array.isArray(arr)) return
+  for (const entry of arr) {
+    stripFields(entry, ['s3Bucket', 's3Key', 's3VersionId', 's3ETag'])
+  }
+}
+
 function sanitizeDocumentWrapper(doc) {
   if (!doc || typeof doc !== 'object') return
   // Document docs (EvaluationCertificate, DealHunterDoc) wrap their S3 fields
@@ -64,6 +72,7 @@ export function sanitizeListingMediaResponse(doc) {
   sanitizeMediaArray(doc?.pictures?.images)
   sanitizeMediaArray(doc?.thumbnailImg?.images)
   sanitizeMediaArray(doc?.video?.videos)
+  sanitizeQrMediaArray(doc?.qrScan?.images)
 
   for (const key of OFF_PLAN_LAYOUT_MEDIA_KEYS) {
     sanitizeMediaArray(doc?.[key]?.images)
