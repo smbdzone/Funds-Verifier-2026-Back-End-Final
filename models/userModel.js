@@ -73,6 +73,7 @@ const userSchema = new Schema(
         'TechnicalReport',
         '3dWalkthrough',
         'Advertiser',
+        'Developer',
       ],
       required: true,
     },
@@ -104,6 +105,21 @@ const userSchema = new Schema(
         default: 'Pending',
         enum: ['Pending', 'Approved'],
       },
+    },
+    // Corporate KYC for Developer / Corporate accounts
+    developerKyc: {
+      companyName: { type: String },
+      username: { type: String },
+      jurisdiction: { type: String },
+      tradeLicenseNumber: { type: String },
+      status: {
+        type: String,
+        enum: ['NotStarted', 'Submitted', 'Pending', 'Approved', 'Rejected'],
+        default: 'NotStarted',
+      },
+      submittedAt: { type: Date },
+      reviewedAt: { type: Date },
+      reviewNote: { type: String },
     },
     personalDetails: {
       residenceStatus: String,

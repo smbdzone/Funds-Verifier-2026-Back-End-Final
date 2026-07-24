@@ -1,9 +1,11 @@
+import { normalizePersonFullName } from './parseUaePassName.js'
+
 const EID_PATTERN = /^784-\d{4}-\d{7}-\d$/
 
 export function sanitizeEmiratesIdPayload(raw) {
   if (!raw || typeof raw !== 'object') return null
 
-  const fullName = String(raw.fullName || '').trim().slice(0, 200)
+  const fullName = normalizePersonFullName(raw.fullName || '').slice(0, 200)
   const number = String(raw.number || '').trim().slice(0, 30)
   let expiryDate = raw.expiryDate
 
@@ -32,7 +34,7 @@ export function sanitizeEmiratesIdPayload(raw) {
 export function isEmiratesIdComplete(user) {
   return Boolean(
     user?.emiratesId?.fullName?.trim() &&
-      user?.emiratesId?.number?.trim() &&
-      user?.emiratesId?.expiryDate,
+    user?.emiratesId?.number?.trim() &&
+    user?.emiratesId?.expiryDate,
   )
 }

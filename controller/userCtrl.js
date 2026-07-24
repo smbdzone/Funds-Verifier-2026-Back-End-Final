@@ -104,7 +104,20 @@ const DEFAULT_PUBLIC_ROLE = 'DealHunter'
 const PUBLIC_SIGNUP_ROLES = ['DealHunter', 'AssetHolder']
 // Roles a member of the public may self-assign at signup (UAE Pass / email).
 // Kept separate from PUBLIC_SIGNUP_ROLES so the buyer/seller role-switch stays limited.
-const SELF_SIGNUP_ROLES = ['DealHunter', 'AssetHolder', 'Advertiser']
+const SELF_SIGNUP_ROLES = [
+  'DealHunter',
+  'AssetHolder',
+  'Advertiser',
+  'Developer',
+]
+
+const DEVELOPER_KYC_REQUIRED_DOCS = [
+  'Trade License',
+  'Certificate of Incorporation',
+  'MOA',
+  'UBO Passport',
+  'Authorized Signer ID',
+]
 
 /**
  * Same token sources as authMiddleware: Bearer header or accessToken cookie.
@@ -169,7 +182,7 @@ const resolveSignupRole = ({ requestedRole, creator, tokenPresent }) => {
         ok: false,
         status: 400,
         message:
-          'Public signup is only available for DealHunter, AssetHolder or Advertiser',
+          'Public signup is only available for DealHunter, AssetHolder, Advertiser or Developer',
       }
     }
     return { ok: true, role: normalizedRequestedRole }
@@ -359,6 +372,7 @@ const storeUserThroughUaePass = asyncHandler(async (req, res) => {
     let user = await User.findOne({ email: sanitizedEmail, isDeleted: false })
 
     if (!user) {
+      const isDeveloper = roleDecision.role === 'Developer'
       user = new User({
         name: normalizedName,
         email: sanitizedEmail,
@@ -368,7 +382,14 @@ const storeUserThroughUaePass = asyncHandler(async (req, res) => {
         userType,
         lastname: normalizedLastname,
         isEmailVerified: true,
-        userState: 'active',
+        userState: isDeveloper ? 'inactive' : 'active',
+        ...(isDeveloper
+          ? {
+            developerKyc: {
+              status: 'NotStarted',
+            },
+          }
+          : {}),
       })
       await user.save()
     } else if (
@@ -424,6 +445,10 @@ const createUser = asyncHandler(async (req, res) => {
     userType,
     uuid,
     lastname,
+    companyName,
+    username,
+    jurisdiction,
+    tradeLicenseNumber,
   } = req.body
 
   try {
@@ -493,6 +518,27 @@ const createUser = asyncHandler(async (req, res) => {
     const salt = await bcrypt.genSalt(10)
     const hashedPassword = await bcrypt.hash(password, salt)
 
+    const isDeveloper = roleDecision.role === 'Developer'
+    const resolvedUsername = username ? String(username).trim() : ''
+    if (isDeveloper) {
+      if (!resolvedUsername) {
+        return res.status(400).json({
+          success: false,
+          message: 'Username is required for Developer accounts',
+        })
+      }
+      const usernameTaken = await User.findOne({
+        'developerKyc.username': resolvedUsername,
+        isDeleted: false,
+      })
+      if (usernameTaken) {
+        return res.status(400).json({
+          success: false,
+          message: 'Username is already taken',
+        })
+      }
+    }
+
     const newUser = new User({
       name: resolvedName,
       email: sanitizedEmail,
@@ -501,7 +547,7 @@ const createUser = asyncHandler(async (req, res) => {
       profileImage,
       phone,
       city,
-      country,
+      country: country || (isDeveloper && jurisdiction ? String(jurisdiction).trim() : undefined),
       parentEvaluator:
         creator?.role === 'Evaluator' && roleDecision.role === 'Sub-Evaluator'
           ? String(creator.uuid || creator._id)
@@ -509,6 +555,24 @@ const createUser = asyncHandler(async (req, res) => {
       userType,
       uuid: resolvedUuid,
       lastname: resolvedLastname,
+      ...(isDeveloper
+        ? {
+          userState: 'inactive',
+          developerKyc: {
+            username: resolvedUsername,
+            ...(companyName
+              ? { companyName: String(companyName).trim() }
+              : {}),
+            ...(jurisdiction
+              ? { jurisdiction: String(jurisdiction).trim() }
+              : {}),
+            ...(tradeLicenseNumber
+              ? { tradeLicenseNumber: String(tradeLicenseNumber).trim() }
+              : {}),
+            status: 'NotStarted',
+          },
+        }
+        : {}),
     })
 
     await newUser.save()
@@ -562,6 +626,7 @@ const createUser = asyncHandler(async (req, res) => {
       role: newUser.role,
       profileImage: newUser.profileImage,
       parentEvaluator: newUser.parentEvaluator,
+      developerKyc: newUser.developerKyc,
       message: 'Registration successful!',
     })
   } catch (error) {
@@ -1116,6 +1181,9 @@ const updateUser = asyncHandler(async (req, res) => {
     const updatePayload = { ...req.body }
     // Role changes are not allowed from profile update endpoint for any user.
     delete updatePayload.role
+    // Developers cannot self-approve KYC via profile update.
+    delete updatePayload.developerKyc
+    delete updatePayload.userState
 
     if (updatePayload.emiratesId) {
       try {
@@ -1442,6 +1510,236 @@ const updateTargetingProfile = asyncHandler(async (req, res) => {
   })
 })
 
+const getUploadedDocTypes = (user) =>
+  (user?.documentation || [])
+    .map((doc) => String(doc?.type || '').trim())
+    .filter(Boolean)
+
+const hasRequiredDeveloperKycDocs = (user) => {
+  const types = new Set(getUploadedDocTypes(user))
+  return DEVELOPER_KYC_REQUIRED_DOCS.every((required) => types.has(required))
+}
+
+const updateDeveloperKycProfile = asyncHandler(async (req, res) => {
+  const requester = req.user
+  if (!requester) {
+    return res.status(401).json({ success: false, message: 'Unauthorized' })
+  }
+
+  const user = await User.findById(requester._id)
+  if (!user || user.isDeleted) {
+    return res.status(404).json({ success: false, message: 'User not found' })
+  }
+  if (user.role !== 'Developer') {
+    return res.status(403).json({
+      success: false,
+      message: 'Only Developer accounts can update corporate KYC profile',
+    })
+  }
+
+  const { companyName, jurisdiction, tradeLicenseNumber } = req.body
+  const kyc = user.developerKyc || {}
+
+  if (companyName !== undefined) {
+    kyc.companyName = String(companyName || '').trim()
+  }
+  if (jurisdiction !== undefined) {
+    kyc.jurisdiction = String(jurisdiction || '').trim()
+    if (kyc.jurisdiction) user.country = kyc.jurisdiction
+  }
+  if (tradeLicenseNumber !== undefined) {
+    kyc.tradeLicenseNumber = String(tradeLicenseNumber || '').trim()
+  }
+
+  if (!kyc.status || kyc.status === 'NotStarted') {
+    kyc.status = 'NotStarted'
+  }
+
+  user.developerKyc = kyc
+  await user.save()
+
+  const sanitizedUser = await sanitizeUserForSelf(user)
+  return res.status(200).json({
+    success: true,
+    message: 'Company profile updated',
+    user: sanitizedUser,
+  })
+})
+
+const submitDeveloperKyc = asyncHandler(async (req, res) => {
+  const requester = req.user
+  if (!requester) {
+    return res.status(401).json({ success: false, message: 'Unauthorized' })
+  }
+
+  const user = await User.findById(requester._id).populate({
+    path: 'documentation.document',
+    select:
+      'Certificate.name Certificate.s3Key Certificate.encrypted Certificate.url uuid',
+  })
+
+  if (!user || user.isDeleted) {
+    return res.status(404).json({ success: false, message: 'User not found' })
+  }
+  if (user.role !== 'Developer') {
+    return res.status(403).json({
+      success: false,
+      message: 'Only Developer accounts can submit corporate KYC',
+    })
+  }
+
+  if (user.developerKyc?.status === 'Approved') {
+    return res.status(400).json({
+      success: false,
+      message: 'Corporate KYC is already approved',
+    })
+  }
+
+  const companyName = String(user.developerKyc?.companyName || '').trim()
+  const jurisdiction = String(user.developerKyc?.jurisdiction || '').trim()
+  const tradeLicenseNumber = String(
+    user.developerKyc?.tradeLicenseNumber || '',
+  ).trim()
+
+  if (!companyName || !jurisdiction || !tradeLicenseNumber) {
+    return res.status(400).json({
+      success: false,
+      message:
+        'Company name, jurisdiction, and trade license number are required before submit',
+    })
+  }
+
+  if (!hasRequiredDeveloperKycDocs(user)) {
+    return res.status(400).json({
+      success: false,
+      message: `Upload all required documents: ${DEVELOPER_KYC_REQUIRED_DOCS.join(', ')}`,
+      requiredDocs: DEVELOPER_KYC_REQUIRED_DOCS,
+      uploadedDocs: getUploadedDocTypes(user),
+    })
+  }
+
+  user.developerKyc = {
+    ...(user.developerKyc?.toObject?.() || user.developerKyc || {}),
+    companyName,
+    jurisdiction,
+    tradeLicenseNumber,
+    status: 'Pending',
+    submittedAt: new Date(),
+    reviewedAt: undefined,
+    reviewNote: '',
+  }
+  user.userState = 'inactive'
+  await user.save()
+
+  const sanitizedUser = await sanitizeUserForSelf(user)
+  return res.status(200).json({
+    success: true,
+    message: 'Corporate KYC submitted for review',
+    user: sanitizedUser,
+  })
+})
+
+const GetDeveloperKycQueue = asyncHandler(async (req, res) => {
+  try {
+    const users = await User.find({
+      isDeleted: false,
+      role: 'Developer',
+      'developerKyc.status': {
+        $in: ['Pending', 'Submitted', 'Approved', 'Rejected', 'NotStarted'],
+      },
+    })
+      .select(
+        'name lastname email phone country developerKyc documentation createdAt uuid',
+      )
+      .sort({ 'developerKyc.submittedAt': -1, createdAt: -1 })
+
+    return res.status(200).json({ users, success: true })
+  } catch (error) {
+    return res
+      .status(500)
+      .json({ message: error?.message || 'Something went wrong!' })
+  }
+})
+
+const GetDeveloperKycById = asyncHandler(async (req, res) => {
+  try {
+    const { id } = req.params
+    const user = await User.findOne({
+      _id: id,
+      isDeleted: false,
+      role: 'Developer',
+    })
+      .select('-password -refreshToken')
+      .populate({
+        path: 'documentation.document',
+        select:
+          'Certificate.name Certificate.s3Key Certificate.encrypted Certificate.url uuid',
+      })
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' })
+    }
+
+    return res.status(200).json({ user, success: true })
+  } catch (error) {
+    return res
+      .status(500)
+      .json({ message: error?.message || 'Something went wrong!' })
+  }
+})
+
+const UpdateDeveloperKycStatus = asyncHandler(async (req, res) => {
+  try {
+    const { id } = req.params
+    const { status, reviewNote } = req.body
+
+    if (!['Approved', 'Rejected', 'Pending'].includes(status)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Status must be Approved, Rejected, or Pending',
+      })
+    }
+
+    const user = await User.findOne({
+      _id: id,
+      isDeleted: false,
+      role: 'Developer',
+    })
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' })
+    }
+
+    user.developerKyc = {
+      ...(user.developerKyc?.toObject?.() || user.developerKyc || {}),
+      status,
+      reviewedAt: new Date(),
+      reviewNote: reviewNote ? String(reviewNote).trim() : '',
+    }
+    user.userState = status === 'Approved' ? 'active' : 'inactive'
+    await user.save()
+
+    try {
+      await createNotification({
+        data: {
+          userId: user._id,
+          userUUID: user.uuid,
+          UserRole: 'Developer',
+          title: 'Corporate KYC',
+          message: `Your corporate KYC status is updated to: ${status}`,
+        },
+      })
+    } catch (error) {
+      console.log({ error: error?.message })
+    }
+
+    return res.status(200).json({ user, success: true })
+  } catch (error) {
+    return res
+      .status(500)
+      .json({ message: error?.message || 'Something went wrong!' })
+  }
+})
+
 export {
   createUser,
   loginUser,
@@ -1467,4 +1765,9 @@ export {
   validateToken,
   forgotPassword,
   resetPassword,
+  updateDeveloperKycProfile,
+  submitDeveloperKyc,
+  GetDeveloperKycQueue,
+  GetDeveloperKycById,
+  UpdateDeveloperKycStatus,
 }

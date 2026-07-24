@@ -1,15 +1,22 @@
 /**
  * UAE Pass userinfo often returns fullnameEN as comma-separated values with empties,
- * e.g. "HAMZA,BETRAOUI,,,,,". Normalize into first, last, and full display name.
+ * e.g. "HAMZA,BETRAOUI,,,,," or "MOHAMMED,BERRADA......".
+ * Normalize into a proper spaced full name (no commas / dots / dashes as separators).
  */
+export function cleanNameSeparators(value) {
+  return String(value || '')
+    .replace(/[,.;·•]+/g, ' ')
+    .replace(/[-–—_]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
 export function parseUaePassName(fullnameEN, lastnameEN) {
-  const parts = String(fullnameEN || '')
-    .split(',')
-    .map((part) => part.trim())
-    .filter(Boolean)
+  const cleaned = cleanNameSeparators(fullnameEN)
+  const parts = cleaned.split(/\s+/).map((part) => part.trim()).filter(Boolean)
 
   const firstName = parts[0] || ''
-  const lastNameFromField = String(lastnameEN || '').trim()
+  const lastNameFromField = cleanNameSeparators(lastnameEN)
   const lastName =
     lastNameFromField || parts.slice(1).join(' ') || parts[1] || ''
 
@@ -30,11 +37,12 @@ export function parseUaePassName(fullnameEN, lastnameEN) {
     fullName = lastNameFromField || firstName
   }
 
-  return { firstName, lastName, fullName }
+  return { firstName, lastName, fullName: cleanNameSeparators(fullName) }
 }
 
 export function hasMalformedUaePassName(name) {
-  return typeof name === 'string' && name.includes(',')
+  if (typeof name !== 'string') return false
+  return /[,.;·•]|[-–—_]{2,}|\.{2,}/.test(name) || name.includes(',')
 }
 
 /** Clean display / Clozer full name from UAE Pass comma blobs or name + lastname. */
@@ -42,21 +50,24 @@ export function normalizePersonFullName(name, lastname = '') {
   const raw = String(name ?? '').trim()
   const last = String(lastname ?? '').trim()
 
-  if (hasMalformedUaePassName(raw)) {
+  if (hasMalformedUaePassName(raw) || hasMalformedUaePassName(last)) {
     return parseUaePassName(raw, last).fullName
   }
 
-  if (!raw && !last) return ''
-  if (!raw) return last
-  if (!last) return raw
+  const cleanedRaw = cleanNameSeparators(raw)
+  const cleanedLast = cleanNameSeparators(last)
 
-  const rawLower = raw.toLowerCase()
-  const lastLower = last.toLowerCase()
+  if (!cleanedRaw && !cleanedLast) return ''
+  if (!cleanedRaw) return cleanedLast
+  if (!cleanedLast) return cleanedRaw
 
-  if (rawLower === lastLower) return raw
+  const rawLower = cleanedRaw.toLowerCase()
+  const lastLower = cleanedLast.toLowerCase()
+
+  if (rawLower === lastLower) return cleanedRaw
   if (rawLower.endsWith(lastLower) || rawLower.includes(` ${lastLower}`)) {
-    return raw
+    return cleanedRaw
   }
 
-  return `${raw} ${last}`.trim()
+  return `${cleanedRaw} ${cleanedLast}`.trim()
 }

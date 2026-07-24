@@ -22,6 +22,11 @@ import {
   forgotPassword,
   resetPassword,
   updateTargetingProfile,
+  updateDeveloperKycProfile,
+  submitDeveloperKyc,
+  GetDeveloperKycQueue,
+  GetDeveloperKycById,
+  UpdateDeveloperKycStatus,
 } from '../controller/userCtrl.js'
 import {
   authMiddleware,
@@ -110,6 +115,38 @@ router.put(
   ...adminOnly,
   financialInfoLimiter,
   UpdateUsersFinancialInfo,
+)
+
+// Developer corporate KYC (must be before /:id)
+router.put(
+  '/developer-kyc/profile',
+  authMiddleware,
+  userUpdateLimiter,
+  updateDeveloperKycProfile,
+)
+router.post(
+  '/developer-kyc/submit',
+  authMiddleware,
+  userUpdateLimiter,
+  submitDeveloperKyc,
+)
+router.get(
+  '/developer-kyc',
+  ...adminOnly,
+  financialInfoLimiter,
+  GetDeveloperKycQueue,
+)
+router.get(
+  '/developer-kyc/:id',
+  ...adminOnly,
+  financialInfoLimiter,
+  GetDeveloperKycById,
+)
+router.put(
+  '/developer-kyc/:id',
+  ...adminOnly,
+  financialInfoLimiter,
+  UpdateDeveloperKycStatus,
 )
 
 // refresh token

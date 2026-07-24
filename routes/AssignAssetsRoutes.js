@@ -1,8 +1,10 @@
-import express from "express";
-import { adminOnly } from "../middlewares/adminOnly.js";
-import { AssignAssetToEvaluator } from "../controller/AssignAssetsCtrl.js";
-const router = express.Router();
+import express from 'express'
+import { authMiddleware } from '../middlewares/authMiddleware.js'
+import { AssignAssetToEvaluator } from '../controller/AssignAssetsCtrl.js'
 
-router.post("/", ...adminOnly, AssignAssetToEvaluator);
+const router = express.Router()
 
-export default router;
+// Parent Evaluators assign assets to their Sub-Evaluators; Admin may also assign.
+router.post('/', authMiddleware, AssignAssetToEvaluator)
+
+export default router
