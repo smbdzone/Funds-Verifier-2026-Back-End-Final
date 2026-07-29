@@ -2,6 +2,8 @@ import express from 'express'
 import {
   createUser,
   loginUser,
+  verifyLoginOtp,
+  resendLoginOtp,
   getEvaluator,
   deleteUser,
   updateStatus,
@@ -27,6 +29,7 @@ import {
   GetDeveloperKycQueue,
   GetDeveloperKycById,
   UpdateDeveloperKycStatus,
+  RequestDeveloperKycDocuments,
 } from '../controller/userCtrl.js'
 import {
   authMiddleware,
@@ -37,6 +40,7 @@ import {
   signupLimiter,
   loginLimiter,
   loginIpLimiter,
+  emailFormLimiter,
   passwordResetLimiter,
   userUpdateLimiter,
   financialInfoLimiter,
@@ -63,6 +67,22 @@ router.post(
 
 // login user - limit to 10 attempts per user (email) per 24 hours
 router.post('/login', loginIpLimiter, loginLimiter, validateEmail, loginUser)
+
+// step 2 of login for OTP-gated roles (Evaluator, Sub-Evaluator, ...)
+router.post(
+  '/login/verify-otp',
+  loginIpLimiter,
+  loginLimiter,
+  validateEmail,
+  verifyLoginOtp,
+)
+router.post(
+  '/login/resend-otp',
+  loginIpLimiter,
+  emailFormLimiter,
+  validateEmail,
+  resendLoginOtp,
+)
 
 // get specific role users
 router.get(
@@ -147,6 +167,12 @@ router.put(
   ...adminOnly,
   financialInfoLimiter,
   UpdateDeveloperKycStatus,
+)
+router.post(
+  '/developer-kyc/:id/request-documents',
+  ...adminOnly,
+  financialInfoLimiter,
+  RequestDeveloperKycDocuments,
 )
 
 // refresh token

@@ -171,23 +171,24 @@ const createProduct = asyncHandler(async (req, res) => {
     } else {
       // If no pending request was found, just return the created product
       await session.commitTransaction()
-
-      try {
-        await notifyEvaluatorsNewListing({
-          message: `New Car (${createPdt[0]?.title}) added for evaluation.`,
-          assetType: createPdt[0]?.assetType || 'car',
-          relatedId: createPdt[0]?._id,
-          relatedUUID: createPdt[0]?.uuid,
-        })
-      } catch (error) {
-        console.log({ error: error?.message })
-      }
-
       res.json({
         car: createPdt[0],
         message:
           'Car created successfully, but no pending 3D request or but no pending 3D report was found to update.',
       })
+    }
+
+    try {
+      await notifyEvaluatorsNewListing({
+        message: `New Car (${createPdt[0]?.title}) added for evaluation.`,
+        assetType: createPdt[0]?.assetType || 'car',
+        relatedId: createPdt[0]?._id,
+        relatedUUID: createPdt[0]?.uuid,
+        listing: createPdt[0],
+        assetHolder: user,
+      })
+    } catch (error) {
+      console.log({ error: error?.message })
     }
   } catch (err) {
     await session.abortTransaction()

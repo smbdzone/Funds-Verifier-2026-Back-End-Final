@@ -18,6 +18,8 @@ import {
   notifyAssetHolderTechnicalReportCompleted,
   resolveListingFromPremiumRecord,
 } from '../helper/notifyAssetHolderListingEvents.js'
+import { notifyFvPremiumServiceRequested } from '../utils/fvPortalMail.js'
+import { notifyPremiumProviderRequest } from '../utils/premiumProviderMail.js'
 
 export const createReport = async (req, res) => {
   try {
@@ -108,6 +110,42 @@ export const createReport = async (req, res) => {
       await createNotification({ data: NotificationData })
     } catch (error) {
       console.log({ error: error?.message })
+    }
+
+    try {
+      await notifyFvPremiumServiceRequested({
+        serviceType: 'technical_report',
+        request: newReport,
+        listing: listingMeta?.productTitle
+          ? {
+            title: listingMeta.productTitle,
+            assetType,
+            uuid: listingMeta.productUUID,
+            _id: listingMeta.productId,
+          }
+          : null,
+      })
+    } catch (error) {
+      console.log({ fvPortalTechnicalRequestEmailError: error?.message || error })
+    }
+
+    try {
+      await notifyPremiumProviderRequest({
+        serviceType: 'technical_report',
+        request: newReport,
+        listing: listingMeta?.productTitle
+          ? {
+            title: listingMeta.productTitle,
+            assetType,
+            uuid: listingMeta.productUUID,
+            _id: listingMeta.productId,
+          }
+          : null,
+      })
+    } catch (error) {
+      console.log({
+        premiumTechnicalRequestEmailError: error?.message || error,
+      })
     }
 
     res

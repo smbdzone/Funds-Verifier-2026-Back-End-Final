@@ -34,6 +34,8 @@ import {
   syncAssetTransactionOnPaymentProof,
   syncAssetTransactionOnTransferComplete,
 } from '../utils/transactionBooking.js'
+import { notifyAssetHolderViewingCompleted } from '../helper/notifyAssetHolderViewingBooked.js'
+import moment from 'moment'
 
 const GetAssetName = getAssetModelForType
 
@@ -875,11 +877,14 @@ export const MarkAssetAsTransfered = async (req, res) => {
 
     const booking = await Booking.findOne({ uuid: sanitizedId, isDeleted: false })
       .populate({ path: 'brokerId', select: 'email name phoneNumber' })
-      .populate({ path: 'assetHolderId', select: 'email name' })
+      .populate({ path: 'assetHolderId', select: 'email name uuid' })
+      .populate({ path: 'slotId', select: 'date times' })
 
     if (!booking) {
       return res.status(400).json({ message: 'Booking not found' })
     }
+
+    const previousStatus = booking.status
 
     const { asset } = await findAssetForBooking(booking)
 
@@ -905,7 +910,7 @@ export const MarkAssetAsTransfered = async (req, res) => {
     try {
       const NotificationData = {
         userId: booking?.assetHolderId?._id,
-        userUUID: booking?.assetHolderId?.uuid,
+        userUUID: booking?.assetHolderId?.uuid || booking?.assetHolderUUID,
         UserRole: 'AssetHolder',
         title: 'Asset Sold',
         message: `Your asset (${booking?.productData?.title || ''
@@ -915,6 +920,40 @@ export const MarkAssetAsTransfered = async (req, res) => {
       await createNotification({ data: NotificationData })
     } catch (error) {
       console.log({ error: error?.message })
+    }
+
+    // First time booking becomes completed → email asset holder + FV
+    if (previousStatus !== 'completed') {
+      try {
+        const timeSlot = booking?.slotId?.times?.find(
+          (time) => time.uuid === booking.timeSlotUUID,
+        )
+        const slotDate = booking?.slotId?.date
+          ? moment(booking.slotId.date).format('DD MMM YYYY')
+          : ''
+        const slotTime = timeSlot?.time || ''
+        const ownerUUID =
+          booking?.assetHolderId?.uuid ||
+          booking?.assetHolderUUID ||
+          booking?.productData?.userUUID
+
+        await notifyAssetHolderViewingCompleted({
+          assetHolderUUID: ownerUUID,
+          assetHolder: booking?.assetHolderId,
+          buyerName: booking?.brokerId?.name || booking?.brokerId?.email,
+          buyerEmail: booking?.brokerId?.email || '',
+          listingTitle: booking?.productData?.title,
+          assetType: booking?.productData?.assetType || 'property',
+          listingUUID: booking?.productData?.uuid,
+          bookingId: booking?._id,
+          bookingUUID: booking?.uuid,
+          slotDate,
+          slotTime,
+          completedBy: req.user || { name: 'Trustee' },
+        })
+      } catch (error) {
+        console.log({ viewingCompletedNotifyError: error?.message || error })
+      }
     }
 
     res.status(200).json({ message: 'Asset marked as transfered' })

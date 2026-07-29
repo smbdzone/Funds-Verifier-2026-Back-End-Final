@@ -14,6 +14,7 @@ import {
   sanitizeUser,
   sanitizeUserForSelf,
   sanitizeUserForPublic,
+  sanitizeUserForAdmin,
 } from '../utils/userSanitizer.js'
 import { validatePassword } from '../utils/passwordValidator.js'
 import {
@@ -30,6 +31,18 @@ import {
   isParentEvaluatorOf,
   isSubEvaluatorRole,
 } from '../utils/parentEvaluator.js'
+import {
+  OTP_MAX_ATTEMPTS,
+  OTP_RESEND_COOLDOWN_SECONDS,
+  OTP_TTL_MINUTES,
+  generateOtpCode,
+  getResendWaitSeconds,
+  hashOtpCode,
+  maskEmail,
+  requiresLoginOtp,
+  sanitizeOtpCode,
+} from '../utils/loginOtp.js'
+import sendLoginOtpEmail from '../utils/loginOtpMail.js'
 
 // Base cookie options object
 const isProd = process.env.NODE_ENV === 'production'
@@ -119,6 +132,106 @@ const DEVELOPER_KYC_REQUIRED_DOCS = [
   'Authorized Signer ID',
 ]
 
+const getDeveloperPortalBase = () =>
+  String(process.env.DEVELOPER_PORTAL_URL || 'http://localhost:3012').replace(
+    /\/$/,
+    '',
+  )
+
+const notifyDeveloperKycDecision = async (user, status, reviewNote = '') => {
+  const note = String(reviewNote || '').trim()
+  const companyName = String(user.developerKyc?.companyName || '').trim()
+  const portalBase = getDeveloperPortalBase()
+
+  if (status === 'Approved') {
+    await createNotification({
+      data: {
+        userId: user._id,
+        userUUID: user.uuid,
+        UserRole: 'Developer',
+        title: 'Corporate KYC Approved',
+        message:
+          'Your corporate KYC has been approved. You now have full access to the Developer Dashboard.',
+        RelateRoute: '/dashboard',
+      },
+    })
+
+    if (user.email) {
+      sendEmail({
+        to: user.email,
+        subject: 'Funds Verifier — corporate KYC approved',
+        html: `
+          <h2>Corporate KYC approved</h2>
+          <p>Hello ${user.name || 'Developer'},</p>
+          <p>Funds Verifier has approved your corporate KYC and compliance review${companyName ? ` for <strong>${companyName}</strong>` : ''
+          }.</p>
+          <p>Your Developer Portal account is now active. Sign in to access your dashboard, manage projects, and list inventory.</p>
+          <p><a href="${portalBase}/dashboard">Go to Developer Dashboard</a></p>
+          ${note
+            ? `<p><strong>Note from reviewer:</strong> ${note}</p>`
+            : ''
+          }
+          <p>Thank you for partnering with Funds Verifier.</p>
+        `,
+      }).then((result) => {
+        if (!result.success) {
+          console.warn(`KYC approval email failed: ${result.error}`)
+        }
+      })
+    }
+    return
+  }
+
+  if (status === 'Rejected') {
+    await createNotification({
+      data: {
+        userId: user._id,
+        userUUID: user.uuid,
+        UserRole: 'Developer',
+        title: 'Corporate KYC Not Approved',
+        message: note
+          ? `Your corporate KYC was not approved. Reviewer note: ${note}`
+          : 'Your corporate KYC was not approved. Please review your submission and resubmit.',
+        RelateRoute: '/dashboard/kyc',
+      },
+    })
+
+    if (user.email) {
+      sendEmail({
+        to: user.email,
+        subject: 'Funds Verifier — corporate KYC update',
+        html: `
+          <h2>Corporate KYC not approved</h2>
+          <p>Hello ${user.name || 'Developer'},</p>
+          <p>After review, Funds Verifier was unable to approve your corporate KYC submission at this time.</p>
+          ${note
+            ? `<p><strong>Reviewer note:</strong> ${note}</p>`
+            : ''
+          }
+          <p>Please sign in to the Developer Portal, review your documents, and resubmit under <strong>Corporate KYC</strong>.</p>
+          <p><a href="${portalBase}/dashboard/kyc">Update Corporate KYC</a></p>
+        `,
+      }).then((result) => {
+        if (!result.success) {
+          console.warn(`KYC rejection email failed: ${result.error}`)
+        }
+      })
+    }
+    return
+  }
+
+  await createNotification({
+    data: {
+      userId: user._id,
+      userUUID: user.uuid,
+      UserRole: 'Developer',
+      title: 'Corporate KYC',
+      message: `Your corporate KYC status is updated to: ${status}`,
+      RelateRoute: '/dashboard/kyc',
+    },
+  })
+}
+
 /**
  * Same token sources as authMiddleware: Bearer header or accessToken cookie.
  *
@@ -162,6 +275,12 @@ const getSignupCreatorFromRequest = async (req) => {
 const resolveSignupRole = ({ requestedRole, creator, tokenPresent }) => {
   const normalizedRequestedRole = requestedRole || DEFAULT_PUBLIC_ROLE
 
+  // Self-registration roles must work even if another app on localhost left an
+  // accessToken cookie (e.g. Evaluator session on :5002 blocking Developer on :3012).
+  if (SELF_SIGNUP_ROLES.includes(normalizedRequestedRole)) {
+    return { ok: true, role: normalizedRequestedRole }
+  }
+
   if (!creator) {
     if (tokenPresent) {
       return {
@@ -177,15 +296,12 @@ const resolveSignupRole = ({ requestedRole, creator, tokenPresent }) => {
         message: 'Public signup cannot assign privileged roles',
       }
     }
-    if (!SELF_SIGNUP_ROLES.includes(normalizedRequestedRole)) {
-      return {
-        ok: false,
-        status: 400,
-        message:
-          'Public signup is only available for DealHunter, AssetHolder, Advertiser or Developer',
-      }
+    return {
+      ok: false,
+      status: 400,
+      message:
+        'Public signup is only available for DealHunter, AssetHolder, Advertiser or Developer',
     }
-    return { ok: true, role: normalizedRequestedRole }
   }
 
   if (creator.role === 'Admin') {
@@ -292,7 +408,9 @@ const sendVerificationEmail = async (user) => {
   user.emailVerificationExpires = Date.now() + 24 * 60 * 60 * 1000
   await user.save()
 
-  const verificationLink = `${process.env.FRONTEND_URL}/verify-email?token=${token}&uuid=${user.uuid}`
+  // Always use the official public site for verify links (not local FRONTEND_URL).
+  const frontendBase = 'https://fundsverifier.com'
+  const verificationLink = `${frontendBase}/verify-email?token=${token}&uuid=${user.uuid}`
 
   const html = `
     <h2>Email Verification</h2>
@@ -661,27 +779,177 @@ const loginUser = asyncHandler(async (req, res) => {
     return res.status(401).json({ message: 'Invalid email or password' })
   }
 
-  const accessToken = generateToken(findUser._id)
-  const refreshToken = generateRefreshToken(findUser._id)
+  if (requiresLoginOtp(findUser)) {
+    return startLoginOtpChallenge(res, findUser)
+  }
 
-  findUser.refreshToken = refreshToken
-  await findUser.save()
+  return issueLoginSession(res, findUser)
+})
+
+/**
+ * Issue auth cookies + tokens and return the self-view of the user.
+ * Shared by password-only login and the OTP verification step.
+ */
+const issueLoginSession = async (res, user) => {
+  const accessToken = generateToken(user._id)
+  const refreshToken = generateRefreshToken(user._id)
+
+  user.refreshToken = refreshToken
+  user.loginOtpHash = undefined
+  user.loginOtpExpiresAt = undefined
+  user.loginOtpAttempts = 0
+  await user.save()
 
   res.cookie('refreshToken', refreshToken, cookieOptions)
 
-  const assignedRole = findUser.role
+  const assignedRole = user.role
 
   res.cookie('accessToken', accessToken, { ...cookieOptions })
   res.cookie('role', assignedRole, { ...cookieOptions })
 
-  const sanitizedUser = sanitizeUserForSelf(findUser)
+  const sanitizedUser = sanitizeUserForSelf(user)
 
-  res.json({
+  return res.json({
     ...sanitizedUser,
     accessToken,
     role: assignedRole,
     message: 'Login successful!',
   })
+}
+
+/** Generate + email a fresh code and tell the client to show the OTP screen. */
+const startLoginOtpChallenge = async (res, user, { resend = false } = {}) => {
+  const waitSeconds = getResendWaitSeconds(user.loginOtpSentAt)
+  if (resend && waitSeconds > 0) {
+    return res.status(429).json({
+      otpRequired: true,
+      email: user.email,
+      maskedEmail: maskEmail(user.email),
+      resendInSeconds: waitSeconds,
+      message: `Please wait ${waitSeconds}s before requesting a new code.`,
+    })
+  }
+
+  const code = generateOtpCode()
+
+  user.loginOtpHash = hashOtpCode(code)
+  user.loginOtpExpiresAt = new Date(Date.now() + OTP_TTL_MINUTES * 60 * 1000)
+  user.loginOtpAttempts = 0
+  user.loginOtpSentAt = new Date()
+  await user.save()
+
+  const mailResult = await sendLoginOtpEmail({
+    to: user.email,
+    recipientName: user.firstName || user.name || user.email,
+    code,
+    expiryMinutes: OTP_TTL_MINUTES,
+  })
+
+  if (!mailResult.success) {
+    return res.status(502).json({
+      otpRequired: true,
+      email: user.email,
+      maskedEmail: maskEmail(user.email),
+      message:
+        'We could not send your verification code right now. Please try again.',
+    })
+  }
+
+  return res.status(200).json({
+    otpRequired: true,
+    email: user.email,
+    maskedEmail: maskEmail(user.email),
+    expiresInMinutes: OTP_TTL_MINUTES,
+    resendInSeconds: OTP_RESEND_COOLDOWN_SECONDS,
+    message: 'Check your email — we sent you a 6-digit verification code.',
+  })
+}
+
+/** Look up an OTP-eligible user with the hidden OTP fields included. */
+const findOtpUser = async (email) => {
+  const sanitizedEmail = sanitizeEmail(email)
+  if (!sanitizedEmail) return { error: 'Invalid email format' }
+
+  const user = await User.findOne({ email: sanitizedEmail })
+    .select('+loginOtpHash +loginOtpExpiresAt +loginOtpAttempts +loginOtpSentAt')
+    .populate('parentEvaluator')
+
+  if (!user || !requiresLoginOtp(user)) {
+    return { error: 'Invalid or expired verification code' }
+  }
+
+  return { user }
+}
+
+const verifyLoginOtp = asyncHandler(async (req, res) => {
+  const { email, otp, code } = req.body
+
+  const submitted = sanitizeOtpCode(otp ?? code)
+  if (!submitted) {
+    return res.status(400).json({ message: 'Enter the 6-digit code' })
+  }
+
+  const { user, error } = await findOtpUser(email)
+  if (error) return res.status(401).json({ message: error })
+
+  if (!user.loginOtpHash || !user.loginOtpExpiresAt) {
+    return res
+      .status(401)
+      .json({ message: 'No active code. Please sign in again.' })
+  }
+
+  if (user.loginOtpExpiresAt.getTime() < Date.now()) {
+    user.loginOtpHash = undefined
+    user.loginOtpExpiresAt = undefined
+    user.loginOtpAttempts = 0
+    await user.save()
+    return res
+      .status(401)
+      .json({ message: 'This code has expired. Please request a new one.' })
+  }
+
+  if ((user.loginOtpAttempts || 0) >= OTP_MAX_ATTEMPTS) {
+    user.loginOtpHash = undefined
+    user.loginOtpExpiresAt = undefined
+    user.loginOtpAttempts = 0
+    await user.save()
+    return res.status(429).json({
+      message: 'Too many incorrect codes. Please sign in again.',
+    })
+  }
+
+  const submittedHash = hashOtpCode(submitted)
+  const isValid = crypto.timingSafeEqual(
+    Buffer.from(submittedHash),
+    Buffer.from(user.loginOtpHash),
+  )
+
+  if (!isValid) {
+    user.loginOtpAttempts = (user.loginOtpAttempts || 0) + 1
+    await user.save()
+    const attemptsLeft = Math.max(OTP_MAX_ATTEMPTS - user.loginOtpAttempts, 0)
+    return res.status(401).json({
+      message: attemptsLeft
+        ? `Incorrect code. ${attemptsLeft} attempt${attemptsLeft === 1 ? '' : 's'} left.`
+        : 'Incorrect code. Please sign in again.',
+      attemptsLeft,
+    })
+  }
+
+  return issueLoginSession(res, user)
+})
+
+const resendLoginOtp = asyncHandler(async (req, res) => {
+  const { user, error } = await findOtpUser(req.body?.email)
+  if (error) return res.status(401).json({ message: error })
+
+  if (!user.loginOtpSentAt) {
+    return res
+      .status(401)
+      .json({ message: 'No active sign-in request. Please sign in again.' })
+  }
+
+  return startLoginOtpChallenge(res, user, { resend: true })
 })
 
 const getEvaluator = asyncHandler(async (req, res) => {
@@ -889,12 +1157,12 @@ const getCurrentUser = asyncHandler(async (req, res) => {
       .populate({
         path: 'documentation.document',
         select:
-          'Certificate.name Certificate.s3Key Certificate.encrypted Certificate.url uuid',
+          'Certificate.name Certificate.s3Key Certificate.s3Bucket Certificate.encrypted Certificate.url uuid',
       })
       .populate({
         path: 'financialInfo.verificationCertificate',
         select:
-          'Certificate.name Certificate.s3Key Certificate.encrypted Certificate.url uuid',
+          'Certificate.name Certificate.s3Key Certificate.s3Bucket Certificate.encrypted Certificate.url uuid',
       })
 
     if (!currentUser) {
@@ -936,7 +1204,7 @@ const getSingleUser = asyncHandler(async (req, res) => {
       .populate({
         path: 'documentation.document',
         select:
-          'Certificate.name Certificate.s3Key Certificate.encrypted Certificate.url uuid',
+          'Certificate.name Certificate.s3Key Certificate.s3Bucket Certificate.encrypted Certificate.url uuid',
       })
 
     if (!singleUser) {
@@ -1016,7 +1284,7 @@ const getUserByRole = asyncHandler(async (req, res) => {
       .populate({
         path: 'documentation.document',
         select:
-          'Certificate.name Certificate.s3Key Certificate.encrypted Certificate.url uuid',
+          'Certificate.name Certificate.s3Key Certificate.s3Bucket Certificate.encrypted Certificate.url uuid',
       })
 
     const sanitizedUsers = await Promise.all(
@@ -1142,9 +1410,67 @@ const updateUser = asyncHandler(async (req, res) => {
   try {
     let upUser
 
-    if (req.body.documentation) {
+    if (req.body.removeDocumentation) {
+      const removeType = String(
+        req.body.removeDocumentation?.type || req.body.removeDocumentation || '',
+      ).trim()
+      if (!removeType) {
+        return res.status(400).json({ message: 'Document type is required' })
+      }
+
       upUser = await User.findOneAndUpdate(
-        loggedInUser?._id,
+        { _id: loggedInUser?._id },
+        { $pull: { documentation: { type: removeType } } },
+        { new: true },
+      )
+        .select('-password')
+        .populate({
+          path: 'documentation.document',
+          select:
+            'Certificate.name Certificate.s3Key Certificate.s3Bucket Certificate.encrypted Certificate.url uuid',
+        })
+        .populate({
+          path: 'financialInfo.verificationCertificate',
+          select:
+            'Certificate.name Certificate.s3Key Certificate.s3Bucket Certificate.encrypted Certificate.url uuid',
+        })
+
+      // If this was an admin-requested KYC doc, open the request again
+      if (upUser?.role === 'Developer') {
+        const requests = upUser.developerKyc?.requestedDocuments || []
+        let changed = false
+        for (const reqDoc of requests) {
+          if (
+            String(reqDoc.name || '').trim().toLowerCase() ===
+            removeType.toLowerCase() &&
+            reqDoc.status === 'Fulfilled'
+          ) {
+            reqDoc.status = 'Pending'
+            changed = true
+          }
+        }
+        if (changed) {
+          upUser.markModified('developerKyc.requestedDocuments')
+          await upUser.save()
+        }
+      }
+
+      const sanitizedRemoved = await sanitizeUserForSelf(upUser)
+      return res.json(sanitizedRemoved)
+    }
+
+    if (req.body.documentation) {
+      const docType = String(req.body.documentation?.type || '').trim()
+      // Replace: drop previous entries of the same type before pushing the new one
+      if (req.body.replaceDocumentation && docType) {
+        await User.updateOne(
+          { _id: loggedInUser?._id },
+          { $pull: { documentation: { type: docType } } },
+        )
+      }
+
+      upUser = await User.findOneAndUpdate(
+        { _id: loggedInUser?._id },
         { $push: { documentation: req.body.documentation } },
         { new: true },
       )
@@ -1152,13 +1478,33 @@ const updateUser = asyncHandler(async (req, res) => {
         .populate({
           path: 'documentation.document',
           select:
-            'Certificate.name Certificate.s3Key Certificate.encrypted Certificate.url uuid',
+            'Certificate.name Certificate.s3Key Certificate.s3Bucket Certificate.encrypted Certificate.url uuid',
         })
         .populate({
           path: 'financialInfo.verificationCertificate',
           select:
-            'Certificate.name Certificate.s3Key Certificate.encrypted Certificate.url uuid',
+            'Certificate.name Certificate.s3Key Certificate.s3Bucket Certificate.encrypted Certificate.url uuid',
         })
+
+      // Mark matching Super Admin document requests as fulfilled
+      if (docType && upUser?.role === 'Developer') {
+        const requests = upUser.developerKyc?.requestedDocuments || []
+        let changed = false
+        for (const reqDoc of requests) {
+          if (
+            String(reqDoc.name || '').trim().toLowerCase() ===
+            docType.toLowerCase() &&
+            reqDoc.status !== 'Fulfilled'
+          ) {
+            reqDoc.status = 'Fulfilled'
+            changed = true
+          }
+        }
+        if (changed) {
+          upUser.markModified('developerKyc.requestedDocuments')
+          await upUser.save()
+        }
+      }
 
       try {
         const NotificationData = {
@@ -1224,12 +1570,12 @@ const updateUser = asyncHandler(async (req, res) => {
       .populate({
         path: 'documentation.document',
         select:
-          'Certificate.name Certificate.s3Key Certificate.encrypted Certificate.url uuid',
+          'Certificate.name Certificate.s3Key Certificate.s3Bucket Certificate.encrypted Certificate.url uuid',
       })
       .populate({
         path: 'financialInfo.verificationCertificate',
         select:
-          'Certificate.name Certificate.s3Key Certificate.encrypted Certificate.url uuid',
+          'Certificate.name Certificate.s3Key Certificate.s3Bucket Certificate.encrypted Certificate.url uuid',
       })
 
     try {
@@ -1293,7 +1639,7 @@ const switchUser = asyncHandler(async (req, res) => {
         .populate({
           path: 'documentation.document',
           select:
-            'Certificate.name Certificate.s3Key Certificate.encrypted Certificate.url uuid',
+            'Certificate.name Certificate.s3Key Certificate.s3Bucket Certificate.encrypted Certificate.url uuid',
         })
 
       if (!userDoc) {
@@ -1575,7 +1921,7 @@ const submitDeveloperKyc = asyncHandler(async (req, res) => {
   const user = await User.findById(requester._id).populate({
     path: 'documentation.document',
     select:
-      'Certificate.name Certificate.s3Key Certificate.encrypted Certificate.url uuid',
+      'Certificate.name Certificate.s3Key Certificate.s3Bucket Certificate.encrypted Certificate.url uuid',
   })
 
   if (!user || user.isDeleted) {
@@ -1673,14 +2019,15 @@ const GetDeveloperKycById = asyncHandler(async (req, res) => {
       .populate({
         path: 'documentation.document',
         select:
-          'Certificate.name Certificate.s3Key Certificate.encrypted Certificate.url uuid',
+          'Certificate.name Certificate.s3Key Certificate.s3Bucket Certificate.encrypted Certificate.url uuid',
       })
 
     if (!user) {
       return res.status(404).json({ success: false, message: 'User not found' })
     }
 
-    return res.status(200).json({ user, success: true })
+    const sanitized = await sanitizeUserForAdmin(user)
+    return res.status(200).json({ user: sanitized, success: true })
   } catch (error) {
     return res
       .status(500)
@@ -1719,15 +2066,11 @@ const UpdateDeveloperKycStatus = asyncHandler(async (req, res) => {
     await user.save()
 
     try {
-      await createNotification({
-        data: {
-          userId: user._id,
-          userUUID: user.uuid,
-          UserRole: 'Developer',
-          title: 'Corporate KYC',
-          message: `Your corporate KYC status is updated to: ${status}`,
-        },
-      })
+      await notifyDeveloperKycDecision(
+        user,
+        status,
+        user.developerKyc?.reviewNote || reviewNote,
+      )
     } catch (error) {
       console.log({ error: error?.message })
     }
@@ -1740,9 +2083,129 @@ const UpdateDeveloperKycStatus = asyncHandler(async (req, res) => {
   }
 })
 
+const RequestDeveloperKycDocuments = asyncHandler(async (req, res) => {
+  try {
+    const { id } = req.params
+    const rawDocs = Array.isArray(req.body?.documents)
+      ? req.body.documents
+      : req.body?.name
+        ? [{ name: req.body.name, note: req.body.note }]
+        : []
+
+    const documents = rawDocs
+      .map((item) => {
+        if (typeof item === 'string') {
+          const name = item.trim()
+          return name ? { name, note: '' } : null
+        }
+        const name = String(item?.name || '').trim()
+        if (!name) return null
+        return {
+          name,
+          note: String(item?.note || '').trim(),
+        }
+      })
+      .filter(Boolean)
+
+    if (!documents.length) {
+      return res.status(400).json({
+        success: false,
+        message: 'Add at least one document name to request',
+      })
+    }
+
+    const user = await User.findOne({
+      _id: id,
+      isDeleted: false,
+      role: 'Developer',
+    })
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' })
+    }
+
+    const kyc = {
+      ...(user.developerKyc?.toObject?.() || user.developerKyc || {}),
+    }
+    const existing = Array.isArray(kyc.requestedDocuments)
+      ? [...kyc.requestedDocuments]
+      : []
+
+    const now = new Date()
+    for (const doc of documents) {
+      const idx = existing.findIndex(
+        (d) =>
+          String(d.name || '').trim().toLowerCase() === doc.name.toLowerCase(),
+      )
+      const entry = {
+        name: doc.name,
+        note: doc.note || '',
+        requestedAt: now,
+        status: 'Pending',
+      }
+      if (idx >= 0) existing[idx] = { ...existing[idx], ...entry }
+      else existing.push(entry)
+    }
+
+    kyc.requestedDocuments = existing
+    // Keep under review so developer can upload the requested files
+    if (!kyc.status || kyc.status === 'NotStarted' || kyc.status === 'Approved') {
+      kyc.status = 'Pending'
+    }
+    user.developerKyc = kyc
+    user.userState = 'inactive'
+    await user.save()
+
+    const names = documents.map((d) => d.name).join(', ')
+    try {
+      await createNotification({
+        data: {
+          userId: user._id,
+          userUUID: user.uuid,
+          UserRole: 'Developer',
+          title: 'Document Request',
+          message: `Funds Verifier requested additional KYC documents: ${names}. Please upload them in Corporate KYC.`,
+          RelateRoute: '/dashboard/kyc',
+        },
+      })
+    } catch (error) {
+      console.log({ error: error?.message })
+    }
+
+    if (user.email) {
+      sendEmail({
+        to: user.email,
+        subject: 'Funds Verifier — additional KYC documents requested',
+        html: `
+          <h2>Additional documents requested</h2>
+          <p>Hello ${user.name || 'Developer'},</p>
+          <p>Funds Verifier Super Admin has requested the following document(s) for your corporate KYC:</p>
+          <ul>${documents.map((d) => `<li><strong>${d.name}</strong>${d.note ? ` — ${d.note}` : ''}</li>`).join('')}</ul>
+          <p>Please sign in to the Developer Portal and upload them under <strong>Corporate KYC</strong>.</p>
+        `,
+      }).then((result) => {
+        if (!result.success) {
+          console.warn(`Document request email failed: ${result.error}`)
+        }
+      })
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: 'Document request sent to developer',
+      user,
+    })
+  } catch (error) {
+    return res
+      .status(500)
+      .json({ message: error?.message || 'Something went wrong!' })
+  }
+})
+
 export {
   createUser,
   loginUser,
+  verifyLoginOtp,
+  resendLoginOtp,
   getEvaluator,
   updateStatus,
   updateTargetingProfile,
@@ -1770,4 +2233,5 @@ export {
   GetDeveloperKycQueue,
   GetDeveloperKycById,
   UpdateDeveloperKycStatus,
+  RequestDeveloperKycDocuments,
 }

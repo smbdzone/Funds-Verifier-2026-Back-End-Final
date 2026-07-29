@@ -6,6 +6,8 @@ import Property from '../models/propertyModel.js'
 import User from '../models/userModel.js'
 import sendEmail from '../utils/nodeMailer.js'
 import { safeURL } from '../controller/emailCtrl.js'
+import { notifyFvListingApproved, notifyFvPremiumServiceCompleted } from '../utils/fvPortalMail.js'
+import { getAssetHolderListingPath } from '../utils/listingDeepLinks.js'
 
 function assetLabel(assetType) {
   const t = String(assetType || 'asset').toLowerCase()
@@ -233,6 +235,19 @@ async function notifySuperAdminsEvent({
   )
 }
 
+function formatApprovedAt(value = new Date()) {
+  const date = value instanceof Date ? value : new Date(value)
+  if (Number.isNaN(date.getTime())) return String(value || '')
+  return date.toLocaleString('en-GB', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true,
+  })
+}
+
 /**
  * Dashboard + email when evaluator approves a listing (status 1 + certificate).
  */
@@ -243,10 +258,22 @@ export async function notifyAssetHolderListingApproved({
 }) {
   if (!listing?.userUUID) return
 
+  const approvedAt = new Date()
+  const approvedAtLabel = formatApprovedAt(approvedAt)
   const evaluatorName = displayName(evaluator) || 'Evaluator'
   const label = assetLabel(assetType || listing.assetType)
   const title = listing.title || 'listing'
-  const message = `${evaluatorName} approved your ${label} (${title}).`
+  const message = `${evaluatorName} approved your ${label} (${title}) on ${approvedAtLabel}.`
+
+  let assetHolder = null
+  try {
+    assetHolder = await User.findOne(
+      { uuid: listing.userUUID, isDeleted: false },
+      { email: 1, name: 1, uuid: 1 },
+    )
+  } catch (error) {
+    console.log({ assetHolderLookupError: error?.message || error })
+  }
 
   await notifyAssetHolderEvent({
     userUUID: listing.userUUID,
@@ -260,15 +287,34 @@ export async function notifyAssetHolderListingApproved({
     emailBodyLines: [
       ...listingDetailsLines(listing, assetType),
       `Approved by: <strong>${evaluatorName}</strong>`,
+      `Approved at: <strong>${approvedAtLabel}</strong>`,
       'Your listing is now eligible to appear for buyers on Funds Verifier.',
+      'Click the button below to open this listing.',
     ],
+    emailCtaLabel: 'Open Listing',
+    emailCtaPath: getAssetHolderListingPath(
+      assetType || listing.assetType,
+      listing.uuid,
+    ),
   })
+
+  try {
+    await notifyFvListingApproved({
+      listing,
+      assetHolder,
+      assetType,
+      evaluator,
+      approvedAt,
+    })
+  } catch (error) {
+    console.log({ fvPortalApprovalEmailError: error?.message || error })
+  }
 
   // Also notify Super Admins
   await notifySuperAdminsEvent({
     listing,
     title: 'Asset Approved',
-    message: `${evaluatorName} approved a ${label} (${title}).`,
+    message: `${evaluatorName} approved a ${label} (${title}) on ${approvedAtLabel}.`,
     relatedUUID: listing.uuid,
     relatedId: listing._id,
     emailSubject: `Asset approved — ${label} — Funds Verifier`,
@@ -276,6 +322,7 @@ export async function notifyAssetHolderListingApproved({
     emailBodyLines: [
       ...listingDetailsLines(listing, assetType),
       `Approved by: <strong>${evaluatorName}</strong>`,
+      `Approved at: <strong>${approvedAtLabel}</strong>`,
       'You can review it in Super Admin notifications.',
     ],
   })
@@ -292,10 +339,22 @@ export async function notifyAssetHolderTechnicalReportCompleted({
   const ownerUUID = listing?.userUUID
   if (!ownerUUID) return
 
+  const completedAt = new Date()
+  const completedAtLabel = formatApprovedAt(completedAt)
   const providerName = displayName(provider) || 'Technical report provider'
   const label = assetLabel(assetType || listing?.assetType)
   const title = listing?.title || 'listing'
-  const message = `${providerName} completed the technical report for your ${label} (${title}).`
+  const message = `${providerName} completed the technical report for your ${label} (${title}) on ${completedAtLabel}.`
+
+  let assetHolder = null
+  try {
+    assetHolder = await User.findOne(
+      { uuid: ownerUUID, isDeleted: false },
+      { email: 1, name: 1, uuid: 1 },
+    )
+  } catch (error) {
+    console.log({ assetHolderLookupError: error?.message || error })
+  }
 
   await notifyAssetHolderEvent({
     userUUID: ownerUUID,
@@ -309,14 +368,34 @@ export async function notifyAssetHolderTechnicalReportCompleted({
     emailBodyLines: [
       ...listingDetailsLines(listing, assetType),
       `Completed by: <strong>${providerName}</strong>`,
+      `Completed at: <strong>${completedAtLabel}</strong>`,
       'You can review the report from your listing on the dashboard.',
+      'Click the button below to open this listing.',
     ],
+    emailCtaLabel: 'Open Listing',
+    emailCtaPath: getAssetHolderListingPath(
+      assetType || listing?.assetType,
+      listing?.uuid,
+    ),
   })
+
+  try {
+    await notifyFvPremiumServiceCompleted({
+      serviceType: 'technical_report',
+      listing,
+      assetHolder,
+      assetType,
+      provider,
+      completedAt,
+    })
+  } catch (error) {
+    console.log({ fvPortalTechnicalCompletedEmailError: error?.message || error })
+  }
 
   await notifySuperAdminsEvent({
     listing,
     title: 'Technical Report Completed',
-    message: `${providerName} completed a technical report for ${label} (${title}).`,
+    message: `${providerName} completed a technical report for ${label} (${title}) on ${completedAtLabel}.`,
     relatedUUID: listing.uuid,
     relatedId: listing._id,
     emailSubject: `Technical report completed — ${label} — Funds Verifier`,
@@ -324,6 +403,7 @@ export async function notifyAssetHolderTechnicalReportCompleted({
     emailBodyLines: [
       ...listingDetailsLines(listing, assetType),
       `Completed by: <strong>${providerName}</strong>`,
+      `Completed at: <strong>${completedAtLabel}</strong>`,
       'You can review it in Super Admin notifications.',
     ],
   })
@@ -340,10 +420,22 @@ export async function notifyAssetHolderWalkthroughCompleted({
   const ownerUUID = listing?.userUUID
   if (!ownerUUID) return
 
+  const completedAt = new Date()
+  const completedAtLabel = formatApprovedAt(completedAt)
   const providerName = displayName(provider) || '3D walkthrough provider'
   const label = assetLabel(assetType || listing?.assetType)
   const title = listing?.title || 'listing'
-  const message = `${providerName} completed the 3D walkthrough for your ${label} (${title}).`
+  const message = `${providerName} completed the 3D walkthrough for your ${label} (${title}) on ${completedAtLabel}.`
+
+  let assetHolder = null
+  try {
+    assetHolder = await User.findOne(
+      { uuid: ownerUUID, isDeleted: false },
+      { email: 1, name: 1, uuid: 1 },
+    )
+  } catch (error) {
+    console.log({ assetHolderLookupError: error?.message || error })
+  }
 
   await notifyAssetHolderEvent({
     userUUID: ownerUUID,
@@ -357,14 +449,34 @@ export async function notifyAssetHolderWalkthroughCompleted({
     emailBodyLines: [
       ...listingDetailsLines(listing, assetType),
       `Completed by: <strong>${providerName}</strong>`,
+      `Completed at: <strong>${completedAtLabel}</strong>`,
       'You can open the walkthrough from your listing on the dashboard.',
+      'Click the button below to open this listing.',
     ],
+    emailCtaLabel: 'Open Listing',
+    emailCtaPath: getAssetHolderListingPath(
+      assetType || listing?.assetType,
+      listing?.uuid,
+    ),
   })
+
+  try {
+    await notifyFvPremiumServiceCompleted({
+      serviceType: '3d_walkthrough',
+      listing,
+      assetHolder,
+      assetType,
+      provider,
+      completedAt,
+    })
+  } catch (error) {
+    console.log({ fvPortalWalkthroughCompletedEmailError: error?.message || error })
+  }
 
   await notifySuperAdminsEvent({
     listing,
     title: '3D Walkthrough Completed',
-    message: `${providerName} completed a 3D walkthrough for ${label} (${title}).`,
+    message: `${providerName} completed a 3D walkthrough for ${label} (${title}) on ${completedAtLabel}.`,
     relatedUUID: listing.uuid,
     relatedId: listing._id,
     emailSubject: `3D walkthrough completed — ${label} — Funds Verifier`,
@@ -372,6 +484,7 @@ export async function notifyAssetHolderWalkthroughCompleted({
     emailBodyLines: [
       ...listingDetailsLines(listing, assetType),
       `Completed by: <strong>${providerName}</strong>`,
+      `Completed at: <strong>${completedAtLabel}</strong>`,
       'You can review it in Super Admin notifications.',
     ],
   })
@@ -379,12 +492,25 @@ export async function notifyAssetHolderWalkthroughCompleted({
 
 /**
  * Dashboard + email when Super Admin approves an off-plan listing.
+ * Also emails FV_EMAIL.
  */
 export async function notifyAssetHolderOffPlanApproved({ listing }) {
   if (!listing?.userUUID) return
 
+  const approvedAt = new Date()
+  const approvedAtLabel = formatApprovedAt(approvedAt)
   const title = listing.title || 'listing'
-  const message = `Your off-plan listing (${title}) was approved by Super Admin and is now live.`
+  const message = `Your off-plan listing (${title}) was approved by Super Admin on ${approvedAtLabel} and is now live.`
+
+  let assetHolder = null
+  try {
+    assetHolder = await User.findOne(
+      { uuid: listing.userUUID, isDeleted: false },
+      { email: 1, name: 1, uuid: 1 },
+    )
+  } catch (error) {
+    console.log({ assetHolderLookupError: error?.message || error })
+  }
 
   await notifyAssetHolderEvent({
     userUUID: listing.userUUID,
@@ -398,9 +524,28 @@ export async function notifyAssetHolderOffPlanApproved({ listing }) {
     emailBodyLines: [
       ...listingDetailsLines(listing, 'off plan'),
       'Approved by: <strong>Super Admin</strong>',
+      `Approved at: <strong>${approvedAtLabel}</strong>`,
       'Your off-plan listing is now live on Funds Verifier.',
+      'Click the button below to open this listing.',
     ],
+    emailCtaLabel: 'Open Listing',
+    emailCtaPath: getAssetHolderListingPath(
+      listing.assetType || 'off plan',
+      listing.uuid,
+    ),
   })
+
+  try {
+    await notifyFvListingApproved({
+      listing,
+      assetHolder,
+      assetType: listing.assetType || 'off plan',
+      evaluator: { name: 'Super Admin' },
+      approvedAt,
+    })
+  } catch (error) {
+    console.log({ fvPortalOffPlanApprovalEmailError: error?.message || error })
+  }
 }
 
 /**

@@ -29,6 +29,21 @@ const findUserByIdOrUuid = async (idOrUuid) => {
   return null
 }
 
+const getAssetModel = (assetType) => {
+  switch (assetType) {
+    case 'car':
+      return Car
+    case 'boat':
+      return Boat
+    case 'property':
+      return Property
+    case 'jewelry':
+      return Jewelry
+    default:
+      return null
+  }
+}
+
 const AssignAssetToEvaluator = asyncHandler(async (req, res) => {
   try {
     const requester = req.user
@@ -47,7 +62,12 @@ const AssignAssetToEvaluator = asyncHandler(async (req, res) => {
       })
     }
 
-    const { assetId, assetType, assigneeId } = req.body
+    const { assetId, assetType, assigneeId, unassign } = req.body
+    const shouldUnassign =
+      unassign === true ||
+      assigneeId === null ||
+      assigneeId === '' ||
+      assigneeId === 'unassign'
 
     if (
       !assetType ||
@@ -58,16 +78,16 @@ const AssignAssetToEvaluator = asyncHandler(async (req, res) => {
         message: `Asset type is required and must be a boat, car, property and jewelry.`,
       })
     }
-    if (!assigneeId) {
-      return res.status(400).json({
-        error: true,
-        message: `Evaluator id as assigneeId is required.`,
-      })
-    }
     if (!assetId) {
       return res
         .status(400)
         .json({ error: true, message: `Asset ID is required.` })
+    }
+    if (!shouldUnassign && !assigneeId) {
+      return res.status(400).json({
+        error: true,
+        message: `Evaluator id as assigneeId is required.`,
+      })
     }
 
     const assetMongoId = sanitizeMongoId(assetId)
@@ -75,6 +95,33 @@ const AssignAssetToEvaluator = asyncHandler(async (req, res) => {
       return res.status(400).json({
         error: true,
         message: 'Invalid asset ID format.',
+      })
+    }
+
+    const Model = getAssetModel(assetType)
+    if (!Model) {
+      return res
+        .status(400)
+        .json({ error: true, message: `Invalid asset type provided.` })
+    }
+
+    if (shouldUnassign) {
+      const Asset = await Model.findByIdAndUpdate(
+        assetMongoId,
+        {
+          $unset: { evaluator: 1, evaluatorUUID: 1 },
+        },
+        { new: true },
+      )
+      if (!Asset) {
+        return res.status(400).json({
+          error: true,
+          message: `Failed to update or asset with this ID not found.`,
+        })
+      }
+      return res.status(200).json({
+        payload: Asset,
+        message: 'Evaluator unassigned successfully',
       })
     }
 
@@ -86,7 +133,6 @@ const AssignAssetToEvaluator = asyncHandler(async (req, res) => {
       })
     }
 
-    // Parent Evaluator may only assign to their own Sub-Evaluators.
     if (isEvaluator) {
       if (!isSubEvaluatorRole(assigneeUser.role)) {
         return res.status(403).json({
@@ -103,47 +149,20 @@ const AssignAssetToEvaluator = asyncHandler(async (req, res) => {
       }
     }
 
-    const AssignAssettoEvaluator = async (Model) => {
-      const Asset = await Model.findByIdAndUpdate(
-        assetMongoId,
-        {
-          evaluator: assigneeUser._id,
-          evaluatorUUID: assigneeUser.uuid,
-        },
-        { new: true },
-      )
-      if (!Asset) {
-        return res.status(400).json({
-          error: true,
-          message: `Failed to update or asset with this ID not found.`,
-        })
-      }
-      return Asset
+    const Asset = await Model.findByIdAndUpdate(
+      assetMongoId,
+      {
+        evaluator: assigneeUser._id,
+        evaluatorUUID: assigneeUser.uuid,
+      },
+      { new: true },
+    )
+    if (!Asset) {
+      return res.status(400).json({
+        error: true,
+        message: `Failed to update or asset with this ID not found.`,
+      })
     }
-
-    let ResponseData
-
-    switch (assetType) {
-      case 'car':
-        ResponseData = await AssignAssettoEvaluator(Car)
-        break
-      case 'boat':
-        ResponseData = await AssignAssettoEvaluator(Boat)
-        break
-      case 'property':
-        ResponseData = await AssignAssettoEvaluator(Property)
-        break
-      case 'jewelry':
-        ResponseData = await AssignAssettoEvaluator(Jewelry)
-        break
-      default:
-        return res
-          .status(400)
-          .json({ error: true, message: `Invalid asset type provided.` })
-    }
-
-    // If response already sent (asset not found), stop.
-    if (res.headersSent) return
 
     try {
       const NotificationData = {
@@ -160,7 +179,10 @@ const AssignAssetToEvaluator = asyncHandler(async (req, res) => {
       console.log({ error: error?.message })
     }
 
-    return res.status(200).json({ payload: ResponseData })
+    return res.status(200).json({
+      payload: Asset,
+      message: 'Evaluator assigned successfully',
+    })
   } catch (err) {
     return res
       .status(500)

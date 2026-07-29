@@ -105,11 +105,11 @@ export const sanitizeUserForAdmin = async (user) => {
     ...sanitized
   } = userObj
 
-  // Sanitize documentation array
+  // For admin: include signed URLs so Super Admin can open KYC files
   if (sanitized.documentation) {
     sanitized.documentation = await sanitizeDocumentation(
       sanitized.documentation,
-      false
+      true,
     )
   }
 

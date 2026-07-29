@@ -22,6 +22,10 @@ export const initSocket = (server) => {
       origin: [
         'http://localhost:5002',
         'http://localhost:3011',
+        'http://localhost:3012',
+        'http://127.0.0.1:5002',
+        'http://127.0.0.1:3011',
+        'http://127.0.0.1:3012',
         'https://fundsverifier.com',
       ],
       credentials: true,

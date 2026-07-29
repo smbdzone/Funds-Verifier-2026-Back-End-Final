@@ -164,6 +164,8 @@ const createProduct = asyncHandler(async (req, res) => {
         assetType: createPdt[0]?.assetType || 'jewelry',
         relatedId: createPdt[0]?._id,
         relatedUUID: createPdt[0]?.uuid,
+        listing: createPdt[0],
+        assetHolder: user,
       })
     } catch (error) {
       console.log({ error: error?.message })

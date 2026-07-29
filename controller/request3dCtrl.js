@@ -18,6 +18,8 @@ import {
   notifyAssetHolderWalkthroughCompleted,
   resolveListingFromPremiumRecord,
 } from '../helper/notifyAssetHolderListingEvents.js'
+import { notifyFvPremiumServiceRequested } from '../utils/fvPortalMail.js'
+import { notifyPremiumProviderRequest } from '../utils/premiumProviderMail.js'
 
 export const createRequest = async (req, res) => {
   try {
@@ -108,6 +110,40 @@ export const createRequest = async (req, res) => {
       await createNotification({ data: NotificationData })
     } catch (error) {
       console.log({ error: error?.message })
+    }
+
+    try {
+      await notifyFvPremiumServiceRequested({
+        serviceType: '3d_walkthrough',
+        request: newRequest,
+        listing: listingMeta?.productTitle
+          ? {
+            title: listingMeta.productTitle,
+            assetType,
+            uuid: listingMeta.productUUID,
+            _id: listingMeta.productId,
+          }
+          : null,
+      })
+    } catch (error) {
+      console.log({ fvPortal3dRequestEmailError: error?.message || error })
+    }
+
+    try {
+      await notifyPremiumProviderRequest({
+        serviceType: '3d_walkthrough',
+        request: newRequest,
+        listing: listingMeta?.productTitle
+          ? {
+            title: listingMeta.productTitle,
+            assetType,
+            uuid: listingMeta.productUUID,
+            _id: listingMeta.productId,
+          }
+          : null,
+      })
+    } catch (error) {
+      console.log({ premium3dRequestEmailError: error?.message || error })
     }
 
     res

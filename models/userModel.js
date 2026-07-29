@@ -120,6 +120,18 @@ const userSchema = new Schema(
       submittedAt: { type: Date },
       reviewedAt: { type: Date },
       reviewNote: { type: String },
+      requestedDocuments: [
+        {
+          name: { type: String, required: true },
+          note: { type: String, default: '' },
+          requestedAt: { type: Date, default: Date.now },
+          status: {
+            type: String,
+            enum: ['Pending', 'Fulfilled'],
+            default: 'Pending',
+          },
+        },
+      ],
     },
     personalDetails: {
       residenceStatus: String,
@@ -153,6 +165,11 @@ const userSchema = new Schema(
     passwordChangedAt: Date,
     passwordResetToken: String,
     passwordResetTokenExpiresAt: Date,
+    // Two-step email OTP login (staff roles: evaluator, sub-evaluator, etc.)
+    loginOtpHash: { type: String, select: false },
+    loginOtpExpiresAt: { type: Date, select: false },
+    loginOtpAttempts: { type: Number, default: 0, select: false },
+    loginOtpSentAt: { type: Date, select: false },
     // Soft delete fields
     isDeleted: { type: Boolean, default: false },
     deletedAt: { type: Date, default: null },

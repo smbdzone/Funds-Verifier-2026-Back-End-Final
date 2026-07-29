@@ -15,6 +15,7 @@ import {
   resolveTransferDocumentsForBooking,
 } from '../utils/transactionBooking.js'
 import { notifyAssetHolderViewingBooked } from '../helper/notifyAssetHolderViewingBooked.js'
+import sendTrusteeViewingBookedEmail from '../utils/trusteeViewingMail.js'
 
 export const VIEWING_SLOT_CATEGORY = 'viewing'
 export const SERVICE_SLOT_CATEGORY = 'service'
@@ -126,7 +127,7 @@ export const createBookingService = async (bookingData) => {
   const slotOwner = await User.findOne({
     uuid: slot.userUUID,
     isDeleted: false,
-  }).select('role uuid name')
+  }).select('role uuid name email')
 
   if (roleToSlotCategory(slotOwner?.role) !== VIEWING_SLOT_CATEGORY) {
     throw new Error('This time slot is not available for property viewing')
@@ -212,7 +213,7 @@ export const createBookingService = async (bookingData) => {
     : ''
   const slotTime = matchedTimeSlot?.time || ''
 
-  // Notify Trustee (slot owner), not the buyer.
+  // Notify Trustee (slot owner) — dashboard + email
   try {
     const trusteeUUID = slotOwner?.uuid || slot.userUUID
     if (trusteeUUID) {
@@ -227,17 +228,32 @@ export const createBookingService = async (bookingData) => {
           RelatedUUID: booking?.uuid,
         },
       })
+
+      await sendTrusteeViewingBookedEmail({
+        trusteeUUID,
+        buyerName,
+        buyerEmail: broker?.email || '',
+        assetHolderName: assetHolder?.name || assetHolder?.displayName || '',
+        assetHolderEmail: assetHolder?.email || '',
+        listingTitle,
+        assetType,
+        slotDate,
+        slotTime,
+        message,
+      })
     }
   } catch (error) {
-    console.log({ error: error?.message })
+    console.log({ trusteeViewingNotifyError: error?.message || error })
   }
 
-  // Notify Asset Holder (dashboard + email) for property / off-plan / car / boat / jewelry.
+  // Notify Asset Holder + FV (dashboard + email) for property / off-plan / car / boat / jewelry.
   try {
     const ownerUUID = assetHolder?.uuid || normalizedAssetHolderId
     await notifyAssetHolderViewingBooked({
       assetHolderUUID: ownerUUID,
+      assetHolder,
       buyerName,
+      buyerEmail: broker?.email || '',
       listingTitle,
       assetType,
       listingUUID: productData?.uuid,
@@ -245,6 +261,7 @@ export const createBookingService = async (bookingData) => {
       bookingUUID: booking?.uuid,
       slotDate,
       slotTime,
+      message,
     })
   } catch (error) {
     console.log({ assetHolderViewingNotifyError: error?.message })

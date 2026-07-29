@@ -15,7 +15,7 @@ import { verifyToken } from '../middlewares/JwtAuth.js'
 import UserModel from '../models/userModel.js'
 import { AssetsListingsPricing } from '../utils/AssetsListingsPricing.js'
 import { createNotification } from './notifications.controller.js'
-import { notifyEvaluatorsNewListing } from '../helper/notificationHelpers.js'
+import { notifyEvaluatorsNewListing, notifyAssetHolderListingSubmitted } from '../helper/notificationHelpers.js'
 import { notifyAssetHolderDocumentRequested } from '../helper/notifyDocumentRequested.js'
 import {
   listingBecameEvaluatorApproved,
@@ -23,6 +23,7 @@ import {
   notifyAssetHolderOffPlanApproved,
   notifyAssetHolderOffPlanFeeRequested,
 } from '../helper/notifyAssetHolderListingEvents.js'
+import { notifyFvListingPosted } from '../utils/fvPortalMail.js'
 import { stripe } from '../libs/stripe.js'
 import { AddPaymentJob } from '../utils/jobs/index.js'
 import UserPaymentDetails from '../models/UserPaymentDetails.js'
@@ -190,6 +191,8 @@ const createProduct = asyncHandler(async (req, res) => {
           assetType: createPdt[0]?.assetType || 'property',
           relatedId: createPdt[0]._id,
           relatedUUID: createPdt[0]?.uuid,
+          listing: createPdt[0],
+          assetHolder: user,
         })
       } else {
         await createNotification({
@@ -201,6 +204,16 @@ const createProduct = asyncHandler(async (req, res) => {
             RelatedId: createPdt[0]._id,
             RelatedUUID: createPdt[0]?.uuid,
           },
+        })
+        await notifyFvListingPosted({
+          listing: createPdt[0],
+          assetHolder: user,
+          assetType: createPdt[0]?.assetType || 'off plan',
+        })
+        await notifyAssetHolderListingSubmitted({
+          listing: createPdt[0],
+          assetHolder: user,
+          assetType: createPdt[0]?.assetType || 'off plan',
         })
       }
     } catch (error) {
