@@ -19,6 +19,7 @@ import {
   requestOffPlanApprovalFee,
   updateOffPlanAgencyAgreement,
 } from '../controller/propertyCtrl.js'
+import { createDeveloperInquiry } from '../controller/developerInquiryCtrl.js'
 import {
   authMiddleware,
   isAdmin,
@@ -69,6 +70,12 @@ router.patch(
   updateOffPlanAgencyAgreement,
 )
 router.put('/rating', ...listingReadAccess, addRating)
+router.post(
+  '/:id/developer-inquiry',
+  authMiddleware,
+  formLimiter,
+  createDeveloperInquiry,
+)
 router.put('/:moduleId', authMiddleware, assetHolderUpdate, updateProduct)
 router.delete('/:deleteId', authMiddleware, assetHolderCreate, deleteProduct)
 router.get('/:id', ...listingReadAccess, getSingleProperty)

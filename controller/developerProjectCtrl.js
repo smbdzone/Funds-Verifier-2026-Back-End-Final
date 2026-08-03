@@ -186,6 +186,18 @@ export const updateDeveloperProject = asyncHandler(async (req, res) => {
       .json({ success: false, message: built.message })
   }
 
+  // Operational Active is only allowed after marketplace publish approval.
+  if (
+    built.payload.status === 'Active' &&
+    !['Published', 'Approved'].includes(project.reviewStatus || 'Draft')
+  ) {
+    return res.status(400).json({
+      success: false,
+      message:
+        'Project can only be set Active after Funds Verifier approves/publishes the listing',
+    })
+  }
+
   Object.assign(project, built.payload)
   await project.save()
   await project.populate([

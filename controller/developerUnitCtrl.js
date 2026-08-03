@@ -5,6 +5,7 @@ import DeveloperUnit, {
 } from '../models/developerUnitModel.js'
 import { requireOwnedProject } from '../utils/developerProjectAccess.js'
 import { sanitizeMongoId } from '../utils/nosqlSanitizer.js'
+import { syncPublishedPropertyFromUnit } from '../utils/syncPublishedUnitProperty.js'
 
 const parseOptionalNumber = (value) => {
   if (value === undefined) return undefined
@@ -201,7 +202,21 @@ export const updateUnit = asyncHandler(async (req, res) => {
   try {
     Object.assign(unit, built.payload)
     await unit.save()
-    return res.status(200).json({ success: true, message: 'Unit updated', unit })
+    let marketplace = null
+    try {
+      marketplace = await syncPublishedPropertyFromUnit(unit)
+    } catch (syncErr) {
+      console.warn(
+        'Published Property sync failed:',
+        syncErr?.message || syncErr,
+      )
+    }
+    return res.status(200).json({
+      success: true,
+      message: 'Unit updated',
+      unit,
+      marketplaceSynced: Boolean(marketplace),
+    })
   } catch (error) {
     if (error?.code === 11000) {
       return res.status(400).json({
@@ -223,6 +238,15 @@ export const deleteUnit = asyncHandler(async (req, res) => {
   unit.isDeleted = true
   unit.deletedAt = new Date()
   await unit.save()
+
+  try {
+    await syncPublishedPropertyFromUnit(unit)
+  } catch (syncErr) {
+    console.warn(
+      'Published Property sync on delete failed:',
+      syncErr?.message || syncErr,
+    )
+  }
 
   return res.status(200).json({ success: true, message: 'Unit removed' })
 })

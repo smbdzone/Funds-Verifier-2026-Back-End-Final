@@ -276,6 +276,8 @@ const resizeImages =
 
         req.files = await Promise.all(
           req.files.map(async (file) => {
+            // Watermark is burned client-side (centered light "FUNDS VERIFIER" text)
+            // before upload so downloads keep branding without double-stamping here.
             const resizedBuffer = await sharp(file.buffer)
               .resize(width, height)
               .toFormat('jpeg')
@@ -288,7 +290,7 @@ const resizeImages =
               mimetype: 'image/jpeg',
               size: resizedBuffer.length,
             }
-          })
+          }),
         )
 
         next()

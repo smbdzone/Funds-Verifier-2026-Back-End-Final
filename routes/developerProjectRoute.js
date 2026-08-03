@@ -1,5 +1,6 @@
 import express from 'express'
 import { authMiddleware } from '../middlewares/authMiddleware.js'
+import { adminOnly } from '../middlewares/adminOnly.js'
 import {
   listDeveloperProjects,
   getDeveloperProject,
@@ -26,11 +27,67 @@ import {
   createMedia,
   deleteMedia,
 } from '../controller/developerMediaCtrl.js'
+import {
+  getProjectReviewChecklist,
+  submitProjectForReview,
+  listDeveloperReviews,
+  listAdminReviewRequests,
+  getAdminReviewRequest,
+  assignReviewEvaluator,
+  updateAdminReviewStatus,
+  publishReviewRequest,
+} from '../controller/developerReviewCtrl.js'
+import { getDeveloperCrmAnalytics } from '../controller/developerAnalyticsCtrl.js'
+import {
+  listDeveloperInquiries,
+  updateDeveloperInquiryStatus,
+} from '../controller/developerInquiryCtrl.js'
 
 const router = express.Router()
 
 router.get('/', authMiddleware, listDeveloperProjects)
 router.post('/', authMiddleware, createDeveloperProject)
+
+// Developer reviews list (must be before /:id)
+router.get('/reviews', authMiddleware, listDeveloperReviews)
+
+// CRM + transaction analytics (must be before /:id)
+router.get('/analytics', authMiddleware, getDeveloperCrmAnalytics)
+
+// Buyer inquiries CRM (must be before /:id)
+router.get('/inquiries', authMiddleware, listDeveloperInquiries)
+router.patch(
+  '/inquiries/:id/status',
+  authMiddleware,
+  updateDeveloperInquiryStatus,
+)
+
+// Super Admin review queue (must be before /:projectId)
+router.get(
+  '/admin/review-requests',
+  ...adminOnly,
+  listAdminReviewRequests,
+)
+router.get(
+  '/admin/review-requests/:id',
+  ...adminOnly,
+  getAdminReviewRequest,
+)
+router.patch(
+  '/admin/review-requests/:id/assign',
+  ...adminOnly,
+  assignReviewEvaluator,
+)
+router.patch(
+  '/admin/review-requests/:id/status',
+  ...adminOnly,
+  updateAdminReviewStatus,
+)
+router.post(
+  '/admin/review-requests/:id/publish',
+  ...adminOnly,
+  publishReviewRequest,
+)
 
 // Units (Step 5)
 router.get('/:projectId/units', authMiddleware, listUnits)
@@ -58,6 +115,10 @@ router.delete(
 router.get('/:projectId/media', authMiddleware, listMedia)
 router.post('/:projectId/media', authMiddleware, createMedia)
 router.delete('/:projectId/media/:mediaId', authMiddleware, deleteMedia)
+
+// Review & submit (Step 8)
+router.get('/:projectId/review', authMiddleware, getProjectReviewChecklist)
+router.post('/:projectId/submit', authMiddleware, submitProjectForReview)
 
 router.get('/:id', authMiddleware, getDeveloperProject)
 router.put('/:id', authMiddleware, updateDeveloperProject)

@@ -838,6 +838,13 @@ const startLoginOtpChallenge = async (res, user, { resend = false } = {}) => {
   user.loginOtpSentAt = new Date()
   await user.save()
 
+  // Local/dev: always print the code so sign-in works even if inbox/spam delays.
+  if (process.env.NODE_ENV !== 'production') {
+    console.log(
+      `\n[LOGIN OTP] ${user.email} → ${code} (expires in ${OTP_TTL_MINUTES}m)\n`,
+    )
+  }
+
   const mailResult = await sendLoginOtpEmail({
     to: user.email,
     recipientName: user.firstName || user.name || user.email,

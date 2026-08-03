@@ -62,6 +62,13 @@ const developerUnitSchema = new mongoose.Schema(
       default: 'Draft',
     },
     notes: { type: String, default: '', trim: true, maxlength: 2000 },
+    /** Linked public marketplace Property after Super Admin publish */
+    publishedPropertyId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Property',
+      default: null,
+    },
+    publishedAt: { type: Date, default: null },
     isDeleted: { type: Boolean, default: false },
     deletedAt: { type: Date, default: null },
   },

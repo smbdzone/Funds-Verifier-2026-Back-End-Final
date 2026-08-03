@@ -45,6 +45,47 @@ const developerProjectSchema = new mongoose.Schema(
       enum: ['Draft', 'Active', 'Archived'],
       default: 'Draft',
     },
+    // Listing review lifecycle (Steps 8–9) — separate from operational status
+    reviewStatus: {
+      type: String,
+      enum: [
+        'Draft',
+        'Submitted',
+        'UnderReview',
+        'ChangesRequested',
+        'Approved',
+        'Published',
+        'Suspended',
+      ],
+      default: 'Draft',
+      index: true,
+    },
+    submittedAt: { type: Date, default: null },
+    reviewedAt: { type: Date, default: null },
+    reviewedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
+    },
+    reviewNote: { type: String, default: '', trim: true, maxlength: 2000 },
+    assignedEvaluator: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
+    },
+    reviewHistory: [
+      {
+        status: { type: String, required: true },
+        note: { type: String, default: '' },
+        actor: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: 'User',
+          default: null,
+        },
+        at: { type: Date, default: Date.now },
+      },
+    ],
+    publishedAt: { type: Date, default: null },
     isDeleted: { type: Boolean, default: false },
     deletedAt: { type: Date, default: null },
   },
@@ -52,6 +93,7 @@ const developerProjectSchema = new mongoose.Schema(
 )
 
 developerProjectSchema.index({ developer: 1, isDeleted: 1, createdAt: -1 })
+developerProjectSchema.index({ reviewStatus: 1, isDeleted: 1, submittedAt: -1 })
 
 const DeveloperProject = mongoose.model(
   'DeveloperProject',

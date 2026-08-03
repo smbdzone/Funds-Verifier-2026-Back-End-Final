@@ -14,8 +14,8 @@ export const OTP_MAX_ATTEMPTS = positiveIntegerFromEnv('OTP_MAX_ATTEMPTS', 5)
 
 // Roles that must confirm a 6-digit email code after password login.
 // Override with OTP_LOGIN_ROLES in .env (comma separated) to add/remove roles
-// without touching code, e.g. OTP_LOGIN_ROLES=Evaluator,Sub-Evaluator,Trustee
-const DEFAULT_OTP_LOGIN_ROLES = ['Evaluator', 'Sub-Evaluator']
+// without touching code, e.g. OTP_LOGIN_ROLES=Evaluator,Sub-Evaluator,Trustee,Developer
+const DEFAULT_OTP_LOGIN_ROLES = ['Evaluator', 'Sub-Evaluator', 'Developer']
 
 const normalizeRoleKey = (role) =>
   String(role || '')
