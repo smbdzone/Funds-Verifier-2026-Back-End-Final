@@ -201,9 +201,10 @@ export const deleteSlot = async (req, res) => {
 // Get all slots
 export const getAllSlots = async (req, res) => {
   const { id } = req.params
+  const { slotCategory } = req.query
   const user = req.user
   try {
-    const slots = await getAllSlotsService(id, user.role)
+    const slots = await getAllSlotsService(id, user.role, slotCategory)
 
     res.status(200).json(slots)
   } catch (error) {

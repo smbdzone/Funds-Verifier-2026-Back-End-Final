@@ -23,16 +23,33 @@ export const SERVICE_SLOT_CATEGORY = 'service'
 export const roleToSlotCategory = (role = '') => {
   const normalized = String(role).trim().toLowerCase().replace(/[\s_-]/g, '')
   if (normalized === 'trustee') return VIEWING_SLOT_CATEGORY
+  if (normalized === 'assetholder' || normalized === 'dealhunter') {
+    return VIEWING_SLOT_CATEGORY
+  }
   return SERVICE_SLOT_CATEGORY
 }
 
+/** Slots are stored as UTC midnight from YYYY-MM-DD — query the same UTC day. */
 const buildDateRange = (date) => {
-  const parsedDate = moment(date)
+  if (!date) return null
+  const day = String(date).trim().slice(0, 10)
+  if (/^\d{4}-\d{2}-\d{2}$/.test(day)) {
+    return {
+      $gte: new Date(`${day}T00:00:00.000Z`),
+      $lte: new Date(`${day}T23:59:59.999Z`),
+    }
+  }
+  const parsedDate = moment.utc(date)
   if (!parsedDate.isValid()) return null
   return {
     $gte: parsedDate.clone().startOf('day').toDate(),
     $lte: parsedDate.clone().endOf('day').toDate(),
   }
+}
+
+/** Include docs created before isDeleted existed. */
+const notDeletedClause = {
+  $or: [{ isDeleted: false }, { isDeleted: { $exists: false } }],
 }
 
 const buildSlotCategoryClause = async (userUUID, slotCategory) => {
@@ -42,9 +59,18 @@ const buildSlotCategoryClause = async (userUUID, slotCategory) => {
   if (!user) return null
 
   const inferred = roleToSlotCategory(user.role)
+  const normalizedRole = String(user.role || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[\s_-]/g, '')
+  const canOwnViewing =
+    inferred === VIEWING_SLOT_CATEGORY ||
+    normalizedRole === 'assetholder' ||
+    normalizedRole === 'dealhunter' ||
+    normalizedRole === 'trustee'
 
   if (slotCategory === VIEWING_SLOT_CATEGORY) {
-    if (inferred !== VIEWING_SLOT_CATEGORY) return null
+    if (!canOwnViewing) return null
     return {
       $or: [
         { slotCategory: VIEWING_SLOT_CATEGORY },
@@ -354,20 +380,22 @@ export const deleteSlotService = async (slotId) => {
 }
 
 // Get all slots
-export const getAllSlotsService = async (id, role) => {
-  const slotCategory = roleToSlotCategory(role)
+export const getAllSlotsService = async (id, role, explicitCategory) => {
+  const slotCategory =
+    explicitCategory === VIEWING_SLOT_CATEGORY ||
+    explicitCategory === SERVICE_SLOT_CATEGORY
+      ? explicitCategory
+      : roleToSlotCategory(role)
   const categoryClause = await buildSlotCategoryClause(id, slotCategory)
 
-  const baseQuery = { isDeleted: false }
-  if (categoryClause) {
-    Object.assign(baseQuery, categoryClause)
-  }
-
   if (role === 'Admin') {
-    return Slot.find({ isDeleted: false }).sort({ createdAt: -1 })
+    return Slot.find({ ...notDeletedClause }).sort({ createdAt: -1 })
   }
 
-  return Slot.find({ userUUID: id, ...baseQuery }).sort({ createdAt: -1 })
+  const query = { userUUID: id, $and: [notDeletedClause] }
+  if (categoryClause) query.$and.push(categoryClause)
+
+  return Slot.find(query).sort({ createdAt: -1 })
 }
 
 // Get all bookings
@@ -694,8 +722,7 @@ export const getAvailableSlotsByDateService = async (
   return Slot.find({
     userUUID,
     date: dateRange,
-    isDeleted: false,
-    ...categoryClause,
+    $and: [notDeletedClause, categoryClause],
   }).select('-_id -createdAt -isDeleted -deletedAt')
 }
 
@@ -715,8 +742,7 @@ export const getSlotsByDateService = async (
   return Slot.find({
     userUUID,
     date: dateRange,
-    isDeleted: false,
-    ...categoryClause,
+    $and: [notDeletedClause, categoryClause],
   })
     .select('-_id -createdAt -isDeleted -deletedAt')
     .lean()
