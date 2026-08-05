@@ -60,6 +60,7 @@ export const PUBLIC_PROPERTY_FIELDS = `
   paymentPlan
   unitLayout
   floorPlan
+  titleDeed
   advertisementId
   analytics
   evaluationCertificate

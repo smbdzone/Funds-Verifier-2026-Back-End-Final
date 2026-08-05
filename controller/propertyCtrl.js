@@ -266,6 +266,7 @@ const getSingleProperty = asyncHandler(async (req, res) => {
       .populate('agencyAgreement')
       .populate('unitLayout')
       .populate('floorPlan')
+      .populate('titleDeed')
       .populate('qrScan')
       .lean()
 
@@ -468,6 +469,7 @@ const getAllProduct = asyncHandler(async (req, res) => {
       .populate({ path: 'thumbnailImg', select: '-_id' })
       .populate({ path: 'unitLayout', select: '-_id' })
       .populate({ path: 'floorPlan', select: '-_id' })
+      .populate({ path: 'titleDeed', select: '-_id' })
       .populate({ path: 'qrScan', select: '-_id' })
       .populate({ path: 'userId', select: 'profileImage name uuid' })
 
@@ -647,6 +649,7 @@ const getAllProductByFilter = asyncHandler(async (req, res) => {
     .populate('video3DWalkthrough')
     .populate('unitLayout')
     .populate('floorPlan')
+    .populate('titleDeed')
     .populate('qrScan')
     .populate({ path: 'userId', select: 'profileImage name uuid' })
     .populate({

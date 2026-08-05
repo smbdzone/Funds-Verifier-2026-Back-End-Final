@@ -140,6 +140,8 @@ const propertySchema = new mongoose.Schema({
   availableApartment: { type: String },
   unitLayout: { type: mongoose.Schema.Types.ObjectId, ref: 'ImageAsset' },
   floorPlan: { type: mongoose.Schema.Types.ObjectId, ref: 'ImageAsset' },
+  /** Ready-market title deed image (optional). */
+  titleDeed: { type: mongoose.Schema.Types.ObjectId, ref: 'ImageAsset' },
   studioLayout: { type: mongoose.Schema.Types.ObjectId, ref: 'ImageAsset' },
   oneBhkLayout: { type: mongoose.Schema.Types.ObjectId, ref: 'ImageAsset' },
   twoBhkLayout: { type: mongoose.Schema.Types.ObjectId, ref: 'ImageAsset' },
