@@ -6,6 +6,7 @@ import {
   getTechnicalReportRequestPath,
   getWalkthroughRequestPath,
 } from './listingDeepLinks.js'
+import { formatDubaiDateTime } from './dubaiDateTime.js'
 
 function displayName(userOrName) {
   if (!userOrName) return ''
@@ -30,16 +31,7 @@ function assetLabel(assetType) {
 
 function formatDateTime(value) {
   if (!value) return ''
-  const date = value instanceof Date ? value : new Date(value)
-  if (Number.isNaN(date.getTime())) return String(value)
-  return date.toLocaleString('en-GB', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: true,
-  })
+  return formatDubaiDateTime(value)
 }
 
 function buildEmailHtml({ recipientName, headline, bodyLines = [], ctaLabel, ctaUrl }) {

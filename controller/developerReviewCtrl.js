@@ -5,8 +5,10 @@ import DeveloperUnit from '../models/developerUnitModel.js'
 import DeveloperPaymentPlan from '../models/developerPaymentPlanModel.js'
 import DeveloperMedia from '../models/developerMediaModel.js'
 import Property from '../models/propertyModel.js'
+import ImageAsset from '../models/imgModel.js'
 import User from '../models/userModel.js'
 import { sanitizeMongoId } from '../utils/nosqlSanitizer.js'
+import { mapUnitSizeToPropertyFields } from '../utils/mapUnitSizeToProperty.js'
 import {
   assertApprovedDeveloper,
   findOwnedProject,
@@ -176,20 +178,145 @@ const categoryToPropertyType = (category) => {
   return 'Apartment'
 }
 
+/**
+ * Merge all project image media into one ImageAsset so the public listing
+ * gallery shows every uploaded photo (not just the latest media row).
+ */
+const buildMergedListingImageAsset = async ({
+  projectId,
+  unitId = null,
+  developerUuid,
+  existingAssetId = null,
+}) => {
+  const mediaQuery = {
+    project: projectId,
+    isDeleted: { $ne: true },
+    fileKind: 'image',
+    imageAsset: { $ne: null },
+  }
+
+  const mediaRows = await DeveloperMedia.find(mediaQuery)
+    .populate({ path: 'imageAsset', select: 'images' })
+    .sort({ createdAt: 1 })
+
+  const preferred = []
+  const rest = []
+  for (const row of mediaRows) {
+    const images = Array.isArray(row?.imageAsset?.images)
+      ? row.imageAsset.images
+      : []
+    if (!images.length) continue
+    const linkedToUnit =
+      unitId &&
+      row.unit &&
+      String(row.unit) === String(unitId)
+    if (linkedToUnit || !row.unit) preferred.push(...images)
+    else rest.push(...images)
+  }
+
+  const combined = [...preferred, ...rest]
+  const seen = new Set()
+  const uniqueImages = combined.filter((img) => {
+    const key =
+      img?.s3Key ||
+      img?.url ||
+      img?.signedUrl ||
+      `${img?.originalName || ''}-${img?.size || ''}`
+    if (!key || seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
+
+  if (!uniqueImages.length) {
+    return existingAssetId || null
+  }
+
+  // Never overwrite a single DeveloperMedia ImageAsset — those stay 1:1 with uploads.
+  // Listing gallery gets its own merged ImageAsset (or an already-dedicated one).
+  const sourceAssetIds = new Set(
+    mediaRows.map((row) => String(row.imageAsset?._id || row.imageAsset || '')),
+  )
+  const canReuseExisting =
+    existingAssetId && !sourceAssetIds.has(String(existingAssetId))
+
+  if (canReuseExisting) {
+    const existing = await ImageAsset.findOne({
+      _id: existingAssetId,
+      isDeleted: { $ne: true },
+    })
+    if (existing) {
+      existing.images = uniqueImages
+      await existing.save()
+      return existing._id
+    }
+  }
+
+  const created = await ImageAsset.create({
+    userUUID: developerUuid || undefined,
+    images: uniqueImages,
+  })
+  return created._id
+}
+
 const mapPaymentPlanToProperty = (plan) => {
   if (!plan) return { paymentPlanType: '', paymentPlan: [] }
-  const down = Number(plan.downPaymentPercent || 0)
-  const construction = Number(plan.constructionPercent || 0)
-  const post = Number(plan.postHandoverPercent || 0)
-  const paymentPlanType = `${down}/${construction}/${post}`
-  const paymentPlan = (plan.milestones || []).map((m, index) => ({
-    step: index + 1,
-    stepLabel: m.label || `Step ${index + 1}`,
-    paymentLabel: `${m.percent || 0}%`,
-    sharePercent: String(m.percent ?? ''),
-    milestone: m.dueLabel || m.label || '',
-  }))
+
+  const name = String(plan.name || '').trim()
+  // Prefer explicit plan label (e.g. "20/80") over legacy 10/60/30 summary fields
+  const looksLikeRatio = /^\d{1,3}\/\d{1,3}(\/\d{1,3})?$/.test(name)
+
+  let paymentPlanType = ''
+  if (looksLikeRatio) {
+    paymentPlanType = name
+  } else {
+    const down = Number(plan.downPaymentPercent || 0)
+    const construction = Number(plan.constructionPercent || 0)
+    const post = Number(plan.postHandoverPercent || 0)
+    if (down || construction || post) {
+      paymentPlanType =
+        construction || post
+          ? `${down}/${construction}/${post}`
+          : `${down}/${Math.max(0, 100 - down)}`
+    } else if (name) {
+      paymentPlanType = name
+    }
+  }
+
+  const paymentPlan = (plan.milestones || []).map((m, index, arr) => {
+    const title =
+      String(m.label || '').trim() ||
+      String(m.dueLabel || '').trim() ||
+      (index === 0
+        ? 'Down Payment'
+        : index === arr.length - 1
+          ? 'Final Payment'
+          : 'Payment Share')
+    return {
+      step: index + 1,
+      stepLabel: `Step ${index + 1}`,
+      paymentLabel: title,
+      sharePercent: String(m.percent ?? ''),
+      // Public UI shows `milestone` under the % — use the full step title
+      milestone: title,
+    }
+  })
   return { paymentPlanType, paymentPlan }
+}
+
+const mapUnitPaymentPlan = (unit, plan) => {
+  const type = String(unit?.paymentPlanType || '').trim()
+  const steps = Array.isArray(unit?.paymentPlanSteps) ? unit.paymentPlanSteps : []
+  if (type || steps.length) {
+    return mapPaymentPlanToProperty({
+      name: type,
+      milestones: steps.map((s) => ({
+        label: s.paymentLabel || s.milestone || '',
+        percent: s.sharePercent,
+        dueLabel: s.milestone || s.paymentLabel || '',
+      })),
+    })
+  }
+  return mapPaymentPlanToProperty(plan)
 }
 
 const buildPropertyPayloadFromUnit = ({
@@ -200,25 +327,39 @@ const buildPropertyPayloadFromUnit = ({
   imageAssetId,
 }) => {
   const companyName =
+    String(unit?.developerName || '').trim() ||
     String(developer?.developerKyc?.companyName || '').trim() ||
     String(developer?.name || 'Developer').trim()
-  const titleBase = `${project.name} — Unit ${unit.unitNumber}`.slice(0, 50)
-  const price = Number(unit.listingPrice || 0) || 1
-  const bua = Number(unit.builtUpArea || 0) || 0
-  const phoneRaw = String(developer?.phone || '').replace(/\D/g, '')
+  const titleBase = (
+    String(unit.title || '').trim() ||
+    `${project.name} — Unit ${unit.unitNumber}`
+  ).slice(0, 50)
+  const priceFrom =
+    Number(unit.priceFrom || unit.listingPrice || 0) ||
+    Number(unit.priceTo || 0) ||
+    1
+  const priceTo = Number(unit.priceTo || unit.priceFrom || unit.listingPrice || 0) || priceFrom
+  const phoneRaw = String(unit.phoneNumber || developer?.phone || '').replace(
+    /\D/g,
+    '',
+  )
   const phoneNumber = phoneRaw ? Number(phoneRaw) : 971000000000
-  const { paymentPlanType, paymentPlan } = mapPaymentPlanToProperty(plan)
+  const { paymentPlanType, paymentPlan } = mapUnitPaymentPlan(unit, plan)
   const neighbourhood =
     String(project.address || '').trim() ||
     String(project.city || '').trim() ||
     'UAE'
+  const sizeFields = mapUnitSizeToPropertyFields(unit)
+  const shortDesc = String(unit.description || unit.notes || project.description || '')
+    .trim()
+    .slice(0, 300)
 
   const payload = {
     assetType: 'Property Off Plan For Sale',
     country: String(project.country || 'United Arab Emirates').trim(),
     city: String(project.city || '').trim() || 'Dubai',
     neighbourhood,
-    mapUrl: String(project.mapUrl || '').trim(),
+    mapUrl: String(unit.mapUrl || project.mapUrl || '').trim(),
     propertyType: categoryToPropertyType(unit.category),
     title: titleBase,
     slug: slugify(`${titleBase}-${unit.uuid || unit._id}`.slice(0, 80), {
@@ -226,45 +367,54 @@ const buildPropertyPayloadFromUnit = ({
       strict: true,
     }),
     phoneNumber: Number.isFinite(phoneNumber) ? phoneNumber : 971000000000,
-    price,
-    priceFrom: price,
-    priceTo: price,
-    sizeSQFT: bua,
-    sizeSQFTFrom: bua || undefined,
-    sizeSQFTTo: bua || undefined,
-    sizeUnit: 'SQFT',
+    price: priceFrom,
+    priceFrom,
+    priceTo,
+    ...sizeFields,
     bedrooms: unit.bedrooms ?? undefined,
     bathrooms: unit.bathrooms ?? undefined,
-    propertyDescription: String(project.description || '')
+    propertyDescription: shortDesc,
+    description: shortDesc,
+    additionalDescription: String(unit.additionalDescription || '')
       .trim()
-      .slice(0, 300),
-    description: String(unit.notes || project.description || '')
-      .trim()
-      .slice(0, 300),
+      .slice(0, 1000),
     developer: companyName,
-    dldNumber: String(project.reraNumber || '').trim(),
+    dldNumber: String(unit.dldNumber || project.reraNumber || '').trim(),
     paymentPlanType,
     paymentPlan,
+    layout: String(unit.layout || '').trim() || undefined,
+    numberOfFloors: String(unit.numberOfFloors || '').trim() || undefined,
+    facilities: Array.isArray(unit.facilities) ? unit.facilities : [],
+    customFacilities: Array.isArray(unit.customFacilities)
+      ? unit.customFacilities
+      : [],
     userId: developer._id,
     userUUID: developer.uuid,
     assetId: developer._id,
     status: 1,
     evaluationStatus: 'approved',
-    listing: 'Public',
+    listing: unit.listing === 'Private' ? 'Private' : 'Public',
     underProcess: false,
-    occupancyStatus: unit.status === 'Draft' ? 'Available' : unit.status || 'Available',
+    occupancyStatus: 'Available',
   }
 
-  if (imageAssetId) {
-    payload.pictures = imageAssetId
-  }
+  const picturesId = imageAssetId || unit.pictures || null
+  if (picturesId) payload.pictures = picturesId
+  if (unit.thumbnailImg) payload.thumbnailImg = unit.thumbnailImg
+  if (unit.qrScan) payload.qrScan = unit.qrScan
+  if (unit.unitLayout) payload.unitLayout = unit.unitLayout
+  if (unit.floorPlan) payload.floorPlan = unit.floorPlan
+  if (unit.agencyAgreement) payload.agencyAgreement = unit.agencyAgreement
 
-  if (project.expectedHandoverDate) {
+  if (unit.deliveryQuarter) payload.deliveryQuarter = String(unit.deliveryQuarter)
+  if (unit.deliveryYear) payload.deliveryYear = String(unit.deliveryYear)
+
+  if (!payload.deliveryYear && project.expectedHandoverDate) {
     const d = new Date(project.expectedHandoverDate)
     if (!Number.isNaN(d.getTime())) {
       payload.deliveryYear = String(d.getFullYear())
       const q = Math.floor(d.getMonth() / 3) + 1
-      payload.deliveryQuarter = `Q${q}`
+      payload.deliveryQuarter = payload.deliveryQuarter || `Q${q}`
     }
   }
 
@@ -279,6 +429,7 @@ export const getProjectReviewChecklist = asyncHandler(async (req, res) => {
     return res.status(404).json({ success: false, message: 'Project not found' })
   }
   const checklist = await buildSubmitChecklist(project)
+  await project.populate({ path: 'requestedDocuments.document' })
   return res.status(200).json({
     success: true,
     project: {
@@ -292,6 +443,7 @@ export const getProjectReviewChecklist = asyncHandler(async (req, res) => {
       publishedAt: project.publishedAt,
       reviewHistory: project.reviewHistory || [],
       assignedEvaluator: project.assignedEvaluator,
+      requestedDocuments: project.requestedDocuments || [],
     },
     checklist,
   })
@@ -362,7 +514,13 @@ export const listDeveloperReviews = asyncHandler(async (req, res) => {
   const user = await assertApprovedDeveloper(req, res)
   const status = String(req.query.status || '').trim()
   const query = { developer: user._id, isDeleted: false }
-  if (status && status !== 'All') {
+  if (status === 'Pending') {
+    query.reviewStatus = {
+      $in: ['Submitted', 'UnderReview', 'ChangesRequested'],
+    }
+  } else if (status === 'Approved') {
+    query.reviewStatus = { $in: ['Approved', 'Published'] }
+  } else if (status && status !== 'All') {
     query.reviewStatus = status
   } else {
     query.reviewStatus = { $ne: 'Draft' }
@@ -375,6 +533,74 @@ export const listDeveloperReviews = asyncHandler(async (req, res) => {
   return res.status(200).json({ success: true, projects })
 })
 
+/** Developer: aggregate Super Admin document requests across projects */
+export const listDeveloperDocumentRequests = asyncHandler(async (req, res) => {
+  const user = await assertApprovedDeveloper(req, res)
+  const filter = String(req.query.status || 'All').trim()
+
+  const projects = await DeveloperProject.find({
+    developer: user._id,
+    isDeleted: false,
+    'requestedDocuments.0': { $exists: true },
+  })
+    .select('name uuid requestedDocuments updatedAt')
+    .populate({
+      path: 'requestedDocuments.document',
+      select: 'uuid Certificate originalName name',
+    })
+    .sort({ updatedAt: -1 })
+
+  const allRows = []
+  for (const project of projects) {
+    const docs = Array.isArray(project.requestedDocuments)
+      ? project.requestedDocuments
+      : []
+    for (const doc of docs) {
+      const status = String(doc.status || 'Pending')
+      allRows.push({
+        _id: doc._id,
+        name: doc.name,
+        note: doc.note || '',
+        status,
+        requestedAt: doc.requestedAt || null,
+        fulfilledAt: doc.fulfilledAt || null,
+        document: doc.document || null,
+        project: {
+          _id: project._id,
+          uuid: project.uuid,
+          name: project.name,
+        },
+      })
+    }
+  }
+
+  allRows.sort((a, b) => {
+    const aPending = a.status !== 'Fulfilled'
+    const bPending = b.status !== 'Fulfilled'
+    if (aPending !== bPending) return aPending ? -1 : 1
+    const aTime = new Date(a.requestedAt || 0).getTime()
+    const bTime = new Date(b.requestedAt || 0).getTime()
+    return bTime - aTime
+  })
+
+  const requests =
+    filter === 'Pending'
+      ? allRows.filter((r) => r.status !== 'Fulfilled')
+      : filter === 'Fulfilled'
+        ? allRows.filter((r) => r.status === 'Fulfilled')
+        : allRows
+
+  return res.status(200).json({
+    success: true,
+    requests,
+    counts: {
+      all: allRows.length,
+      pending: allRows.filter((r) => r.status !== 'Fulfilled').length,
+      fulfilled: allRows.filter((r) => r.status === 'Fulfilled').length,
+    },
+  })
+})
+
 /** Admin: list review queue */
 export const listAdminReviewRequests = asyncHandler(async (req, res) => {
   const status = String(req.query.status || 'pending').toLowerCase()
@@ -384,17 +610,22 @@ export const listAdminReviewRequests = asyncHandler(async (req, res) => {
 
   const query = { isDeleted: false }
   if (status === 'pending') {
-    query.reviewStatus = { $in: ['Submitted', 'UnderReview'] }
+    query.reviewStatus = {
+      $in: ['Submitted', 'UnderReview', 'ChangesRequested'],
+    }
   } else if (status === 'changes') {
     query.reviewStatus = 'ChangesRequested'
   } else if (status === 'approved') {
-    query.reviewStatus = 'Approved'
+    // Published marketplace listings stay visible under Approved
+    query.reviewStatus = { $in: ['Approved', 'Published'] }
   } else if (status === 'published') {
     query.reviewStatus = 'Published'
   } else if (status === 'suspended') {
     query.reviewStatus = 'Suspended'
   } else if (status !== 'all') {
-    query.reviewStatus = { $in: ['Submitted', 'UnderReview'] }
+    query.reviewStatus = {
+      $in: ['Submitted', 'UnderReview', 'ChangesRequested'],
+    }
   }
 
   const [total, projects] = await Promise.all([
@@ -434,6 +665,7 @@ export const getAdminReviewRequest = asyncHandler(async (req, res) => {
     { path: 'reviewHistory.actor', select: 'name email' },
     { path: 'thumbnailImg', select: 'images' },
     { path: 'pictures', select: 'images' },
+    { path: 'requestedDocuments.document' },
   ])
 
   const [units, plans, media, checklist] = await Promise.all([
@@ -518,13 +750,13 @@ export const assignReviewEvaluator = asyncHandler(async (req, res) => {
     project,
     title: 'Listing under review',
     message: `“${project.name}” is under review by Funds Verifier.`,
-    relateRoute: `/dashboard/projects/${project.uuid || project._id}/review`,
+    relateRoute: `/dashboard/projects/${project.uuid || project._id}/units`,
     emailSubject: 'Funds Verifier — listing under review',
     emailHtml: `
       <h2>Listing under review</h2>
       <p>Hello ${developer?.name || 'Developer'},</p>
       <p>Your project <strong>${project.name}</strong> is now under review.</p>
-      <p><a href="${portalBase}/dashboard/projects/${project.uuid || project._id}/review">View status</a></p>
+      <p><a href="${portalBase}/dashboard/projects/${project.uuid || project._id}/units">View units</a></p>
     `,
   })
 
@@ -563,17 +795,13 @@ export const updateAdminReviewStatus = asyncHandler(async (req, res) => {
 
   if (nextStatus === 'ChangesRequested') {
     if (
-      !['Submitted', 'UnderReview', 'Approved'].includes(project.reviewStatus)
+      !['Submitted', 'UnderReview', 'Approved', 'Published'].includes(
+        project.reviewStatus,
+      )
     ) {
       return res.status(400).json({
         success: false,
         message: `Cannot request changes from ${project.reviewStatus}`,
-      })
-    }
-    if (!note) {
-      return res.status(400).json({
-        success: false,
-        message: 'reviewNote is required when requesting changes',
       })
     }
   }
@@ -612,22 +840,22 @@ export const updateAdminReviewStatus = asyncHandler(async (req, res) => {
 
   const developer = await User.findById(project.developer)
   const portalBase = getDeveloperPortalBase()
-  const reviewPath = `/dashboard/projects/${project.uuid || project._id}/review`
+  const reviewPath = `/dashboard/projects/${project.uuid || project._id}/units`
 
   if (nextStatus === 'Approved') {
     await notifyDeveloperReview({
       developer,
       project,
       title: 'Listing approved',
-      message: `“${project.name}” was approved and is ready to publish.`,
+      message: `“${project.name}” was approved and is live on the marketplace.`,
       relateRoute: reviewPath,
       emailSubject: 'Funds Verifier — listing approved',
       emailHtml: `
         <h2>Listing approved</h2>
         <p>Hello ${developer?.name || 'Developer'},</p>
-        <p>Funds Verifier approved <strong>${project.name}</strong>. It will be published to the marketplace by the FV team.</p>
+        <p>Funds Verifier approved <strong>${project.name}</strong>. Your submitted units are now Available.</p>
         ${note ? `<p><strong>Note:</strong> ${note}</p>` : ''}
-        <p><a href="${portalBase}${reviewPath}">View status</a></p>
+        <p><a href="${portalBase}${reviewPath}">View units</a></p>
       `,
     })
   } else if (nextStatus === 'ChangesRequested') {
@@ -645,7 +873,7 @@ export const updateAdminReviewStatus = asyncHandler(async (req, res) => {
         <p>Hello ${developer?.name || 'Developer'},</p>
         <p>Funds Verifier requested updates to <strong>${project.name}</strong>.</p>
         <p><strong>Note:</strong> ${note}</p>
-        <p><a href="${portalBase}${reviewPath}">Update and resubmit</a></p>
+        <p><a href="${portalBase}${reviewPath}">Update units</a></p>
       `,
     })
   } else if (nextStatus === 'Suspended') {
@@ -694,13 +922,13 @@ export const publishReviewRequest = asyncHandler(async (req, res) => {
   const units = await DeveloperUnit.find({
     project: project._id,
     isDeleted: false,
-    status: { $in: ['Draft', 'Available'] },
+    status: { $in: ['Pending', 'Available'] },
   }).populate('paymentPlan')
 
   if (!units.length) {
     return res.status(400).json({
       success: false,
-      message: 'No Draft/Available units to publish',
+      message: 'No Pending/Available units to publish',
     })
   }
 
@@ -714,22 +942,33 @@ export const publishReviewRequest = asyncHandler(async (req, res) => {
     isDeleted: false,
   }).sort({ createdAt: -1 })
 
-  const imageMedia = await DeveloperMedia.findOne({
-    project: project._id,
-    isDeleted: false,
-    fileKind: 'image',
-    imageAsset: { $ne: null },
-  }).sort({ createdAt: -1 })
-
   const published = []
   for (const unit of units) {
     const plan = unit.paymentPlan || defaultPlan || anyPlan
+    const existingPicturesId =
+      unit.publishedPropertyId
+        ? (
+          await Property.findById(unit.publishedPropertyId)
+            .select('pictures')
+            .lean()
+        )?.pictures
+        : null
+
+    const imageAssetId =
+      unit.pictures ||
+      (await buildMergedListingImageAsset({
+        projectId: project._id,
+        unitId: unit._id,
+        developerUuid: developer.uuid,
+        existingAssetId: existingPicturesId || project.pictures || null,
+      }))
+
     const payload = buildPropertyPayloadFromUnit({
       project,
       unit,
       developer,
       plan,
-      imageAssetId: imageMedia?.imageAsset || project.pictures || null,
+      imageAssetId,
     })
 
     let property
@@ -746,7 +985,7 @@ export const publishReviewRequest = asyncHandler(async (req, res) => {
 
     unit.publishedPropertyId = property._id
     unit.publishedAt = new Date()
-    if (unit.status === 'Draft') unit.status = 'Available'
+    unit.status = 'Available'
     await unit.save()
     published.push({
       unitId: unit._id,
@@ -770,7 +1009,7 @@ export const publishReviewRequest = asyncHandler(async (req, res) => {
   await project.save()
 
   const portalBase = getDeveloperPortalBase()
-  const reviewPath = `/dashboard/projects/${project.uuid || project._id}/review`
+  const reviewPath = `/dashboard/projects/${project.uuid || project._id}/units`
   await notifyDeveloperReview({
     developer,
     project,
@@ -781,8 +1020,8 @@ export const publishReviewRequest = asyncHandler(async (req, res) => {
     emailHtml: `
       <h2>Listing published</h2>
       <p>Hello ${developer.name || 'Developer'},</p>
-      <p><strong>${project.name}</strong> (${published.length} unit(s)) is now live on the public marketplace.</p>
-      <p><a href="${portalBase}${reviewPath}">View in Developer Portal</a></p>
+      <p><strong>${project.name}</strong> (${published.length} unit(s)) is now live. Units are marked Available.</p>
+      <p><a href="${portalBase}${reviewPath}">View units</a></p>
     `,
   })
 
@@ -791,5 +1030,230 @@ export const publishReviewRequest = asyncHandler(async (req, res) => {
     message: 'Project published to marketplace',
     project,
     published,
+  })
+})
+
+/** Admin: soft-delete a developer project from the review queue */
+export const deleteAdminReviewRequest = asyncHandler(async (req, res) => {
+  const project = await DeveloperProject.findOne({
+    $or: [
+      { uuid: req.params.id },
+      { _id: sanitizeMongoId(req.params.id) },
+    ],
+    isDeleted: false,
+  })
+  if (!project) {
+    return res.status(404).json({ success: false, message: 'Project not found' })
+  }
+
+  // Unlist any published marketplace properties for this project's units
+  const units = await DeveloperUnit.find({
+    project: project._id,
+    isDeleted: { $ne: true },
+    publishedPropertyId: { $ne: null },
+  }).select('publishedPropertyId')
+
+  for (const unit of units) {
+    if (!unit.publishedPropertyId) continue
+    await Property.findByIdAndUpdate(unit.publishedPropertyId, {
+      $set: { status: 0, listing: 'Private' },
+    })
+  }
+
+  project.isDeleted = true
+  project.deletedAt = new Date()
+  pushHistory(project, {
+    status: project.reviewStatus || 'Deleted',
+    note: 'Deleted by Super Admin',
+    actor: req.user?._id,
+  })
+  await project.save()
+
+  return res.status(200).json({
+    success: true,
+    message: 'Project deleted',
+  })
+})
+
+/** Admin: request specific documents from developer for a project */
+export const requestProjectDocuments = asyncHandler(async (req, res) => {
+  const project = await findProjectByIdParam(req.params.id)
+  if (!project) {
+    return res.status(404).json({ success: false, message: 'Project not found' })
+  }
+
+  const raw = Array.isArray(req.body?.documents) ? req.body.documents : []
+  const documents = raw
+    .map((d) => ({
+      name: String(d?.name || '').trim(),
+      note: String(d?.note || '').trim(),
+    }))
+    .filter((d) => d.name)
+
+  if (!documents.length) {
+    return res.status(400).json({
+      success: false,
+      message: 'Add at least one document name to request',
+    })
+  }
+
+  const existing = Array.isArray(project.requestedDocuments)
+    ? [...project.requestedDocuments.map((d) => d.toObject?.() || d)]
+    : []
+  const now = new Date()
+
+  for (const doc of documents) {
+    const idx = existing.findIndex(
+      (d) =>
+        String(d.name || '')
+          .trim()
+          .toLowerCase() === doc.name.toLowerCase() &&
+        String(d.status || 'Pending') === 'Pending',
+    )
+    const entry = {
+      name: doc.name,
+      note: doc.note || '',
+      requestedAt: now,
+      status: 'Pending',
+      document: null,
+      fulfilledAt: null,
+    }
+    if (idx >= 0) existing[idx] = { ...existing[idx], ...entry }
+    else existing.push(entry)
+  }
+
+  project.requestedDocuments = existing
+  project.reviewStatus = 'ChangesRequested'
+  project.reviewNote = `Requested documents: ${documents.map((d) => d.name).join(', ')}`
+  project.reviewedAt = now
+  project.reviewedBy = req.user._id
+  pushHistory(project, {
+    status: 'ChangesRequested',
+    note: project.reviewNote,
+    actor: req.user._id,
+  })
+  await project.save()
+
+  const developer = await User.findById(project.developer)
+  const portalBase = getDeveloperPortalBase()
+  const docsPath = `/dashboard/document-storage`
+
+  if (developer) {
+    try {
+      await createNotification({
+        data: {
+          userId: developer._id,
+          userUUID: developer.uuid,
+          UserRole: 'Developer',
+          title: 'Document request',
+          message: `Funds Verifier requested documents for “${project.name}”: ${documents.map((d) => d.name).join(', ')}.`,
+          RelateRoute: docsPath,
+        },
+      })
+    } catch (error) {
+      console.log({ error: error?.message })
+    }
+
+    if (developer.email) {
+      sendEmail({
+        to: developer.email,
+        subject: `Funds Verifier — documents requested for ${project.name}`,
+        html: `
+          <h2>Documents requested</h2>
+          <p>Hello ${developer.name || 'Developer'},</p>
+          <p>Funds Verifier Super Admin requested the following document(s) for <strong>${project.name}</strong>:</p>
+          <ul>${documents.map((d) => `<li><strong>${d.name}</strong>${d.note ? ` — ${d.note}` : ''}</li>`).join('')}</ul>
+          <p><a href="${portalBase}${docsPath}">Open Document Storage</a></p>
+        `,
+      }).then((result) => {
+        if (!result.success) {
+          console.warn(`Document request email failed: ${result.error}`)
+        }
+      })
+    }
+  }
+
+  return res.status(200).json({
+    success: true,
+    message: 'Document request sent to developer',
+    project,
+  })
+})
+
+/** Developer: fulfill one requested document by uploading a file */
+export const fulfillProjectDocument = asyncHandler(async (req, res) => {
+  const user = await assertApprovedDeveloper(req, res)
+  const project = await findOwnedProject(req.params.projectId, user._id)
+  if (!project) {
+    return res.status(404).json({ success: false, message: 'Project not found' })
+  }
+
+  const requestId = String(req.body?.requestId || '').trim()
+  const documentId = sanitizeMongoId(req.body?.documentId)
+  const name = String(req.body?.name || '').trim()
+
+  if (!documentId) {
+    return res.status(400).json({
+      success: false,
+      message: 'documentId is required',
+    })
+  }
+
+  const requests = Array.isArray(project.requestedDocuments)
+    ? project.requestedDocuments
+    : []
+  const target = requests.find((d) => {
+    if (requestId && String(d._id) === requestId) return true
+    if (
+      name &&
+      String(d.name || '')
+        .trim()
+        .toLowerCase() === name.toLowerCase() &&
+      String(d.status || 'Pending') === 'Pending'
+    ) {
+      return true
+    }
+    return false
+  })
+
+  if (!target) {
+    return res.status(404).json({
+      success: false,
+      message: 'Requested document not found',
+    })
+  }
+
+  target.document = documentId
+  target.status = 'Fulfilled'
+  target.fulfilledAt = new Date()
+  project.markModified('requestedDocuments')
+
+  // Also store in project media so it appears in document storage
+  await DeveloperMedia.create({
+    project: project._id,
+    developer: user._id,
+    unit: null,
+    docType: 'Other',
+    title: target.name || 'Requested document',
+    fileKind: 'document',
+    document: documentId,
+  })
+
+  pushHistory(project, {
+    status: project.reviewStatus || 'ChangesRequested',
+    note: `Uploaded requested document: ${target.name}`,
+    actor: user._id,
+  })
+  await project.save()
+
+  await project.populate({ path: 'requestedDocuments.document' })
+
+  return res.status(200).json({
+    success: true,
+    message: 'Document uploaded',
+    project: {
+      requestedDocuments: project.requestedDocuments || [],
+      reviewHistory: project.reviewHistory || [],
+    },
   })
 })

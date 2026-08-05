@@ -50,7 +50,6 @@ import {
 } from '../helper/sanitizeListingResponse.js'
 import {
   recordListingClick,
-  recordListingImpressions,
 } from '../helper/listingAnalytics.js'
 import {
   getListingSellersByUuid,
@@ -288,6 +287,9 @@ const getSingleProperty = asyncHandler(async (req, res) => {
 
     if (!isPrivilegedUser) {
       recordListingClick(Property, property)
+      await attachDocumentSignedUrls(property, {
+        fields: ['evaluationCertificate', 'technicalReport'],
+      })
       const publicFields = PUBLIC_PROPERTY_FIELDS.trim().split(/\s+/)
       const publicProperty = filterPublicFields(property, publicFields)
       const sellersByUuid = await getListingSellersByUuid([property])
@@ -511,10 +513,6 @@ const getAllProduct = asyncHandler(async (req, res) => {
     const total = await Property.countDocuments(parseData)
     const products = await query.skip(skip).limit(limit)
 
-    if (!isAuthenticated) {
-      recordListingImpressions(Property, products)
-    }
-
     // Post-find hook on Property model already refreshed signed URLs on
     // populated media; re-run as a safety net for non-hooked paths.
     await refreshListingsMediaSignedUrls(products)
@@ -700,9 +698,6 @@ const getAllProductByFilter = asyncHandler(async (req, res) => {
       return obj
     })
     await refreshListingsMediaSignedUrls(allProduct)
-    if (!userId) {
-      recordListingImpressions(Property, allProduct)
-    }
     // Listing cards need fresh `signedUrl` on evaluation certificate / technical
     // report. Authenticated users also get uploadDocument + invoice when present.
     await Promise.all(

@@ -16,6 +16,7 @@ const uploadImgs = asyncHandler(async (req, res) => {
   try {
     const files = req.files
     const userUUID = req.user?.uuid || req.query.userId
+    const appendToId = String(req.body?.assetId || req.query?.assetId || '').trim()
     const SIGNED_URL_EXPIRES_IN_SECONDS = 60 * 60 // 1 hour
 
     const images = (files || []).map((file) => ({
@@ -33,6 +34,19 @@ const uploadImgs = asyncHandler(async (req, res) => {
         SIGNED_URL_EXPIRES_IN_SECONDS
       ).signedUrl,
     }))
+
+    // Append to an existing gallery so the listing's single pictures ref keeps all images.
+    if (appendToId) {
+      const existing = await ImageAsset.findOne({
+        _id: appendToId,
+        isDeleted: { $ne: true },
+      })
+      if (existing) {
+        existing.images = [...(existing.images || []), ...images]
+        await existing.save()
+        return res.status(200).json(existing)
+      }
+    }
 
     const createImage = await ImageAsset.create({ userUUID, images })
 

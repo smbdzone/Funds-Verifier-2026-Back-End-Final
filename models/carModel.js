@@ -14,7 +14,7 @@ const CarAdSchema = new Schema(
     },
     /** Unique listing number issued by the DLD (Dubai Land Department). */
     dldNumber: { type: String, default: '', trim: true },
-    /** Public visibility counters: impressions = shown on cards, clicks = detail views. */
+    /** Public visibility counters: incremented when a visitor opens this listing. */
     analytics: {
       impressions: { type: Number, default: 0 },
       clicks: { type: Number, default: 0 },

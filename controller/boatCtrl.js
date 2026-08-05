@@ -25,7 +25,6 @@ import {
 } from '../helper/sanitizeListingResponse.js'
 import {
   recordListingClick,
-  recordListingImpressions,
 } from '../helper/listingAnalytics.js'
 import {
   getListingSellersByUuid,
@@ -272,6 +271,9 @@ const getSingleProduct = asyncHandler(async (req, res) => {
     // Public user → return limited fields
     if (!isPrivilegedUser) {
       recordListingClick(Boat, boat)
+      await attachDocumentSignedUrls(boat, {
+        fields: ['evaluationCertificate', 'technicalReport'],
+      })
       const publicBoat = pickFields(boat, PUBLIC_BOAT_FIELDS.trim().split(/\s+/))
       const sellersByUuid = await getListingSellersByUuid([boat])
       const seller = resolveListingSeller(boat, sellersByUuid)
@@ -511,9 +513,6 @@ const getAllProduct = asyncHandler(async (req, res) => {
       }
       return obj
     })
-    if (!user) {
-      recordListingImpressions(Boat, products)
-    }
     await refreshListingsMediaSignedUrls(products)
     await Promise.all(
       products.map((p) =>

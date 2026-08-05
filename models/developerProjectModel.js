@@ -68,6 +68,24 @@ const developerProjectSchema = new mongoose.Schema(
       default: null,
     },
     reviewNote: { type: String, default: '', trim: true, maxlength: 2000 },
+    requestedDocuments: [
+      {
+        name: { type: String, required: true, trim: true },
+        note: { type: String, default: '', trim: true },
+        requestedAt: { type: Date, default: Date.now },
+        status: {
+          type: String,
+          enum: ['Pending', 'Fulfilled'],
+          default: 'Pending',
+        },
+        document: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: 'EvaluationCertificate',
+          default: null,
+        },
+        fulfilledAt: { type: Date, default: null },
+      },
+    ],
     assignedEvaluator: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',

@@ -8,6 +8,7 @@ import sendEmail from '../utils/nodeMailer.js'
 import { safeURL } from '../controller/emailCtrl.js'
 import { notifyFvListingApproved, notifyFvPremiumServiceCompleted } from '../utils/fvPortalMail.js'
 import { getAssetHolderListingPath } from '../utils/listingDeepLinks.js'
+import { formatDubaiDateTime } from '../utils/dubaiDateTime.js'
 
 function assetLabel(assetType) {
   const t = String(assetType || 'asset').toLowerCase()
@@ -236,16 +237,7 @@ async function notifySuperAdminsEvent({
 }
 
 function formatApprovedAt(value = new Date()) {
-  const date = value instanceof Date ? value : new Date(value)
-  if (Number.isNaN(date.getTime())) return String(value || '')
-  return date.toLocaleString('en-GB', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: true,
-  })
+  return formatDubaiDateTime(value)
 }
 
 /**

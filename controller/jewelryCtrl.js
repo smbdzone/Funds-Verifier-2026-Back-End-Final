@@ -25,7 +25,6 @@ import {
 } from '../helper/sanitizeListingResponse.js'
 import {
   recordListingClick,
-  recordListingImpressions,
 } from '../helper/listingAnalytics.js'
 import {
   getListingSellersByUuid,
@@ -262,6 +261,9 @@ const getSingleProduct = asyncHandler(async (req, res) => {
     // 🔒 Public / non-privileged users
     if (!isPrivilegedUser) {
       recordListingClick(Jewelry, jewelry)
+      await attachDocumentSignedUrls(jewelry, {
+        fields: ['evaluationCertificate', 'technicalReport'],
+      })
       const publicJewelry = pickFields(
         jewelry,
         PUBLIC_JEWELRY_FIELDS.trim().split(/\s+/),
@@ -433,10 +435,6 @@ const getAllProduct = asyncHandler(async (req, res) => {
 
   /* ===================== EXECUTION ===================== */
   const products = await query
-
-  if (isPublicUser) {
-    recordListingImpressions(Jewelry, products)
-  }
 
   // Post-find hook on Jewelry model already refreshed signed URLs on populated
   // media; re-run as a safety net for non-hooked paths (e.g. legacy lean).

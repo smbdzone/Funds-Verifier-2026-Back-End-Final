@@ -24,7 +24,6 @@ import {
 } from '../helper/sanitizeListingResponse.js'
 import {
   recordListingClick,
-  recordListingImpressions,
 } from '../helper/listingAnalytics.js'
 import {
   getListingSellersByUuid,
@@ -254,6 +253,9 @@ const getSingleProduct = asyncHandler(async (req, res) => {
 
     if (!isPrivilegedUser) {
       recordListingClick(Car, car)
+      await attachDocumentSignedUrls(car, {
+        fields: ['evaluationCertificate', 'technicalReport'],
+      })
       const publicCar = pickFields(car, PUBLIC_CAR_FIELDS.trim().split(/\s+/))
       const sellersByUuid = await getListingSellersByUuid([car])
       const seller = resolveListingSeller(car, sellersByUuid)
@@ -417,10 +419,6 @@ const getAllProduct = asyncHandler(async (req, res) => {
 
   const total = await Car.countDocuments(parseData)
   const products = await query.skip(skip).limit(limit)
-
-  if (!isAuthenticated) {
-    recordListingImpressions(Car, products)
-  }
 
   // Post-find hook on Car model already refreshed signed URLs on populated
   // media; re-run as a safety net for non-hooked paths (e.g. legacy lean).

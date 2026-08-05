@@ -1,4 +1,5 @@
 import Property from '../models/propertyModel.js'
+import { mapUnitSizeToPropertyFields } from './mapUnitSizeToProperty.js'
 
 /**
  * Map developer unit inventory status onto the linked marketplace Property.
@@ -16,6 +17,7 @@ export function mapUnitStatusToPropertyFields(unitStatus, { isDeleted = false } 
   switch (unitStatus) {
     case 'Sold':
     case 'Draft':
+    case 'Pending':
       return {
         status: 0,
         underProcess: false,
@@ -51,23 +53,26 @@ export async function syncPublishedPropertyFromUnit(unit) {
     }),
   }
 
-  if (unit.listingPrice != null && unit.listingPrice !== '') {
-    const price = Number(unit.listingPrice)
-    if (Number.isFinite(price) && price > 0) {
-      updates.price = price
-      updates.priceFrom = price
-      updates.priceTo = price
-    }
+  const priceFrom = Number(unit.priceFrom ?? unit.listingPrice)
+  const priceTo = Number(unit.priceTo ?? unit.priceFrom ?? unit.listingPrice)
+  if (Number.isFinite(priceFrom) && priceFrom > 0) {
+    updates.price = priceFrom
+    updates.priceFrom = priceFrom
+    updates.priceTo =
+      Number.isFinite(priceTo) && priceTo > 0 ? priceTo : priceFrom
+  }
+
+  if (unit.title) {
+    updates.title = String(unit.title).trim().slice(0, 50)
   }
 
   if (unit.builtUpArea != null && unit.builtUpArea !== '') {
     const bua = Number(unit.builtUpArea)
     if (Number.isFinite(bua)) {
-      updates.sizeSQFT = bua
-      updates.sizeSQFTFrom = bua
-      updates.sizeSQFTTo = bua
-      updates.sizeUnit = 'SQFT'
+      Object.assign(updates, mapUnitSizeToPropertyFields(unit))
     }
+  } else if (unit.sizeUnit) {
+    updates.sizeUnit = unit.sizeUnit
   }
 
   if (unit.bedrooms != null && unit.bedrooms !== '') {

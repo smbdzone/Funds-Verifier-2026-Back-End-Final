@@ -277,6 +277,97 @@ const DeleteNotificationById = async (id) => {
   }
 }
 
+/** Soft-delete all notifications visible to this user/role. */
+const ClearAllNotificationsForUser = async ({
+  userUUID,
+  userMongoId,
+  UserRole,
+  isAdmin = false,
+}) => {
+  try {
+    const findClause = buildUserNotificationFilter({
+      userUUID,
+      userMongoId,
+      UserRole,
+      isAdmin,
+    })
+
+    const result = await Notifications.updateMany(findClause, {
+      $set: { isDeleted: true, deletedAt: new Date(), isRead: true },
+    })
+
+    const io = getIO()
+    if (io) {
+      const payload = {
+        type: 'notification:cleared',
+        data: { cleared: true, UserRole },
+      }
+      if (userUUID) {
+        io.to(userUUID).emit('notification:cleared', payload)
+      }
+      if (UserRole) {
+        io.to(`role:${UserRole}`).emit('notification:cleared', payload)
+      }
+    }
+
+    return {
+      success: true,
+      message: 'All notifications cleared',
+      cleared: result?.modifiedCount || 0,
+    }
+  } catch (error) {
+    console.error('Error clearing notifications:', error)
+    throw { error: true, message: 'Internal server error!' }
+  }
+}
+
+/** Mark all notifications visible to this user/role as read. */
+const MarkAllNotificationsAsRead = async ({
+  userUUID,
+  userMongoId,
+  UserRole,
+  isAdmin = false,
+}) => {
+  try {
+    const findClause = {
+      ...buildUserNotificationFilter({
+        userUUID,
+        userMongoId,
+        UserRole,
+        isAdmin,
+      }),
+      isRead: false,
+    }
+
+    const result = await Notifications.updateMany(findClause, {
+      $set: { isRead: true },
+    })
+
+    const io = getIO()
+    if (io) {
+      const payload = {
+        type: 'notification:read-all',
+        data: { readAll: true, UserRole },
+      }
+      if (userUUID) {
+        io.to(userUUID).emit('notification:read-all', payload)
+      }
+      if (UserRole) {
+        io.to(`role:${UserRole}`).emit('notification:read-all', payload)
+      }
+    }
+
+    return {
+      success: true,
+      message: 'All notifications marked as read',
+      updated: result?.modifiedCount || 0,
+    }
+  } catch (error) {
+    console.error('Error marking all notifications read:', error)
+    throw { error: true, message: 'Internal server error!' }
+  }
+}
+
 export const GetRoutesForNotifications = (notification) => {
   try {
     const role = notification?.UserRole
@@ -387,4 +478,6 @@ export {
   UpdateNotificationAsRead,
   DeleteNotificationById,
   GetAllNotificationByUserRole,
+  ClearAllNotificationsForUser,
+  MarkAllNotificationsAsRead,
 }

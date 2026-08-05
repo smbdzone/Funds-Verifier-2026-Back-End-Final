@@ -14,14 +14,49 @@ const parseOptionalNumber = (value) => {
   return Number.isNaN(n) ? null : n
 }
 
+const parseStringArray = (value) => {
+  if (value === undefined) return undefined
+  if (!Array.isArray(value)) return []
+  return value.map((v) => String(v || '').trim()).filter(Boolean)
+}
+
+const parsePaymentSteps = (value) => {
+  if (value === undefined) return undefined
+  if (!Array.isArray(value)) return []
+  return value.map((step, index) => ({
+    step: index + 1,
+    stepLabel: `Step ${index + 1}`,
+    paymentLabel: String(step?.paymentLabel || step?.milestone || '').trim(),
+    sharePercent: String(step?.sharePercent ?? '').trim(),
+    milestone: String(step?.milestone || step?.paymentLabel || '').trim(),
+  }))
+}
+
+const slugUnitNumber = (title) => {
+  const base = String(title || 'unit')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
+    .slice(0, 40)
+  return base || `unit-${Date.now().toString(36)}`
+}
+
 const buildUnitPayload = (body, { forCreate = false } = {}) => {
-  const unitNumber =
+  let unitNumber =
     body.unitNumber !== undefined
       ? String(body.unitNumber || '').trim()
       : undefined
 
+  const title =
+    body.title !== undefined ? String(body.title || '').trim().slice(0, 50) : undefined
+
   if (forCreate && !unitNumber) {
-    return { ok: false, status: 400, message: 'Unit number is required' }
+    unitNumber = slugUnitNumber(title || body.unitNumber)
+  }
+
+  if (forCreate && !unitNumber) {
+    return { ok: false, status: 400, message: 'Title or unit number is required' }
   }
 
   if (body.category && !UNIT_CATEGORIES.includes(body.category)) {
@@ -40,28 +75,126 @@ const buildUnitPayload = (body, { forCreate = false } = {}) => {
     }
   }
 
+  const sizeUnitRaw =
+    body.sizeUnit !== undefined
+      ? String(body.sizeUnit || 'SQFT').trim().toUpperCase()
+      : undefined
+  if (sizeUnitRaw && !['SQFT', 'SQM'].includes(sizeUnitRaw)) {
+    return {
+      ok: false,
+      status: 400,
+      message: 'sizeUnit must be SQFT or SQM',
+    }
+  }
+
+  const listingRaw =
+    body.listing !== undefined ? String(body.listing || '').trim() : undefined
+  if (listingRaw && !['Public', 'Private', ''].includes(listingRaw)) {
+    return {
+      ok: false,
+      status: 400,
+      message: 'listing must be Public or Private',
+    }
+  }
+
   const payload = {}
   const fields = {
     unitNumber,
+    title,
+    phoneNumber:
+      body.phoneNumber !== undefined
+        ? String(body.phoneNumber || '').trim()
+        : undefined,
     floor: body.floor !== undefined ? String(body.floor || '').trim() : undefined,
     category: body.category,
     builtUpArea: parseOptionalNumber(body.builtUpArea),
+    builtUpAreaTo: parseOptionalNumber(body.builtUpAreaTo),
+    sizeUnit: sizeUnitRaw,
     orientation:
       body.orientation !== undefined
         ? String(body.orientation || '').trim()
         : undefined,
     view: body.view !== undefined ? String(body.view || '').trim() : undefined,
-    listingPrice: parseOptionalNumber(body.listingPrice),
+    listingPrice: parseOptionalNumber(
+      body.listingPrice !== undefined ? body.listingPrice : body.priceFrom,
+    ),
+    priceFrom: parseOptionalNumber(body.priceFrom),
+    priceTo: parseOptionalNumber(body.priceTo),
     currency:
       body.currency !== undefined
         ? String(body.currency || 'AED').trim() || 'AED'
         : undefined,
+    listing: listingRaw,
     bedrooms: parseOptionalNumber(body.bedrooms),
     bathrooms: parseOptionalNumber(body.bathrooms),
-    paymentPlan:
-      body.paymentPlan !== undefined
-        ? sanitizeMongoId(body.paymentPlan) || null
+    description:
+      body.description !== undefined
+        ? String(body.description || '').trim().slice(0, 300)
         : undefined,
+    additionalDescription:
+      body.additionalDescription !== undefined
+        ? String(body.additionalDescription || '').trim().slice(0, 1000)
+        : undefined,
+    developerName:
+      body.developerName !== undefined
+        ? String(body.developerName || '').trim()
+        : undefined,
+    dldNumber:
+      body.dldNumber !== undefined
+        ? String(body.dldNumber || '').trim()
+        : undefined,
+    deliveryQuarter:
+      body.deliveryQuarter !== undefined
+        ? String(body.deliveryQuarter || '').trim()
+        : undefined,
+    deliveryYear:
+      body.deliveryYear !== undefined
+        ? String(body.deliveryYear || '').trim()
+        : undefined,
+    layout:
+      body.layout !== undefined ? String(body.layout || '').trim() : undefined,
+    numberOfFloors:
+      body.numberOfFloors !== undefined
+        ? String(body.numberOfFloors || '').trim()
+        : undefined,
+    mapUrl:
+      body.mapUrl !== undefined ? String(body.mapUrl || '').trim() : undefined,
+    paymentPlanType:
+      body.paymentPlanType !== undefined
+        ? String(body.paymentPlanType || '').trim()
+        : undefined,
+    paymentPlanSteps: parsePaymentSteps(
+      body.paymentPlanSteps !== undefined
+        ? body.paymentPlanSteps
+        : Array.isArray(body.paymentPlan)
+          ? body.paymentPlan
+          : undefined,
+    ),
+    paymentPlan:
+      body.paymentPlanId !== undefined
+        ? sanitizeMongoId(body.paymentPlanId) || null
+        : body.paymentPlan !== undefined &&
+          typeof body.paymentPlan === 'string'
+          ? sanitizeMongoId(body.paymentPlan) || null
+          : undefined,
+    pictures: body.pictures !== undefined ? sanitizeMongoId(body.pictures) : undefined,
+    thumbnailImg:
+      body.thumbnailImg !== undefined
+        ? sanitizeMongoId(body.thumbnailImg)
+        : undefined,
+    qrScan: body.qrScan !== undefined ? sanitizeMongoId(body.qrScan) : undefined,
+    unitLayout:
+      body.unitLayout !== undefined
+        ? sanitizeMongoId(body.unitLayout)
+        : undefined,
+    floorPlan:
+      body.floorPlan !== undefined ? sanitizeMongoId(body.floorPlan) : undefined,
+    agencyAgreement:
+      body.agencyAgreement !== undefined
+        ? sanitizeMongoId(body.agencyAgreement)
+        : undefined,
+    facilities: parseStringArray(body.facilities),
+    customFacilities: parseStringArray(body.customFacilities),
     status: body.status,
     notes: body.notes !== undefined ? String(body.notes || '').trim() : undefined,
   }
@@ -89,7 +222,9 @@ export const listUnits = asyncHandler(async (req, res) => {
     isDeleted: false,
   })
     .populate({ path: 'paymentPlan', select: 'name uuid' })
-    .sort({ unitNumber: 1 })
+    .populate({ path: 'pictures', select: 'images' })
+    .populate({ path: 'thumbnailImg', select: 'images' })
+    .sort({ updatedAt: -1 })
 
   return res.status(200).json({
     success: true,
@@ -105,7 +240,15 @@ export const getUnit = asyncHandler(async (req, res) => {
   if (!unit) {
     return res.status(404).json({ success: false, message: 'Unit not found' })
   }
-  await unit.populate({ path: 'paymentPlan', select: 'name uuid' })
+  await unit.populate([
+    { path: 'paymentPlan', select: 'name uuid' },
+    { path: 'pictures', select: 'images' },
+    { path: 'thumbnailImg', select: 'images' },
+    { path: 'qrScan', select: 'images' },
+    { path: 'unitLayout', select: 'images' },
+    { path: 'floorPlan', select: 'images' },
+    { path: 'agencyAgreement' },
+  ])
   return res.status(200).json({ success: true, unit })
 })
 
@@ -117,6 +260,9 @@ export const createUnit = asyncHandler(async (req, res) => {
       .status(built.status)
       .json({ success: false, message: built.message })
   }
+
+  // New units stay Draft until "Submit for approval"
+  if (!built.payload.status) built.payload.status = 'Draft'
 
   try {
     const unit = await DeveloperUnit.create({
@@ -136,55 +282,6 @@ export const createUnit = asyncHandler(async (req, res) => {
   }
 })
 
-export const bulkCreateUnits = asyncHandler(async (req, res) => {
-  const { user, project } = await requireOwnedProject(req, res)
-  const rows = Array.isArray(req.body?.units) ? req.body.units : []
-  if (!rows.length) {
-    return res.status(400).json({
-      success: false,
-      message: 'Provide an array of units to import',
-    })
-  }
-
-  const created = []
-  const errors = []
-
-  for (let i = 0; i < rows.length; i += 1) {
-    const row = rows[i]
-    const built = buildUnitPayload(row, { forCreate: true })
-    if (!built.ok) {
-      errors.push({ row: i + 1, message: built.message, unitNumber: row?.unitNumber })
-      continue
-    }
-    try {
-      const unit = await DeveloperUnit.create({
-        ...built.payload,
-        project: project._id,
-        developer: user._id,
-      })
-      created.push(unit)
-    } catch (error) {
-      errors.push({
-        row: i + 1,
-        unitNumber: built.payload.unitNumber,
-        message:
-          error?.code === 11000
-            ? 'Duplicate unit number'
-            : error?.message || 'Failed to create unit',
-      })
-    }
-  }
-
-  return res.status(200).json({
-    success: true,
-    message: `Imported ${created.length} unit(s)`,
-    createdCount: created.length,
-    errorCount: errors.length,
-    units: created,
-    errors,
-  })
-})
-
 export const updateUnit = asyncHandler(async (req, res) => {
   const { project } = await requireOwnedProject(req, res)
   const unit = await findOwnedUnit(req.params.unitId, project._id)
@@ -192,31 +289,21 @@ export const updateUnit = asyncHandler(async (req, res) => {
     return res.status(404).json({ success: false, message: 'Unit not found' })
   }
 
-  const built = buildUnitPayload(req.body)
+  const built = buildUnitPayload(req.body, { forCreate: false })
   if (!built.ok) {
     return res
       .status(built.status)
       .json({ success: false, message: built.message })
   }
 
+  // Developers cannot force Available — only Super Admin publish does that
+  if (built.payload.status === 'Available' && unit.status !== 'Available') {
+    delete built.payload.status
+  }
+
+  Object.assign(unit, built.payload)
   try {
-    Object.assign(unit, built.payload)
     await unit.save()
-    let marketplace = null
-    try {
-      marketplace = await syncPublishedPropertyFromUnit(unit)
-    } catch (syncErr) {
-      console.warn(
-        'Published Property sync failed:',
-        syncErr?.message || syncErr,
-      )
-    }
-    return res.status(200).json({
-      success: true,
-      message: 'Unit updated',
-      unit,
-      marketplaceSynced: Boolean(marketplace),
-    })
   } catch (error) {
     if (error?.code === 11000) {
       return res.status(400).json({
@@ -226,6 +313,73 @@ export const updateUnit = asyncHandler(async (req, res) => {
     }
     throw error
   }
+
+  await syncPublishedPropertyFromUnit(unit)
+  return res.status(200).json({ success: true, message: 'Unit updated', unit })
+})
+
+/** Developer: submit unit listing for Super Admin approval */
+export const submitUnitForApproval = asyncHandler(async (req, res) => {
+  const { user, project } = await requireOwnedProject(req, res)
+  const unit = await findOwnedUnit(req.params.unitId, project._id)
+  if (!unit) {
+    return res.status(404).json({ success: false, message: 'Unit not found' })
+  }
+
+  if (!['Draft', 'Pending', 'Available'].includes(unit.status)) {
+    return res.status(400).json({
+      success: false,
+      message: `Cannot submit unit while status is ${unit.status}`,
+    })
+  }
+
+  const title = String(unit.title || '').trim()
+  if (!title) {
+    return res.status(400).json({
+      success: false,
+      message: 'Title is required before submitting for approval',
+    })
+  }
+  if (!unit.pictures && !unit.thumbnailImg) {
+    return res.status(400).json({
+      success: false,
+      message: 'Upload at least a thumbnail or pictures before submitting',
+    })
+  }
+
+  unit.status = 'Pending'
+  unit.submittedAt = new Date()
+  await unit.save()
+
+  const current = project.reviewStatus || 'Draft'
+  if (['Draft', 'ChangesRequested', 'Suspended', 'Approved', 'Published'].includes(current)) {
+    project.reviewStatus = 'Submitted'
+    project.submittedAt = project.submittedAt || new Date()
+    project.reviewHistory = project.reviewHistory || []
+    project.reviewHistory.push({
+      status: 'Submitted',
+      note: `Unit “${title || unit.unitNumber}” submitted for approval`,
+      actor: user._id,
+      at: new Date(),
+    })
+    await project.save()
+  } else if (current === 'UnderReview') {
+    // keep under review
+  } else if (current !== 'Submitted') {
+    project.reviewStatus = 'Submitted'
+    project.submittedAt = new Date()
+    await project.save()
+  }
+
+  return res.status(200).json({
+    success: true,
+    message: 'Submitted for approval',
+    unit,
+    project: {
+      reviewStatus: project.reviewStatus,
+      submittedAt: project.submittedAt,
+    },
+  })
 })
 
 export const deleteUnit = asyncHandler(async (req, res) => {
@@ -238,15 +392,49 @@ export const deleteUnit = asyncHandler(async (req, res) => {
   unit.isDeleted = true
   unit.deletedAt = new Date()
   await unit.save()
-
-  try {
-    await syncPublishedPropertyFromUnit(unit)
-  } catch (syncErr) {
-    console.warn(
-      'Published Property sync on delete failed:',
-      syncErr?.message || syncErr,
-    )
-  }
+  await syncPublishedPropertyFromUnit(unit)
 
   return res.status(200).json({ success: true, message: 'Unit removed' })
+})
+
+export const bulkCreateUnits = asyncHandler(async (req, res) => {
+  const { user, project } = await requireOwnedProject(req, res)
+  const rows = Array.isArray(req.body?.units) ? req.body.units : []
+  if (!rows.length) {
+    return res.status(400).json({ success: false, message: 'units array required' })
+  }
+
+  let createdCount = 0
+  const errors = []
+  for (let i = 0; i < rows.length; i += 1) {
+    const built = buildUnitPayload(rows[i], { forCreate: true })
+    if (!built.ok) {
+      errors.push({ index: i, message: built.message })
+      continue
+    }
+    try {
+      await DeveloperUnit.create({
+        ...built.payload,
+        status: 'Draft',
+        project: project._id,
+        developer: user._id,
+      })
+      createdCount += 1
+    } catch (error) {
+      errors.push({
+        index: i,
+        message:
+          error?.code === 11000
+            ? 'Duplicate unit number'
+            : error?.message || 'Failed',
+      })
+    }
+  }
+
+  return res.status(200).json({
+    success: true,
+    createdCount,
+    errorCount: errors.length,
+    errors,
+  })
 })

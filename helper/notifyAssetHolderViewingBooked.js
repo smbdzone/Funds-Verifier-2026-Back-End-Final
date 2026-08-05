@@ -5,6 +5,7 @@ import {
   notifyFvViewingRequested,
   notifyFvViewingCompleted,
 } from '../utils/fvPortalMail.js'
+import { formatDubaiDateTime } from '../utils/dubaiDateTime.js'
 
 /**
  * In-app notification + email when a buyer books a viewing for an asset.
@@ -103,14 +104,7 @@ export async function notifyAssetHolderViewingCompleted({
   if (!assetHolderUUID) return
 
   const completedAt = new Date()
-  const completedAtLabel = completedAt.toLocaleString('en-GB', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: true,
-  })
+  const completedAtLabel = formatDubaiDateTime(completedAt)
   const buyer = String(buyerName || '').trim() || 'A buyer'
   const title = String(listingTitle || '').trim() || 'listing'
   const assetLabel = String(assetType || 'property').toLowerCase()

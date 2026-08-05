@@ -61,6 +61,9 @@ export const PUBLIC_PROPERTY_FIELDS = `
   unitLayout
   floorPlan
   advertisementId
+  analytics
+  evaluationCertificate
+  technicalReport
 `
 
 export const PUBLIC_CAR_FIELDS = `
@@ -109,6 +112,7 @@ export const PUBLIC_CAR_FIELDS = `
   evaluationCertificate
   technicalReport
   video3DWalkthrough
+  analytics
 `
 export const PUBLIC_BOAT_FIELDS = `
 uuid 
@@ -153,6 +157,7 @@ userUUID
   thumbnailImg
   evaluationCertificate
   technicalReport
+  analytics
 `
 
 export const PUBLIC_JEWELRY_FIELDS = `
@@ -195,4 +200,5 @@ export const PUBLIC_JEWELRY_FIELDS = `
   thumbnailImg
   evaluationCertificate
   technicalReport
+  analytics
 `

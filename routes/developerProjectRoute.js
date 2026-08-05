@@ -15,6 +15,7 @@ import {
   bulkCreateUnits,
   updateUnit,
   deleteUnit,
+  submitUnitForApproval,
 } from '../controller/developerUnitCtrl.js'
 import {
   listPaymentPlans,
@@ -36,6 +37,10 @@ import {
   assignReviewEvaluator,
   updateAdminReviewStatus,
   publishReviewRequest,
+  deleteAdminReviewRequest,
+  requestProjectDocuments,
+  fulfillProjectDocument,
+  listDeveloperDocumentRequests,
 } from '../controller/developerReviewCtrl.js'
 import { getDeveloperCrmAnalytics } from '../controller/developerAnalyticsCtrl.js'
 import {
@@ -50,6 +55,13 @@ router.post('/', authMiddleware, createDeveloperProject)
 
 // Developer reviews list (must be before /:id)
 router.get('/reviews', authMiddleware, listDeveloperReviews)
+
+// Aggregated Super Admin document requests (must be before /:id)
+router.get(
+  '/document-requests',
+  authMiddleware,
+  listDeveloperDocumentRequests,
+)
 
 // CRM + transaction analytics (must be before /:id)
 router.get('/analytics', authMiddleware, getDeveloperCrmAnalytics)
@@ -88,6 +100,16 @@ router.post(
   ...adminOnly,
   publishReviewRequest,
 )
+router.delete(
+  '/admin/review-requests/:id',
+  ...adminOnly,
+  deleteAdminReviewRequest,
+)
+router.post(
+  '/admin/review-requests/:id/request-documents',
+  ...adminOnly,
+  requestProjectDocuments,
+)
 
 // Units (Step 5)
 router.get('/:projectId/units', authMiddleware, listUnits)
@@ -95,6 +117,11 @@ router.post('/:projectId/units', authMiddleware, createUnit)
 router.post('/:projectId/units/bulk', authMiddleware, bulkCreateUnits)
 router.get('/:projectId/units/:unitId', authMiddleware, getUnit)
 router.put('/:projectId/units/:unitId', authMiddleware, updateUnit)
+router.post(
+  '/:projectId/units/:unitId/submit',
+  authMiddleware,
+  submitUnitForApproval,
+)
 router.delete('/:projectId/units/:unitId', authMiddleware, deleteUnit)
 
 // Payment plans (Step 6)
@@ -119,6 +146,11 @@ router.delete('/:projectId/media/:mediaId', authMiddleware, deleteMedia)
 // Review & submit (Step 8)
 router.get('/:projectId/review', authMiddleware, getProjectReviewChecklist)
 router.post('/:projectId/submit', authMiddleware, submitProjectForReview)
+router.post(
+  '/:projectId/requested-documents/fulfill',
+  authMiddleware,
+  fulfillProjectDocument,
+)
 
 router.get('/:id', authMiddleware, getDeveloperProject)
 router.put('/:id', authMiddleware, updateDeveloperProject)
