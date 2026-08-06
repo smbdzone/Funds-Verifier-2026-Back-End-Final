@@ -171,11 +171,11 @@ const notifyAdminsOfSubmission = async (project, developer) => {
 }
 
 const categoryToPropertyType = (category) => {
-  const value = String(category || '').toLowerCase()
-  if (value.includes('villa')) return 'Villa'
-  if (value.includes('penthouse')) return 'Penthouse'
-  if (value.includes('completed')) return 'Apartment'
-  return 'Apartment'
+  const raw = String(category || '').trim()
+  if (!raw) return 'Apartment'
+  const value = raw.toLowerCase()
+  if (value === 'off-plan' || value === 'completed') return 'Apartment'
+  return raw
 }
 
 /**

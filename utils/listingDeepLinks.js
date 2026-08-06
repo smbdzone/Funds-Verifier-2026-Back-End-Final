@@ -56,7 +56,7 @@ export function getEvaluatorListingPath(assetType, listingUuid, role) {
   return `/evaluator-profile/property-evaluation/${listingUuid}`
 }
 
-/** Asset holder edit listing page after approval / service completion. */
+/** Asset holder edit listing page (dashboard) — keep for edit/service flows. */
 export function getAssetHolderListingPath(assetType, listingUuid) {
   if (!listingUuid) return '/seller-profile/my-listing'
 
@@ -65,6 +65,22 @@ export function getAssetHolderListingPath(assetType, listingUuid) {
   if (key === 'boat') return `/dashboard/boat-listing?id=${listingUuid}`
   if (key === 'jewelry') return `/dashboard/jewelry-listing?id=${listingUuid}`
   return `/dashboard/property-listing?id=${listingUuid}`
+}
+
+/**
+ * Public marketplace detail page (buyer-facing frontend).
+ * Prefer slug; fall back to uuid so the link still opens after approval.
+ */
+export function getPublicListingPath(listing = {}, assetType) {
+  const key = normalizeAssetKey(assetType || listing?.assetType)
+  const id = listing?.slug || listing?.uuid || listing?._id
+  if (!id) return '/'
+
+  if (key === 'offplan') return `/offplan/${id}`
+  if (key === 'car') return `/car/${id}`
+  if (key === 'boat') return `/boat/${id}`
+  if (key === 'jewelry') return `/jewelry/${id}`
+  return `/property/${id}`
 }
 
 /** Pending evaluation view for asset holder. */

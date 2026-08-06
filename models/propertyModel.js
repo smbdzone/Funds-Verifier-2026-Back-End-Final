@@ -141,7 +141,11 @@ const propertySchema = new mongoose.Schema({
   unitLayout: { type: mongoose.Schema.Types.ObjectId, ref: 'ImageAsset' },
   floorPlan: { type: mongoose.Schema.Types.ObjectId, ref: 'ImageAsset' },
   /** Ready-market title deed image (optional). */
-  titleDeed: { type: mongoose.Schema.Types.ObjectId, ref: 'ImageAsset' },
+  /** Optional ready-market title deed PDF. */
+  titleDeed: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'EvaluationCertificate',
+  },
   studioLayout: { type: mongoose.Schema.Types.ObjectId, ref: 'ImageAsset' },
   oneBhkLayout: { type: mongoose.Schema.Types.ObjectId, ref: 'ImageAsset' },
   twoBhkLayout: { type: mongoose.Schema.Types.ObjectId, ref: 'ImageAsset' },

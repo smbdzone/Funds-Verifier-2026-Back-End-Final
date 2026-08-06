@@ -41,6 +41,7 @@ export async function attachDocumentSignedUrls(obj, options = {}) {
   const pdfFields = options.fields || [
     'evaluationCertificate',
     'agencyAgreement',
+    'titleDeed',
     'uploadDocument',
     'invoice',
     'technicalReport',

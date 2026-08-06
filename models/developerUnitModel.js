@@ -2,11 +2,34 @@ import mongoose from 'mongoose'
 import { v4 as uuidv4 } from 'uuid'
 
 export const UNIT_CATEGORIES = [
+  'Apartment',
+  'Villa',
+  'Townhouse',
+  'Multiple',
+  'Penthouse',
+  'Residential Building',
+  'Residential Floor',
+  'Villa Compound',
+  'Office',
+  'Industrials',
+  'Retail',
+  'Staff Accommodation',
+  'Accommodation',
+  'Shop',
+  'Warehouse',
+  'Commercial Floor',
+  'Commercial Villa',
+  'Bulk Unit',
+  'Commercial Plot',
+  'Factory',
+  'Industrial Land',
+  'Mixed Use Land',
+  'Showroom',
+  'Commercial',
+  'Building',
+  'Other',
   'Off-Plan',
   'Completed',
-  'Villa',
-  'Apartment',
-  'Penthouse',
 ]
 
 export const UNIT_STATUSES = [

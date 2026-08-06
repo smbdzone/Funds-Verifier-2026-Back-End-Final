@@ -472,21 +472,21 @@ const getAllProduct = asyncHandler(async (req, res) => {
       .populate({ path: 'titleDeed', select: '-_id' })
       .populate({ path: 'qrScan', select: '-_id' })
       .populate({ path: 'userId', select: 'profileImage name uuid' })
+      .populate({ path: 'evaluationCertificate', select: '-_id' })
+      .populate({ path: 'video3DWalkthrough', select: '-_id' })
+      .populate({
+        path: 'technicalReport',
+        select: '-_id',
+        populate: { path: 'reportFile', select: '-_id' },
+      })
 
     if (isAuthenticated) {
       query = query
-        .populate({ path: 'evaluationCertificate', select: '-_id' })
         .populate({ path: 'agencyAgreement', select: '-_id' })
         .populate({ path: 'uploadDocument', select: '-_id' })
         .populate(REQUEST_DOCUMENT_POPULATE)
         .populate({ path: 'invoice', select: '-_id' })
         .populate({ path: 'evaluator', select: 'name displayName uuid' })
-        .populate({ path: 'video3DWalkthrough', select: '-_id' })
-        .populate({
-          path: 'technicalReport',
-          select: '-_id',
-          populate: { path: 'reportFile', select: '-_id' },
-        })
     }
 
     query = query.populate({
@@ -543,12 +543,11 @@ const getAllProduct = asyncHandler(async (req, res) => {
           obj.sellerRef = getSellerRef(seller)
         }
 
-        // 🔥 REMOVE SENSITIVE FIELDS FOR PUBLIC
+        // 🔥 REMOVE SENSITIVE FIELDS FOR PUBLIC (keep card certs / reports)
         if (!isAuthenticated) {
-          delete obj.evaluationCertificate
           delete obj.uploadDocument
           delete obj.invoice
-          delete obj.technicalReport
+          delete obj.agencyAgreement
           delete obj.userUUID
 
           // Keep seller avatar for cards; strip other user fields
@@ -563,11 +562,15 @@ const getAllProduct = asyncHandler(async (req, res) => {
           }
         }
 
-        // 🔐 SIGNED URLS ONLY FOR AUTH USERS (S3/CloudFront; legacy docs use stored url)
+        // Card PDFs for everyone; full docs only for authenticated users
         if (isAuthenticated) {
           await attachDocumentSignedUrls(obj)
           obj.requestDocument = normalizeRequestDocumentList(obj.requestDocument)
           await attachRequestDocumentSignedUrls(obj)
+        } else {
+          await attachDocumentSignedUrls(obj, {
+            fields: ['evaluationCertificate', 'technicalReport'],
+          })
         }
 
         // Drop internal S3 fields before serializing (signedUrl is enough).

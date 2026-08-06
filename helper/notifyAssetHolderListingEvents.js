@@ -7,7 +7,7 @@ import User from '../models/userModel.js'
 import sendEmail from '../utils/nodeMailer.js'
 import { safeURL } from '../controller/emailCtrl.js'
 import { notifyFvListingApproved, notifyFvPremiumServiceCompleted } from '../utils/fvPortalMail.js'
-import { getAssetHolderListingPath } from '../utils/listingDeepLinks.js'
+import { getAssetHolderListingPath, getPublicListingPath } from '../utils/listingDeepLinks.js'
 import { formatDubaiDateTime } from '../utils/dubaiDateTime.js'
 
 function assetLabel(assetType) {
@@ -284,9 +284,9 @@ export async function notifyAssetHolderListingApproved({
       'Click the button below to open this listing.',
     ],
     emailCtaLabel: 'Open Listing',
-    emailCtaPath: getAssetHolderListingPath(
+    emailCtaPath: getPublicListingPath(
+      listing,
       assetType || listing.assetType,
-      listing.uuid,
     ),
   })
 
@@ -521,9 +521,9 @@ export async function notifyAssetHolderOffPlanApproved({ listing }) {
       'Click the button below to open this listing.',
     ],
     emailCtaLabel: 'Open Listing',
-    emailCtaPath: getAssetHolderListingPath(
+    emailCtaPath: getPublicListingPath(
+      listing,
       listing.assetType || 'off plan',
-      listing.uuid,
     ),
   })
 
