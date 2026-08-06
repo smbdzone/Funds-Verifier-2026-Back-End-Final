@@ -44,6 +44,7 @@ import {
   sanitizeUnpaidPremiumServicesForClient,
 } from '../utils/listingPremiumSync.js'
 import { buildListingIdQuery } from '../utils/listingIdLookup.js'
+import { isListingPrivilegedUser } from '../utils/parentEvaluator.js'
 import {
   blockPriceChangeIfUnderProcess,
   stripUnderProcessFromListingPayload,
@@ -262,11 +263,7 @@ const getSingleProduct = asyncHandler(async (req, res) => {
 
     await refreshListingMediaSignedUrls(boat)
 
-    const isPrivilegedUser =
-      req.user &&
-      ['Admin', 'AssetHolder', 'Evaluator', 'Sub-Evaluator'].includes(
-        req.user.role,
-      )
+    const isPrivilegedUser = isListingPrivilegedUser(req.user)
 
     // Public user → return limited fields
     if (!isPrivilegedUser) {
@@ -301,11 +298,7 @@ const getSingleProductBySlug = asyncHandler(async (req, res) => {
   const { slug } = req.params
 
   // Check privileged roles
-  const isPrivilegedUser =
-    req.user &&
-    ['AssetHolder', 'Admin', 'Evaluator', 'Sub-Evaluator'].includes(
-      req.user.role,
-    )
+  const isPrivilegedUser = isListingPrivilegedUser(req.user)
 
   try {
     const boat = await Boat.findOne({ slug, isDeleted: false })

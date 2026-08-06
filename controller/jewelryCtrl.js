@@ -44,6 +44,7 @@ import {
   sanitizeUnpaidPremiumServicesForClient,
 } from '../utils/listingPremiumSync.js'
 import { buildListingIdQuery } from '../utils/listingIdLookup.js'
+import { isListingPrivilegedUser } from '../utils/parentEvaluator.js'
 import {
   blockPriceChangeIfUnderProcess,
   stripUnderProcessFromListingPayload,
@@ -252,11 +253,7 @@ const getSingleProduct = asyncHandler(async (req, res) => {
 
     await refreshListingMediaSignedUrls(jewelry)
 
-    const isPrivilegedUser =
-      req.user &&
-      ['Admin', 'AssetHolder', 'Evaluator', 'Sub-Evaluator'].includes(
-        req.user.role,
-      )
+    const isPrivilegedUser = isListingPrivilegedUser(req.user)
 
     // 🔒 Public / non-privileged users
     if (!isPrivilegedUser) {

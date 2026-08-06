@@ -20,7 +20,7 @@ export const getListingSellersByUuid = async (listings) => {
   if (!uuids.length) return new Map()
   try {
     const users = await User.find({ uuid: { $in: uuids } })
-      .select('profileImage name uuid')
+      .select('profileImage name uuid email phoneNumber phone mobile')
       .lean()
     return new Map(users.map((u) => [u.uuid, u]))
   } catch {

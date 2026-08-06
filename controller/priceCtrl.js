@@ -61,6 +61,42 @@ async function resolveFilterUserUuid(requestedUuid) {
   return requestedUuid
 }
 
+/**
+ * Move every Evaluator-owned price row onto EVALUATOR_SHARED so the shared
+ * price list shows all historically stored prices (not only the first opener’s).
+ * Idempotent — safe to run on every list/filter request.
+ * Includes soft-deleted Evaluator accounts so their prices are not left orphaned.
+ */
+async function migrateAllEvaluatorPricesToShared() {
+  const evaluators = await User.find({})
+    .select('uuid role')
+    .lean()
+
+  const evaluatorUuids = [
+    ...new Set(
+      evaluators
+        .filter((u) => normalizeRole(u?.role) === 'Evaluator' && u?.uuid)
+        .map((u) => String(u.uuid).trim())
+        .filter((uuid) => uuid && uuid !== EVALUATOR_SHARED_PRICE_UUID),
+    ),
+  ]
+
+  if (!evaluatorUuids.length) return { matched: 0, modified: 0 }
+
+  const result = await Price.updateMany(
+    {
+      userUUID: { $in: evaluatorUuids },
+      isDeleted: false,
+    },
+    { $set: { userUUID: EVALUATOR_SHARED_PRICE_UUID } },
+  )
+
+  return {
+    matched: result?.matchedCount ?? result?.n ?? 0,
+    modified: result?.modifiedCount ?? result?.nModified ?? 0,
+  }
+}
+
 export const createPrice = async (req, res) => {
   try {
     if (isSubEvaluator(req.user)) return forbidSubEvaluator(res)
@@ -109,24 +145,19 @@ export const getPrices = async (req, res) => {
   try {
     if (isSubEvaluator(req.user)) return forbidSubEvaluator(res)
 
-    const ownerUuid = resolvePriceOwnerUuid(req.user, id)
+    // TEMP OPEN: allow shared list read even when session is missing.
+    // Prefer authenticated owner resolution; fall back to shared/id param.
+    let ownerUuid = resolvePriceOwnerUuid(req.user, id)
+    if (!ownerUuid) {
+      ownerUuid =
+        id === EVALUATOR_SHARED_PRICE_UUID || !id
+          ? EVALUATOR_SHARED_PRICE_UUID
+          : id
+    }
 
-    // Seed shared list once from the first Evaluator who opens Price List.
-    if (
-      isEvaluator(req.user) &&
-      ownerUuid === EVALUATOR_SHARED_PRICE_UUID &&
-      req.user?.uuid
-    ) {
-      const sharedCount = await Price.countDocuments({
-        userUUID: EVALUATOR_SHARED_PRICE_UUID,
-        isDeleted: false,
-      })
-      if (sharedCount === 0) {
-        await Price.updateMany(
-          { userUUID: req.user.uuid, isDeleted: false },
-          { $set: { userUUID: EVALUATOR_SHARED_PRICE_UUID } },
-        )
-      }
+    // Backfill: all personal Evaluator UUID rows → shared list.
+    if (ownerUuid === EVALUATOR_SHARED_PRICE_UUID) {
+      await migrateAllEvaluatorPricesToShared()
     }
 
     const reports = await Price.find({
@@ -149,6 +180,10 @@ export const filterPrice = async (req, res) => {
 
     if (userUUID) {
       query.userUUID = await resolveFilterUserUuid(String(userUUID))
+      // Ensure legacy personal evaluator prices are visible in shared lookups.
+      if (query.userUUID === EVALUATOR_SHARED_PRICE_UUID) {
+        await migrateAllEvaluatorPricesToShared()
+      }
     }
     if (category) query.category = category
     if (subCategory) query.subCategory = subCategory
@@ -196,11 +231,19 @@ export const updatePrice = async (req, res) => {
     }
 
     // Evaluators may only edit the shared list; others only their own rows.
+    // Orphan personal-UUID rows are claimed into the shared list first.
     if (isEvaluator(req.user)) {
       if (existing.userUUID !== EVALUATOR_SHARED_PRICE_UUID) {
-        return res.status(403).json({
-          message: 'Evaluators can only update the shared price list',
-        })
+        await migrateAllEvaluatorPricesToShared()
+        const refreshed = await Price.findOne({ uuid: id, isDeleted: false })
+        if (
+          !refreshed ||
+          refreshed.userUUID !== EVALUATOR_SHARED_PRICE_UUID
+        ) {
+          return res.status(403).json({
+            message: 'Evaluators can only update the shared price list',
+          })
+        }
       }
     } else if (
       existing.userUUID &&
@@ -243,6 +286,10 @@ export const deletePrice = async (req, res) => {
 
   try {
     if (isSubEvaluator(user)) return forbidSubEvaluator(res)
+
+    if (isEvaluator(user)) {
+      await migrateAllEvaluatorPricesToShared()
+    }
 
     const query = { uuid: id, isDeleted: false }
     if (isEvaluator(user)) {

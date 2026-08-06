@@ -27,3 +27,25 @@ export const canAccessParentScope = (requester, parentId) => {
 
 export const isSubEvaluatorRole = (role) =>
   ['Sub-Evaluator', 'SubEvaluator'].includes(String(role || ''))
+
+/** Roles that receive the full listing document (not public field filter). */
+const LISTING_PRIVILEGED_ROLE_KEYS = new Set([
+  'admin',
+  'assetholder',
+  'evaluator',
+  'subevaluator',
+  'trustee',
+])
+
+/**
+ * True when the authenticated user should get the complete asset payload
+ * (media refs, request/upload docs, phone, lease, premium fields, etc.).
+ */
+export const isListingPrivilegedUser = (user) => {
+  if (!user?.role) return false
+  const key = String(user.role)
+    .trim()
+    .toLowerCase()
+    .replace(/[\s_-]/g, '')
+  return LISTING_PRIVILEGED_ROLE_KEYS.has(key)
+}

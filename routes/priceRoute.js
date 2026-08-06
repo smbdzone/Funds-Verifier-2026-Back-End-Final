@@ -7,12 +7,16 @@ import {
   deletePrice,
   filterPrice,
 } from '../controller/priceCtrl.js'
-import { authMiddleware } from '../middlewares/authMiddleware.js'
+import {
+  authMiddleware,
+  optionalAuthMiddleware,
+} from '../middlewares/authMiddleware.js'
 import { userRateLimiter } from '../middlewares/rateLimiter.js'
 
 const router = express.Router()
 router.post('/', authMiddleware, createPrice)
-router.get('/all/:id', authMiddleware, getPrices)
+// TEMP OPEN: list prices without forcing login (close when user asks)
+router.get('/all/:id', optionalAuthMiddleware, getPrices)
 router.get('/filter-price', authMiddleware, filterPrice)
 router.put('/:id', authMiddleware, updatePrice)
 router.get('/:id', authMiddleware, getPriceById)

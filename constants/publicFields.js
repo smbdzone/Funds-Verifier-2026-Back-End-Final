@@ -47,6 +47,7 @@ export const PUBLIC_PROPERTY_FIELDS = `
   mapUrl
   country
   city
+  phoneNumber
   userUUID
   video
   pictures
@@ -65,6 +66,7 @@ export const PUBLIC_PROPERTY_FIELDS = `
   analytics
   evaluationCertificate
   technicalReport
+  leaseNumberofCheques
 `
 
 export const PUBLIC_CAR_FIELDS = `

@@ -65,6 +65,7 @@ import {
   applyRoiRangeFilter,
 } from '../utils/listingQuery.js'
 import { buildListingIdQuery } from '../utils/listingIdLookup.js'
+import { isListingPrivilegedUser } from '../utils/parentEvaluator.js'
 import {
   blockPriceChangeIfUnderProcess,
   stripUnderProcessFromListingPayload,
@@ -280,11 +281,7 @@ const getSingleProperty = asyncHandler(async (req, res) => {
 
     await refreshListingMediaSignedUrls(property)
 
-    const isPrivilegedUser =
-      req.user &&
-      ['AssetHolder', 'Admin', 'Evaluator', 'Sub-Evaluator'].includes(
-        req.user.role,
-      )
+    const isPrivilegedUser = isListingPrivilegedUser(req.user)
 
     if (!isPrivilegedUser) {
       recordListingClick(Property, property)
@@ -298,10 +295,13 @@ const getSingleProperty = asyncHandler(async (req, res) => {
       if (seller) {
         publicProperty.sellerAvatar = seller.profileImage || ''
         publicProperty.sellerName = seller.name || ''
+        publicProperty.sellerEmail = seller.email || ''
         publicProperty.sellerRef = getSellerRef(seller)
         publicProperty.userId = {
           profileImage: seller.profileImage || '',
           name: seller.name || '',
+          email: seller.email || '',
+          phoneNumber: seller.phoneNumber || seller.phone || '',
         }
       }
       sanitizeListingMediaResponse(publicProperty)
