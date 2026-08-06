@@ -50,6 +50,7 @@ import {
   blockPriceChangeIfUnderProcess,
   stripUnderProcessFromListingPayload,
 } from '../utils/listingUnderProcess.js'
+import { restrictAssetHolderBodyAfterApproval } from '../utils/listingEditLock.js'
 import express from 'express'
 import upload from '../middlewares/Multer.js'
 
@@ -734,6 +735,12 @@ const updateProduct = asyncHandler(async (req, res) => {
       if (priceBlock) {
         return res.status(403).json({ message: priceBlock })
       }
+
+      req.body = restrictAssetHolderBodyAfterApproval(
+        product,
+        req.body,
+        req.user,
+      )
 
       // Update slug if title is provided
       if (req.body.title) {
