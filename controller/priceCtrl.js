@@ -1,4 +1,17 @@
 import Price from '../models/priceModel.js'
+import User from '../models/userModel.js'
+
+/** Shared price list for every Evaluator account (not SubEvaluators). */
+export const EVALUATOR_SHARED_PRICE_UUID = 'EVALUATOR_SHARED'
+
+function normalizeRole(role) {
+  const cleaned = String(role || '')
+    .replace(/[\s-_]/g, '')
+    .toLowerCase()
+  if (cleaned === 'subevaluator') return 'SubEvaluator'
+  if (cleaned === 'evaluator') return 'Evaluator'
+  return String(role || '')
+}
 
 function parsePositivePrice(price) {
   const num = Number(price)
@@ -8,13 +21,54 @@ function parsePositivePrice(price) {
   return num
 }
 
+function isSubEvaluator(user) {
+  return normalizeRole(user?.role) === 'SubEvaluator'
+}
+
+function isEvaluator(user) {
+  return normalizeRole(user?.role) === 'Evaluator'
+}
+
+function forbidSubEvaluator(res) {
+  return res.status(403).json({
+    message: 'Sub-evaluators cannot view or manage the evaluation price list',
+  })
+}
+
+/**
+ * Resolve which userUUID owns the price rows for this request.
+ * Evaluators always read/write the shared list.
+ */
+function resolvePriceOwnerUuid(reqUser, requestedUuid) {
+  if (isEvaluator(reqUser)) return EVALUATOR_SHARED_PRICE_UUID
+  return requestedUuid || reqUser?.uuid
+}
+
+async function resolveFilterUserUuid(requestedUuid) {
+  if (!requestedUuid) return null
+  if (requestedUuid === EVALUATOR_SHARED_PRICE_UUID) {
+    return EVALUATOR_SHARED_PRICE_UUID
+  }
+  const owner = await User.findOne({
+    uuid: requestedUuid,
+    isDeleted: { $ne: true },
+  })
+    .select('role')
+    .lean()
+  if (normalizeRole(owner?.role) === 'Evaluator') {
+    return EVALUATOR_SHARED_PRICE_UUID
+  }
+  return requestedUuid
+}
+
 export const createPrice = async (req, res) => {
   try {
+    if (isSubEvaluator(req.user)) return forbidSubEvaluator(res)
+
     const { assetType, value, price, subCategory, category, userUUID } =
       req.body
 
-    // Validate that required fields are provided
-    if (!assetType || !price || !category || !userUUID) {
+    if (!assetType || !price || !category) {
       return res
         .status(400)
         .json({ message: 'All required fields must be provided' })
@@ -25,14 +79,18 @@ export const createPrice = async (req, res) => {
       return res.status(400).json({ message: 'Price must be a positive number' })
     }
 
-    // Create the new report with assetType, productTitle, and productId initially set to null
+    const ownerUuid = resolvePriceOwnerUuid(req.user, userUUID)
+    if (!ownerUuid) {
+      return res.status(400).json({ message: 'userUUID is required' })
+    }
+
     const newReport = new Price({
       assetType,
       value,
       price: String(validPrice),
       category,
       subCategory,
-      userUUID,
+      userUUID: ownerUuid,
     })
 
     await newReport.save()
@@ -47,12 +105,34 @@ export const createPrice = async (req, res) => {
 
 export const getPrices = async (req, res) => {
   const { id } = req.params
-  console.log(id, 'sdfghyjkl')
 
   try {
-    const reports = await Price.find({ userUUID: id, isDeleted: false }).select(
-      '-_id -isDeleted -deletedAt'
-    )
+    if (isSubEvaluator(req.user)) return forbidSubEvaluator(res)
+
+    const ownerUuid = resolvePriceOwnerUuid(req.user, id)
+
+    // Seed shared list once from the first Evaluator who opens Price List.
+    if (
+      isEvaluator(req.user) &&
+      ownerUuid === EVALUATOR_SHARED_PRICE_UUID &&
+      req.user?.uuid
+    ) {
+      const sharedCount = await Price.countDocuments({
+        userUUID: EVALUATOR_SHARED_PRICE_UUID,
+        isDeleted: false,
+      })
+      if (sharedCount === 0) {
+        await Price.updateMany(
+          { userUUID: req.user.uuid, isDeleted: false },
+          { $set: { userUUID: EVALUATOR_SHARED_PRICE_UUID } },
+        )
+      }
+    }
+
+    const reports = await Price.find({
+      userUUID: ownerUuid,
+      isDeleted: false,
+    }).select('-_id -isDeleted -deletedAt')
     res.status(200).json(reports)
   } catch (error) {
     res.status(500).json({ message: 'Error fetching requests', error })
@@ -63,26 +143,29 @@ export const filterPrice = async (req, res) => {
   const { userUUID, category, subCategory, value, assetType } = req.query
 
   try {
+    if (isSubEvaluator(req.user)) return forbidSubEvaluator(res)
+
     const query = { isDeleted: false }
 
-    if (userUUID) query.userUUID = userUUID
+    if (userUUID) {
+      query.userUUID = await resolveFilterUserUuid(String(userUUID))
+    }
     if (category) query.category = category
     if (subCategory) query.subCategory = subCategory
     if (value) query.value = value
     if (assetType) query.assetType = assetType
-    // Fetch data based on the query object
-    const reports = await Price.find(query).select('-_id -isDeleted -deletedAt')
 
-    // Send the filtered reports
+    const reports = await Price.find(query).select('-_id -isDeleted -deletedAt')
     res.status(200).json(reports)
   } catch (error) {
-    // Handle errors and send response
     res.status(500).json({ message: 'Error fetching requests', error })
   }
 }
 
 export const getPriceById = async (req, res) => {
   try {
+    if (isSubEvaluator(req.user)) return forbidSubEvaluator(res)
+
     const reportId = req.params.id
 
     const report = await Price.findOne({
@@ -103,7 +186,29 @@ export const getPriceById = async (req, res) => {
 
 export const updatePrice = async (req, res) => {
   try {
+    if (isSubEvaluator(req.user)) return forbidSubEvaluator(res)
+
     const { id } = req.params
+
+    const existing = await Price.findOne({ uuid: id, isDeleted: false })
+    if (!existing) {
+      return res.status(404).json({ message: 'Price not found' })
+    }
+
+    // Evaluators may only edit the shared list; others only their own rows.
+    if (isEvaluator(req.user)) {
+      if (existing.userUUID !== EVALUATOR_SHARED_PRICE_UUID) {
+        return res.status(403).json({
+          message: 'Evaluators can only update the shared price list',
+        })
+      }
+    } else if (
+      existing.userUUID &&
+      existing.userUUID !== req.user?.uuid &&
+      req.user?.role !== 'Admin'
+    ) {
+      return res.status(403).json({ message: 'Not allowed to update this price' })
+    }
 
     if (req.body?.price !== undefined) {
       const validPrice = parsePositivePrice(req.body.price)
@@ -113,12 +218,17 @@ export const updatePrice = async (req, res) => {
       req.body.price = String(validPrice)
     }
 
-    const updatedReport = await Price.findOneAndUpdate({ uuid: id }, req.body, {
+    // Never let clients re-scope shared rows to a personal uuid.
+    const patch = { ...req.body }
+    delete patch.userUUID
+    if (isEvaluator(req.user)) {
+      patch.userUUID = EVALUATOR_SHARED_PRICE_UUID
+    }
+
+    const updatedReport = await Price.findOneAndUpdate({ uuid: id }, patch, {
       new: true,
     }).select('-_id -isDeleted -deletedAt')
-    if (!updatedReport) {
-      return res.status(404).json({ message: 'Price not found' })
-    }
+
     res
       .status(200)
       .json({ message: 'Report updated successfully', request: updatedReport })
@@ -130,15 +240,18 @@ export const updatePrice = async (req, res) => {
 export const deletePrice = async (req, res) => {
   const { id } = req.params
   const user = req.user
-  console.log('delete', id, user)
 
   try {
-    const price = await Price.findOne({
-      uuid: id,
-      userUUID: user.uuid,
-      isDeleted: false,
-    })
-    console.log(price)
+    if (isSubEvaluator(user)) return forbidSubEvaluator(res)
+
+    const query = { uuid: id, isDeleted: false }
+    if (isEvaluator(user)) {
+      query.userUUID = EVALUATOR_SHARED_PRICE_UUID
+    } else {
+      query.userUUID = user.uuid
+    }
+
+    const price = await Price.findOne(query)
 
     if (!price || price.isDeleted) {
       return res
@@ -146,7 +259,6 @@ export const deletePrice = async (req, res) => {
         .json({ message: 'Price not found or already deleted' })
     }
 
-    // Soft delete
     price.isDeleted = true
     price.deletedAt = new Date()
     await price.save()
