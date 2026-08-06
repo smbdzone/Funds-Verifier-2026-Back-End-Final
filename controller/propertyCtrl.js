@@ -71,6 +71,7 @@ import {
   blockPriceChangeIfUnderProcess,
   stripUnderProcessFromListingPayload,
 } from '../utils/listingUnderProcess.js'
+import { restrictAssetHolderBodyAfterApproval } from '../utils/listingEditLock.js'
 import {
   applyOffPlanAutoApproval,
   isOffPlanAssetType,
@@ -829,6 +830,14 @@ const updateProduct = asyncHandler(async (req, res) => {
       if (priceBlock) {
         return res.status(403).json({ message: priceBlock })
       }
+
+      // After evaluator approval, keep finalized details — asset holders may
+      // only update price, Public/Private, and premium-service requests.
+      req.body = restrictAssetHolderBodyAfterApproval(
+        product,
+        req.body,
+        req.user,
+      )
 
       // Update slug if title is provided (keep unique across listings)
       if (req.body.title) {
