@@ -6,7 +6,7 @@ import User from '../models/userModel.js'
  * and cards end up without the seller's avatar. This helper batch-loads the
  * owners by uuid so controllers can fill sellerAvatar/sellerName reliably.
  *
- * Returns a Map of userUUID -> { profileImage, name, uuid }.
+ * Returns a Map of userUUID -> seller fields.
  */
 export const getListingSellersByUuid = async (listings) => {
   const items = Array.isArray(listings) ? listings : [listings]
@@ -20,7 +20,9 @@ export const getListingSellersByUuid = async (listings) => {
   if (!uuids.length) return new Map()
   try {
     const users = await User.find({ uuid: { $in: uuids } })
-      .select('profileImage name uuid email phoneNumber phone mobile')
+      .select(
+        'profileImage name lastname uuid email phone phoneNumber mobile emiratesId',
+      )
       .lean()
     return new Map(users.map((u) => [u.uuid, u]))
   } catch {
@@ -45,7 +47,9 @@ export const resolveListingSeller = (listing, sellersByUuid) => {
   if (
     populated &&
     typeof populated === 'object' &&
-    (populated.profileImage !== undefined || populated.name !== undefined)
+    (populated.profileImage !== undefined ||
+      populated.name !== undefined ||
+      populated.email !== undefined)
   ) {
     return populated
   }
@@ -53,4 +57,50 @@ export const resolveListingSeller = (listing, sellersByUuid) => {
     return sellersByUuid.get(listing.userUUID)
   }
   return null
+}
+
+/**
+ * Attach seller contact fields used by evaluator evaluate forms and listing cards.
+ * Safe for both public and privileged single-listing responses.
+ */
+export const attachListingSellerContact = async (listing) => {
+  if (!listing || typeof listing !== 'object') return listing
+
+  const sellersByUuid = await getListingSellersByUuid([listing])
+  const seller = resolveListingSeller(listing, sellersByUuid)
+  if (!seller) return listing
+
+  const sellerPhone =
+    seller.phoneNumber || seller.phone || seller.mobile || ''
+
+  listing.sellerAvatar = seller.profileImage || listing.sellerAvatar || ''
+  listing.sellerName = seller.name || listing.sellerName || ''
+  listing.sellerEmail = seller.email || listing.sellerEmail || ''
+  listing.sellerRef = getSellerRef(seller) || listing.sellerRef || ''
+
+  const existingUser =
+    listing.userId && typeof listing.userId === 'object' ? listing.userId : {}
+
+  listing.userId = {
+    ...existingUser,
+    profileImage: existingUser.profileImage || seller.profileImage || '',
+    name: existingUser.name || seller.name || '',
+    lastname: existingUser.lastname || seller.lastname || '',
+    email: existingUser.email || seller.email || '',
+    phoneNumber:
+      existingUser.phoneNumber || existingUser.phone || sellerPhone || '',
+    phone: existingUser.phone || seller.phone || sellerPhone || '',
+    uuid: existingUser.uuid || seller.uuid || '',
+    emiratesId: existingUser.emiratesId || seller.emiratesId || undefined,
+  }
+
+  // Listing phone is the primary contact on evaluate forms.
+  if (
+    (listing.phoneNumber == null || listing.phoneNumber === '') &&
+    sellerPhone
+  ) {
+    listing.phoneNumber = sellerPhone
+  }
+
+  return listing
 }

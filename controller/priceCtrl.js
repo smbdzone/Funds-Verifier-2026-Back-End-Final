@@ -145,18 +145,13 @@ export const getPrices = async (req, res) => {
   try {
     if (isSubEvaluator(req.user)) return forbidSubEvaluator(res)
 
-    // TEMP OPEN: allow shared list read even when session is missing.
-    // Prefer authenticated owner resolution; fall back to shared/id param.
-    let ownerUuid = resolvePriceOwnerUuid(req.user, id)
-    if (!ownerUuid) {
-      ownerUuid =
-        id === EVALUATOR_SHARED_PRICE_UUID || !id
-          ? EVALUATOR_SHARED_PRICE_UUID
-          : id
-    }
+    const ownerUuid = resolvePriceOwnerUuid(req.user, id)
 
     // Backfill: all personal Evaluator UUID rows → shared list.
-    if (ownerUuid === EVALUATOR_SHARED_PRICE_UUID) {
+    if (
+      isEvaluator(req.user) &&
+      ownerUuid === EVALUATOR_SHARED_PRICE_UUID
+    ) {
       await migrateAllEvaluatorPricesToShared()
     }
 

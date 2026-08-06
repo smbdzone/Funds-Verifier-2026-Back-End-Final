@@ -30,6 +30,7 @@ import {
   getListingSellersByUuid,
   resolveListingSeller,
   getSellerRef,
+  attachListingSellerContact,
 } from '../helper/listingSellerInfo.js'
 import { attachDocumentSignedUrls } from '../helper/attachDocumentSignedUrls.js'
 import {
@@ -286,6 +287,7 @@ const getSingleProduct = asyncHandler(async (req, res) => {
     await attachRequestDocumentSignedUrls(boat)
     sanitizeListingMediaResponse(boat)
     await refreshListingPremiumFieldsForEdit(boat)
+    await attachListingSellerContact(boat)
     res.json(boat)
   } catch (err) {
     console.error('Error fetching boat:', err.message)

@@ -55,6 +55,7 @@ import {
   getListingSellersByUuid,
   resolveListingSeller,
   getSellerRef,
+  attachListingSellerContact,
 } from '../helper/listingSellerInfo.js'
 import {
   getSafeStringParam,
@@ -319,6 +320,10 @@ const getSingleProperty = asyncHandler(async (req, res) => {
     // responding. The signed URL is everything the client needs.
     sanitizeListingMediaResponse(property)
     await refreshListingPremiumFieldsForEdit(property)
+
+    // Many listings only store userUUID (userId ObjectId unset) — fill contact
+    // for evaluator evaluate forms the same way public cards resolve the seller.
+    await attachListingSellerContact(property)
 
     res.json(property)
   } catch (err) {

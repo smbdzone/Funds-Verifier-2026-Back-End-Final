@@ -30,6 +30,7 @@ import {
   getListingSellersByUuid,
   resolveListingSeller,
   getSellerRef,
+  attachListingSellerContact,
 } from '../helper/listingSellerInfo.js'
 import { attachDocumentSignedUrls } from '../helper/attachDocumentSignedUrls.js'
 import {
@@ -279,6 +280,7 @@ const getSingleProduct = asyncHandler(async (req, res) => {
     await attachRequestDocumentSignedUrls(jewelry)
     sanitizeListingMediaResponse(jewelry)
     await refreshListingPremiumFieldsForEdit(jewelry)
+    await attachListingSellerContact(jewelry)
     res.json(jewelry)
   } catch (err) {
     console.error('Error fetching jewelry:', err.message)
