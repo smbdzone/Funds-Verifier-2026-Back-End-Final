@@ -90,6 +90,21 @@ const filterPublicFields = (doc, allowedFields) => {
   return result
 }
 
+/** Ensure title-based slugs stay unique so detail pages don't load the wrong listing. */
+async function ensureUniquePropertySlug(title, excludeId = null) {
+  const base = slugify(title || '') || 'property'
+  let slug = base
+  let suffix = 0
+  while (true) {
+    const query = { slug, isDeleted: false }
+    if (excludeId) query._id = { $ne: excludeId }
+    const exists = await Property.exists(query)
+    if (!exists) return slug
+    suffix += 1
+    slug = `${base}-${suffix}`
+  }
+}
+
 // create product
 const createProduct = asyncHandler(async (req, res) => {
   const session = await mongoose.startSession()
@@ -99,7 +114,7 @@ const createProduct = asyncHandler(async (req, res) => {
   try {
     // Create the new Property
     if (req.body.title) {
-      req.body.slug = slugify(req.body.title)
+      req.body.slug = await ensureUniquePropertySlug(req.body.title)
     }
     if (!req.body.price) {
       return res.status(400).json({ message: 'Price of an asset is required.' })
@@ -240,16 +255,28 @@ const getSingleProperty = asyncHandler(async (req, res) => {
 
   const { sanitizeUUID } = await import('../utils/nosqlSanitizer.js')
   const sanitizedUuid = sanitizeUUID(id)
+  const isRealUuid =
+    typeof sanitizedUuid === 'string' &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+      sanitizedUuid,
+    )
   const lookupQuery = { isDeleted: false }
 
-  if (sanitizedUuid) {
-    lookupQuery.$or = [{ uuid: sanitizedUuid }, { slug: id }]
+  // Exact uuid when the param is a real UUID; otherwise look up by slug.
+  // Slug lookups sort newest-first so duplicate historical slugs don't hide
+  // layout/floor-plan media on an older duplicate listing.
+  if (isRealUuid) {
+    lookupQuery.uuid = sanitizedUuid
   } else {
     lookupQuery.slug = id
   }
 
   try {
-    const property = await Property.findOne(lookupQuery)
+    let propertyQuery = Property.findOne(lookupQuery)
+    if (!isRealUuid) {
+      propertyQuery = propertyQuery.sort({ updatedAt: -1 })
+    }
+    const property = await propertyQuery
       .populate('pictures')
       .populate('video')
       .populate('uploadDocument')
@@ -803,9 +830,12 @@ const updateProduct = asyncHandler(async (req, res) => {
         return res.status(403).json({ message: priceBlock })
       }
 
-      // Update slug if title is provided
+      // Update slug if title is provided (keep unique across listings)
       if (req.body.title) {
-        req.body.slug = slugify(req.body.title)
+        req.body.slug = await ensureUniquePropertySlug(
+          req.body.title,
+          product._id,
+        )
       }
 
       const documentFulfilled = Boolean(req.body.fulfillRequestDocument)
