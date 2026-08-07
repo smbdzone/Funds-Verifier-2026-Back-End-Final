@@ -9,6 +9,7 @@ import { safeURL } from '../controller/emailCtrl.js'
 import { notifyFvListingApproved, notifyFvPremiumServiceCompleted } from '../utils/fvPortalMail.js'
 import { getAssetHolderListingPath, getPublicListingPath } from '../utils/listingDeepLinks.js'
 import { formatDubaiDateTime } from '../utils/dubaiDateTime.js'
+import { resolveListingEmailPreviewUrl } from '../utils/listingEmailPreview.js'
 
 function assetLabel(assetType) {
   const t = String(assetType || 'asset').toLowerCase()
@@ -106,6 +107,9 @@ async function notifyAssetHolderEvent({
   emailCtaLabel,
   emailCtaPath,
   emailCtaUrl,
+  previewImageUrl,
+  listing,
+  assetType,
 }) {
   if (!userUUID) return
 
@@ -125,6 +129,11 @@ async function notifyAssetHolderEvent({
     console.log({ assetHolderEventNotificationError: error?.message || error })
   }
 
+  let resolvedPreview = previewImageUrl
+  if (!resolvedPreview && listing) {
+    resolvedPreview = await resolveListingEmailPreviewUrl(listing, assetType)
+  }
+
   try {
     await sendAssetHolderEventEmail({
       userUUID,
@@ -134,6 +143,7 @@ async function notifyAssetHolderEvent({
       ctaLabel: emailCtaLabel || 'View My Listings',
       ctaPath: emailCtaPath || '/seller-profile/my-listing',
       ctaUrl: emailCtaUrl,
+      previewImageUrl: resolvedPreview || undefined,
     })
   } catch (error) {
     console.log({ assetHolderEventEmailError: error?.message || error })
@@ -288,6 +298,8 @@ export async function notifyAssetHolderListingApproved({
       listing,
       assetType || listing.assetType,
     ),
+    listing,
+    assetType: assetType || listing.assetType,
   })
 
   try {
@@ -525,6 +537,8 @@ export async function notifyAssetHolderOffPlanApproved({ listing }) {
       listing,
       listing.assetType || 'off plan',
     ),
+    listing,
+    assetType: listing.assetType || 'off plan',
   })
 
   try {

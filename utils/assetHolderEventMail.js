@@ -8,9 +8,16 @@ function buildEmailHtml({
   bodyLines = [],
   ctaLabel,
   ctaUrl,
+  previewImageUrl,
 }) {
   const name = recipientName || 'Asset Holder'
   const safeCta = safeURL(ctaUrl)
+  const safePreview = previewImageUrl ? safeURL(previewImageUrl) : '#'
+  const previewHtml =
+    previewImageUrl && safePreview !== '#'
+      ? `<img src="${safePreview}" alt="Listing preview" width="512"
+          style="display:block;width:100%;max-width:512px;height:auto;border-radius:8px;margin:0 0 16px;border:1px solid #e5e7eb;" />`
+      : ''
   const linesHtml = bodyLines
     .filter(Boolean)
     .map(
@@ -39,6 +46,7 @@ function buildEmailHtml({
               <td style="padding:28px 24px;">
                 <p style="margin:0 0 16px;color:#111827;font-size:16px;">Hi ${name},</p>
                 <p style="margin:0 0 16px;color:#111827;font-size:16px;font-weight:600;">${headline}</p>
+                ${previewHtml}
                 ${linesHtml}
                 <a href="${safeCta}"
                   style="display:inline-block;background:#eab308;color:#111827;text-decoration:none;font-weight:600;font-size:14px;padding:12px 20px;border-radius:6px;">
@@ -70,6 +78,7 @@ export default async function sendAssetHolderEventEmail({
   ctaLabel = 'View My Listings',
   ctaPath = '/seller-profile/my-listing',
   ctaUrl: ctaUrlOverride,
+  previewImageUrl,
 }) {
   try {
     if (!userUUID) {
@@ -114,6 +123,7 @@ export default async function sendAssetHolderEventEmail({
         bodyLines,
         ctaLabel,
         ctaUrl,
+        previewImageUrl,
       }),
     })
 

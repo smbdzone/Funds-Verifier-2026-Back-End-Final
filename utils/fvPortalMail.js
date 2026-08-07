@@ -1,6 +1,7 @@
 import sendEmail from './nodeMailer.js'
 import { safeURL } from '../controller/emailCtrl.js'
 import { formatDubaiDateTime } from './dubaiDateTime.js'
+import { resolveListingEmailPreviewUrl } from './listingEmailPreview.js'
 
 export function getFvEmail() {
   return String(process.env.FV_EMAIL || '').trim()
@@ -53,9 +54,15 @@ function listingDetailLines(listing, assetType) {
   return lines
 }
 
-function buildEmailHtml({ recipientName, headline, bodyLines = [], ctaLabel, ctaUrl }) {
+function buildEmailHtml({ recipientName, headline, bodyLines = [], ctaLabel, ctaUrl, previewImageUrl }) {
   const name = recipientName || 'FV Portal'
   const safeCta = safeURL(ctaUrl)
+  const safePreview = previewImageUrl ? safeURL(previewImageUrl) : '#'
+  const previewHtml =
+    previewImageUrl && safePreview !== '#'
+      ? `<img src="${safePreview}" alt="Listing preview" width="512"
+          style="display:block;width:100%;max-width:512px;height:auto;border-radius:8px;margin:0 0 16px;border:1px solid #e5e7eb;" />`
+      : ''
   const linesHtml = bodyLines
     .filter(Boolean)
     .map(
@@ -91,6 +98,7 @@ function buildEmailHtml({ recipientName, headline, bodyLines = [], ctaLabel, cta
               <td style="padding:28px 24px;">
                 <p style="margin:0 0 16px;color:#111827;font-size:16px;">Hi ${name},</p>
                 <p style="margin:0 0 16px;color:#111827;font-size:16px;font-weight:600;">${headline}</p>
+                ${previewHtml}
                 ${linesHtml}
                 ${ctaHtml}
               </td>
@@ -117,6 +125,7 @@ export async function sendFvPortalEmail({
   bodyLines = [],
   ctaLabel,
   ctaPath,
+  previewImageUrl,
 }) {
   try {
     const to = getFvEmail()
@@ -152,6 +161,7 @@ export async function sendFvPortalEmail({
         bodyLines,
         ctaLabel,
         ctaUrl,
+        previewImageUrl,
       }),
     })
 
@@ -235,6 +245,10 @@ export async function notifyFvListingApproved({
   const label = assetLabel(assetType || listing.assetType)
   const title = listing.title || 'listing'
   const when = formatDateTime(approvedAt)
+  const previewImageUrl = await resolveListingEmailPreviewUrl(
+    listing,
+    assetType || listing.assetType,
+  )
 
   return sendFvPortalEmail({
     subject: `Listing approved — ${label} — Funds Verifier`,
@@ -248,6 +262,7 @@ export async function notifyFvListingApproved({
     ],
     ctaLabel: 'Open Site',
     ctaPath: '/',
+    previewImageUrl: previewImageUrl || undefined,
   })
 }
 

@@ -2,13 +2,35 @@ import { generateAssetSignedUrl } from '../services/assetSignedUrlService.js'
 
 const PDF_SIGNED_URL_EXPIRY_SECONDS = 20 * 60 // 20 minutes
 
+/** Decrypt-and-stream URL for encrypted-at-rest PDFs. */
+function buildDocumentStreamUrl(uuid) {
+  if (!uuid || typeof uuid !== 'string') return null
+  const trimmed = uuid.trim()
+  if (!trimmed) return null
+
+  const fromEnv = String(
+    process.env.API_PUBLIC_URL || process.env.BASE_URL || '',
+  )
+    .trim()
+    .replace(/\/+$/, '')
+  if (fromEnv) {
+    const base = fromEnv.endsWith('/api') ? fromEnv : `${fromEnv}/api`
+    return `${base}/evaluation-certificate/${encodeURIComponent(trimmed)}/pdf`
+  }
+  return `/evaluation-certificate/${encodeURIComponent(trimmed)}/pdf`
+}
+
 export async function getDocumentSignedUrl(doc) {
   if (!doc) return null
   const cert = doc.Certificate || doc
-  // Signed S3 URLs serve encrypted bytes; clients use /evaluation-certificate/:uuid/pdf
+  const uuid = typeof doc.uuid === 'string' ? doc.uuid.trim() : ''
+
+  // Encrypted objects are ciphertext on S3 — browsers cannot open them as PDF.
+  // Expose the decrypt stream so View / Open in new tab / Download work.
   if (cert.encrypted === true) {
-    return null
+    return buildDocumentStreamUrl(uuid)
   }
+
   if (cert.s3Key) {
     try {
       const result = await generateAssetSignedUrl(
@@ -24,11 +46,12 @@ export async function getDocumentSignedUrl(doc) {
         cert.s3Key,
         e?.message,
       )
-      return null
+      // Prefer decrypt/stream over a dead link whenever we have a uuid.
+      return buildDocumentStreamUrl(uuid)
     }
   }
   if (cert.url) return cert.url
-  return null
+  return buildDocumentStreamUrl(uuid)
 }
 
 /**
