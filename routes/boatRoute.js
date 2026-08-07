@@ -19,6 +19,7 @@ import {
   getAllProductByFilter,
   getApprovedListingsMetrics,
 } from '../controller/boatCtrl.js'
+import { getBoatLocations } from '../controller/listingLocationsCtrl.js'
 // import { getSingleProductBySlug } from "../controller/carCtrl.js";
 // import { uploadPhoto, productImgResize } from '../middlewares/uploadImgs.js';
 import { assetHolderCreate } from '../middlewares/assetHolderCreate.js'
@@ -40,6 +41,12 @@ router.get(
 router.get('/filter', ...listingReadAccess, getAllProductByFilter)
 
 router.get('/price', ...listingReadAccess, getPrice)
+router.get(
+  '/locations',
+  listingReadLimiter,
+  ...listingReadAccess,
+  getBoatLocations,
+)
 router.get('/related-boat', ...listingReadAccess, getRelatedProduct)
 router.get('/:id', ...listingReadAccess, getSingleProduct)
 

@@ -72,6 +72,13 @@ import UserPaymentDetails from '../models/UserPaymentDetails.js'
 import { AddPaymentJob } from '../utils/jobs/index.js'
 import { PUBLIC_BOAT_FIELDS } from '../constants/publicFields.js'
 import {
+  applyCardListPopulates,
+  CARD_BOAT_FIELDS,
+  computeCardRatingFields,
+  shouldUseCardListProjection,
+} from '../utils/listingCardQuery.js'
+import { findRelatedListings } from '../utils/relatedListings.js'
+import {
   getSafeStringParam,
   getSafeTitleRegex,
   pickScalarFilters,
@@ -380,7 +387,7 @@ const getAllProduct = asyncHandler(async (req, res) => {
     ---------------------------------------------------- */
     if (!user) {
       // PUBLIC USER
-      parseData.listing = { $regex: /^public$/i }
+      parseData.listing = 'Public'
     } else {
       const isSubEvaluator = ['Sub-Evaluator', 'SubEvaluator'].includes(
         user.role
@@ -419,15 +426,15 @@ const getAllProduct = asyncHandler(async (req, res) => {
           user.financialInfo?.status === 'Approved'
         ) {
           parseData.$or = [
-            { listing: { $regex: /^public$/i } },
+            { listing: 'Public' },
             {
-              listing: { $regex: /^private$/i },
+              listing: 'Private',
               price: { $lte: Number(user.financialInfo.fundsVerification) },
             },
           ]
           delete parseData.listing
         } else {
-          parseData.listing = { $regex: /^public$/i }
+          parseData.listing = 'Public'
         }
       }
     }
@@ -443,33 +450,40 @@ const getAllProduct = asyncHandler(async (req, res) => {
     /* ----------------------------------------------------
        6️⃣ QUERY
     ---------------------------------------------------- */
+    const useCardProjection = shouldUseCardListProjection(req, Boolean(user))
     let query = Boat.find(parseData)
-      .populate({ path: 'pictures', select: '-_id' })
-      .populate({ path: 'video', select: '-_id' })
-      .populate({ path: 'thumbnailImg', select: '-_id' })
-      .populate({ path: 'qrScan', select: '-_id' })
-      .populate({ path: 'video3DWalkthrough', select: '-_id' })
-      .populate({ path: 'userId', select: 'profileImage name uuid' })
-      .populate({ path: 'evaluationCertificate', select: '-_id' })
-      .populate({
-        path: 'technicalReport',
-        select: '-_id',
-        populate: { path: 'reportFile', select: '-_id' },
-      })
-      .populate({
-        path: 'ratings.postedBy',
-        select: '-_id',
-      })
 
-    if (user) {
+    if (useCardProjection) {
+      query = applyCardListPopulates(query).select(CARD_BOAT_FIELDS)
+    } else {
       query = query
-        .populate({ path: 'uploadDocument', select: '-_id' })
-        .populate(REQUEST_DOCUMENT_POPULATE)
-        .populate({ path: 'invoice', select: '-_id' })
-        .populate({ path: 'evaluator', select: 'name displayName uuid' })
-    }
+        .populate({ path: 'pictures', select: '-_id' })
+        .populate({ path: 'video', select: '-_id' })
+        .populate({ path: 'thumbnailImg', select: '-_id' })
+        .populate({ path: 'qrScan', select: '-_id' })
+        .populate({ path: 'video3DWalkthrough', select: '-_id' })
+        .populate({ path: 'userId', select: 'profileImage name uuid' })
+        .populate({ path: 'evaluationCertificate', select: '-_id' })
+        .populate({
+          path: 'technicalReport',
+          select: '-_id',
+          populate: { path: 'reportFile', select: '-_id' },
+        })
+        .populate({
+          path: 'ratings.postedBy',
+          select: '-_id',
+        })
 
-    query = user ? query.select('-__v') : query.select(PUBLIC_BOAT_FIELDS)
+      if (user) {
+        query = query
+          .populate({ path: 'uploadDocument', select: '-_id' })
+          .populate(REQUEST_DOCUMENT_POPULATE)
+          .populate({ path: 'invoice', select: '-_id' })
+          .populate({ path: 'evaluator', select: 'name displayName uuid' })
+      }
+
+      query = user ? query.select('-__v') : query.select(PUBLIC_BOAT_FIELDS)
+    }
 
     /* ----------------------------------------------------
        7️⃣ SORTING
@@ -507,18 +521,23 @@ const getAllProduct = asyncHandler(async (req, res) => {
           }
         }
       }
+      const { reviewCount, averageRating } = computeCardRatingFields(obj)
+      obj.reviewCount = reviewCount
+      obj.averageRating = averageRating
       return obj
     })
     await refreshListingsMediaSignedUrls(products)
-    await Promise.all(
-      products.map((p) =>
-        user
-          ? attachDocumentSignedUrls(p)
-          : attachDocumentSignedUrls(p, {
-            fields: ['evaluationCertificate', 'technicalReport'],
-          }),
-      ),
-    )
+    if (!useCardProjection) {
+      await Promise.all(
+        products.map((p) =>
+          user
+            ? attachDocumentSignedUrls(p)
+            : attachDocumentSignedUrls(p, {
+              fields: ['evaluationCertificate', 'technicalReport'],
+            }),
+        ),
+      )
+    }
     sanitizeListingsMediaResponse(products)
 
     /* ----------------------------------------------------
@@ -685,24 +704,16 @@ const getAllProductByFilter = asyncHandler(async (req, res) => {
 // get related product
 
 const getRelatedProduct = asyncHandler(async (req, res) => {
-  const { assetType, country, city, make, price } = req.body
-
-  // Construct the query object based on provided properties
-  const queryObj = {}
-  if (assetType) queryObj.assetType = assetType
-  if (country) queryObj.country = country
-  if (city) queryObj.city = city
-  if (make) queryObj.make = make
-  if (price) queryObj.price = price
-  queryObj.isDeleted = false
   try {
-    // Execute the query with the constructed query object
-    const allProduct = await Boat.find(queryObj).select('-_id')
-    sanitizeListingsMediaResponse(allProduct)
-    res.json(allProduct)
+    const result = await findRelatedListings({
+      Model: Boat,
+      cardFields: CARD_BOAT_FIELDS,
+      query: req.query,
+      softFields: ['assetType', 'country', 'city', 'brands'],
+    })
+    return res.status(200).json(result)
   } catch (err) {
-    // Handle errors appropriately
-    throw new Error(err)
+    return res.status(500).json({ message: err?.message || 'Server error' })
   }
 })
 

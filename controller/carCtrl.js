@@ -71,6 +71,13 @@ import { AddPaymentJob } from '../utils/jobs/index.js'
 import UserPaymentDetails from '../models/UserPaymentDetails.js'
 import { PUBLIC_CAR_FIELDS } from '../constants/publicFields.js'
 import {
+  applyCardListPopulates,
+  CARD_CAR_FIELDS,
+  computeCardRatingFields,
+  shouldUseCardListProjection,
+} from '../utils/listingCardQuery.js'
+import { findRelatedListings } from '../utils/relatedListings.js'
+import {
   getSafeStringParam,
   getSafeTitleRegex,
   pickScalarFilters,
@@ -374,35 +381,41 @@ const getAllProduct = asyncHandler(async (req, res) => {
 
   // ---------------- QUERY BUILD ----------------
   let query = Car.find(parseData)
+  const useCardProjection = shouldUseCardListProjection(req, isAuthenticated)
 
-  // 🔐 FIELD SELECTION
-  if (!isAuthenticated) {
-    query = query.select(PUBLIC_CAR_FIELDS)
+  if (useCardProjection) {
+    query = query.select(CARD_CAR_FIELDS)
+    query = applyCardListPopulates(query)
   } else {
-    query = query.select('-__v')
-  }
+    // 🔐 FIELD SELECTION
+    if (!isAuthenticated) {
+      query = query.select(PUBLIC_CAR_FIELDS)
+    } else {
+      query = query.select('-__v')
+    }
 
-  // 🔐 SAFE POPULATES
-  query = query
-    .populate({ path: 'pictures', select: '-_id' })
-    .populate({ path: 'video', select: '-_id' })
-    .populate({ path: 'thumbnailImg', select: '-_id' })
-    .populate({ path: 'qrScan', select: '-_id' })
-    .populate({ path: 'evaluationCertificate', select: '-_id' })
-    .populate({ path: 'video3DWalkthrough', select: '-_id' })
-    .populate({ path: 'userId', select: 'profileImage name uuid' })
-    .populate({
-      path: 'technicalReport',
-      populate: { path: 'reportFile', select: '-_id' },
-    })
-
-  if (isAuthenticated) {
+    // 🔐 SAFE POPULATES
     query = query
-      .populate({ path: 'uploadDocument', select: '-_id' })
-      .populate(REQUEST_DOCUMENT_POPULATE)
-      .populate({ path: 'invoice', select: '-_id' })
-      .populate({ path: 'evaluator', select: 'name displayName uuid' })
-      .populate({ path: 'ratings.postedBy', select: '-_id' })
+      .populate({ path: 'pictures', select: '-_id' })
+      .populate({ path: 'video', select: '-_id' })
+      .populate({ path: 'thumbnailImg', select: '-_id' })
+      .populate({ path: 'qrScan', select: '-_id' })
+      .populate({ path: 'evaluationCertificate', select: '-_id' })
+      .populate({ path: 'video3DWalkthrough', select: '-_id' })
+      .populate({ path: 'userId', select: 'profileImage name uuid' })
+      .populate({
+        path: 'technicalReport',
+        populate: { path: 'reportFile', select: '-_id' },
+      })
+
+    if (isAuthenticated) {
+      query = query
+        .populate({ path: 'uploadDocument', select: '-_id' })
+        .populate(REQUEST_DOCUMENT_POPULATE)
+        .populate({ path: 'invoice', select: '-_id' })
+        .populate({ path: 'evaluator', select: 'name displayName uuid' })
+        .populate({ path: 'ratings.postedBy', select: '-_id' })
+    }
   }
 
   if (req.query.sort) {
@@ -430,6 +443,7 @@ const getAllProduct = asyncHandler(async (req, res) => {
   const finalProducts = await Promise.all(
     products.map(async (product) => {
       const obj = product.toObject()
+      const { reviewCount, averageRating } = computeCardRatingFields(obj)
 
       // ratings → stars only for public
       if (!isAuthenticated && Array.isArray(obj.ratings)) {
@@ -450,19 +464,25 @@ const getAllProduct = asyncHandler(async (req, res) => {
         }
       }
 
-      if (isAuthenticated) {
-        await attachDocumentSignedUrls(obj)
-      } else {
-        await attachDocumentSignedUrls(obj, {
-          fields: ['evaluationCertificate', 'technicalReport'],
-        })
+      if (!useCardProjection) {
+        if (isAuthenticated) {
+          await attachDocumentSignedUrls(obj)
+        } else {
+          await attachDocumentSignedUrls(obj, {
+            fields: ['evaluationCertificate', 'technicalReport'],
+          })
+        }
       }
 
       // Drop server-internal S3 metadata (s3Bucket/s3Key/s3VersionId/s3ETag/url)
       // — signedUrl is the only URL the client needs.
       sanitizeListingMediaResponse(obj)
 
-      return obj
+      return {
+        ...obj,
+        reviewCount,
+        averageRating,
+      }
     }),
   )
 
@@ -638,24 +658,16 @@ const getAllProductByFilter = asyncHandler(async (req, res) => {
 // get Related product
 
 const getRelatedProduct = asyncHandler(async (req, res) => {
-  const { assetType, country, city, model, price } = req.query
-
-  // Construct the query object based on provided properties
-  const queryObj = {}
-  if (assetType) queryObj.assetType = assetType
-  if (country) queryObj.country = country
-  if (city) queryObj.city = city
-  if (model) queryObj.model = model
-  if (price) queryObj.price = price
-  queryObj.isDeleted = false
   try {
-    // Execute the query with the constructed query object
-    const allProduct = await Car.find(queryObj).select('-_id')
-    sanitizeListingsMediaResponse(allProduct)
-    res.json(allProduct)
+    const result = await findRelatedListings({
+      Model: Car,
+      cardFields: CARD_CAR_FIELDS,
+      query: req.query,
+      softFields: ['assetType', 'country', 'city', 'model', 'make'],
+    })
+    return res.status(200).json(result)
   } catch (err) {
-    // Handle errors appropriately
-    throw new Error(err)
+    return res.status(500).json({ message: err?.message || 'Server error' })
   }
 })
 

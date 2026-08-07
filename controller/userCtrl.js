@@ -58,11 +58,29 @@ const cookieOptions = {
   }),
 }
 
+/** Readable by JS so the SPA can skip /user/me for anonymous visitors. */
+const SESSION_HINT_COOKIE = 'fv_session'
+const sessionHintCookieOptions = {
+  httpOnly: false,
+  secure: isProd,
+  sameSite: isProd ? 'none' : 'lax',
+  path: '/',
+  maxAge: 3 * 24 * 60 * 60 * 1000,
+  ...(isProd && {
+    domain: process.env.COOKIE_DOMAIN || '.fundsverifier.com',
+  }),
+}
+
+const setSessionHintCookie = (res) => {
+  res.cookie(SESSION_HINT_COOKIE, '1', sessionHintCookieOptions)
+}
+
 /** Remove auth cookies using every scope they may have been set with (avoids empty shells in DevTools). */
 const clearAuthCookies = (res) => {
-  const names = ['refreshToken', 'accessToken', 'role']
+  const names = ['refreshToken', 'accessToken', 'role', SESSION_HINT_COOKIE]
   const scopes = [
     cookieOptions,
+    sessionHintCookieOptions,
     {
       path: '/',
       secure: isProd,
@@ -534,6 +552,7 @@ const storeUserThroughUaePass = asyncHandler(async (req, res) => {
 
     res.cookie('accessToken', accessToken, { ...cookieOptions })
     res.cookie('role', assignedRole, { ...cookieOptions })
+    setSessionHintCookie(res)
 
     const sanitizedUser = await sanitizeUserForSelf(user)
 
@@ -806,6 +825,7 @@ const issueLoginSession = async (res, user) => {
 
   res.cookie('accessToken', accessToken, { ...cookieOptions })
   res.cookie('role', assignedRole, { ...cookieOptions })
+  setSessionHintCookie(res)
 
   const sanitizedUser = sanitizeUserForSelf(user)
 
@@ -1088,6 +1108,7 @@ const handleRefreshToken = asyncHandler(async (req, res) => {
 
   res.cookie('accessToken', newAccessToken, { ...cookieOptions })
   res.cookie('role', assignedRole, { ...cookieOptions })
+  setSessionHintCookie(res)
 
   return res.status(200).json({
     success: true,
@@ -1177,6 +1198,7 @@ const getCurrentUser = asyncHandler(async (req, res) => {
     }
 
     const sanitizedUser = await sanitizeUserForSelf(currentUser)
+    setSessionHintCookie(res)
     return res.status(200).json(sanitizedUser)
   } catch (error) {
     return res
@@ -1656,6 +1678,7 @@ const switchUser = asyncHandler(async (req, res) => {
 
     res.cookie('accessToken', accessToken, { ...cookieOptions })
     res.cookie('role', newRole, { ...cookieOptions })
+    setSessionHintCookie(res)
 
     const sanitizedUser = await sanitizeUserForSelf(userDoc)
     return res.status(200).json({

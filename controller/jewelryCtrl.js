@@ -81,6 +81,13 @@ import UserPaymentDetails from '../models/UserPaymentDetails.js'
 import { AddPaymentJob } from '../utils/jobs/index.js'
 import { PUBLIC_JEWELRY_FIELDS } from '../constants/publicFields.js'
 import {
+  applyCardListPopulates,
+  CARD_JEWELRY_FIELDS,
+  computeCardRatingFields,
+  shouldUseCardListProjection,
+} from '../utils/listingCardQuery.js'
+import { findRelatedListings } from '../utils/relatedListings.js'
+import {
   getSafeTitleRegex,
   pickScalarFilters,
   applyListingStatusFilters,
@@ -375,50 +382,57 @@ const getAllProduct = asyncHandler(async (req, res) => {
   parseData.isDeleted = false
 
   /* ===================== BASE QUERY ===================== */
+  const useCardProjection = shouldUseCardListProjection(req, !isPublicUser)
   let query = Jewelry.find(parseData)
-    .populate({ path: 'pictures', select: '-_id' })
-    .populate({ path: 'video', select: '-_id' })
-    .populate({ path: 'thumbnailImg', select: '-_id' })
-    .populate({ path: 'qrScan', select: '-_id' })
-    .populate({ path: 'userId', select: 'profileImage name uuid' })
-    .populate({ path: 'ratings.postedBy', select: '-_id' })
-    .populate({ path: 'evaluationCertificate', select: '-_id' })
-    .populate({ path: 'video3DWalkthrough', select: '-_id' })
-    .populate({
-      path: 'technicalReport',
-      select: '-_id',
-      populate: { path: 'reportFile', select: '-_id' },
-    })
 
-  if (!isPublicUser) {
+  if (useCardProjection) {
+    query = applyCardListPopulates(query).select(CARD_JEWELRY_FIELDS)
+  } else {
     query = query
-      .populate({ path: 'uploadDocument', select: '-_id' })
-      .populate(REQUEST_DOCUMENT_POPULATE)
-      .populate({ path: 'invoice', select: '-_id' })
-      .populate({ path: 'evaluator', select: 'name displayName uuid' })
+      .populate({ path: 'pictures', select: '-_id' })
+      .populate({ path: 'video', select: '-_id' })
+      .populate({ path: 'thumbnailImg', select: '-_id' })
+      .populate({ path: 'qrScan', select: '-_id' })
+      .populate({ path: 'userId', select: 'profileImage name uuid' })
+      .populate({ path: 'ratings.postedBy', select: '-_id' })
+      .populate({ path: 'evaluationCertificate', select: '-_id' })
+      .populate({ path: 'video3DWalkthrough', select: '-_id' })
       .populate({
-        path: 'reviews',
-        match: {
-          isDeleted: false,
-          $or: [{ status: 'approved' }, { status: { $exists: false } }],
-        },
-        select: 'ratingNumber review -_id',
+        path: 'technicalReport',
+        select: '-_id',
+        populate: { path: 'reportFile', select: '-_id' },
       })
+
+    if (!isPublicUser) {
+      query = query
+        .populate({ path: 'uploadDocument', select: '-_id' })
+        .populate(REQUEST_DOCUMENT_POPULATE)
+        .populate({ path: 'invoice', select: '-_id' })
+        .populate({ path: 'evaluator', select: 'name displayName uuid' })
+        .populate({
+          path: 'reviews',
+          match: {
+            isDeleted: false,
+            $or: [{ status: 'approved' }, { status: { $exists: false } }],
+          },
+          select: 'ratingNumber review -_id',
+        })
+    }
+
+    /* ===================== FIELD SELECTION ===================== */
+    if (isPublicUser) {
+      query = query.select(PUBLIC_JEWELRY_FIELDS)
+    } else if (req.query.fields) {
+      query = query.select(req.query.fields.split(',').join(' '))
+    } else {
+      query = query.select('-__v')
+    }
   }
 
   /* ===================== SORTING ===================== */
   query = req.query.sort
     ? query.sort(req.query.sort.split(',').join(' '))
     : query.sort('-createdAt')
-
-  /* ===================== FIELD SELECTION ===================== */
-  if (isPublicUser) {
-    query = query.select(PUBLIC_JEWELRY_FIELDS)
-  } else if (req.query.fields) {
-    query = query.select(req.query.fields.split(',').join(' '))
-  } else {
-    query = query.select('-__v')
-  }
 
   /* ===================== PAGINATION ===================== */
   const page = Number(req.query.page) || 1
@@ -444,13 +458,18 @@ const getAllProduct = asyncHandler(async (req, res) => {
 
   const modifiedProducts = await Promise.all(
     products.map(async (product) => {
-      const reviewCount = product.reviews?.length || 0
-      const averageRating =
-        reviewCount > 0
-          ? product.reviews.reduce((s, r) => s + r.ratingNumber, 0) / reviewCount
-          : 0
-
       const obj = product.toObject()
+      const { reviewCount, averageRating } = useCardProjection
+        ? computeCardRatingFields(obj)
+        : (() => {
+            const count = product.reviews?.length || 0
+            const avg =
+              count > 0
+                ? product.reviews.reduce((s, r) => s + r.ratingNumber, 0) /
+                  count
+                : 0
+            return { reviewCount: count, averageRating: avg }
+          })()
 
       // Seller avatar for cards; strip other user fields for public callers
       const seller = resolveListingSeller(obj, sellersByUuid)
@@ -466,12 +485,14 @@ const getAllProduct = asyncHandler(async (req, res) => {
         }
       }
 
-      if (isPublicUser) {
-        await attachDocumentSignedUrls(obj, {
-          fields: ['evaluationCertificate', 'technicalReport'],
-        })
-      } else {
-        await attachDocumentSignedUrls(obj)
+      if (!useCardProjection) {
+        if (isPublicUser) {
+          await attachDocumentSignedUrls(obj, {
+            fields: ['evaluationCertificate', 'technicalReport'],
+          })
+        } else {
+          await attachDocumentSignedUrls(obj)
+        }
       }
       sanitizeListingMediaResponse(obj)
 
@@ -618,24 +639,16 @@ const getAllProductByFilter = asyncHandler(async (req, res) => {
 // get related product
 
 const getRelatedProduct = asyncHandler(async (req, res) => {
-  const { assetType, country, city, make, price } = req.query
-  // Construct the query object based on provided properties
-  const queryObj = {}
-  if (assetType) queryObj.assetType = assetType
-  if (country) queryObj.country = country
-  if (city) queryObj.city = city
-  if (make) queryObj.make = make
-  if (price) queryObj.price = price
-  // if (condition) queryObj.condition = condition;
-  queryObj.isDeleted = false
   try {
-    // Execute the query with the constructed query object
-    const allProduct = await Jewelry.find(queryObj).select('-_id')
-    sanitizeListingsMediaResponse(allProduct)
-    res.json(allProduct)
+    const result = await findRelatedListings({
+      Model: Jewelry,
+      cardFields: CARD_JEWELRY_FIELDS,
+      query: req.query,
+      softFields: ['assetType', 'country', 'city', 'make', 'brands'],
+    })
+    return res.status(200).json(result)
   } catch (err) {
-    // Handle errors appropriately
-    throw new Error(err)
+    return res.status(500).json({ message: err?.message || 'Server error' })
   }
 })
 

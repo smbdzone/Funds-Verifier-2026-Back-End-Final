@@ -28,6 +28,13 @@ import { stripe } from '../libs/stripe.js'
 import { AddPaymentJob } from '../utils/jobs/index.js'
 import UserPaymentDetails from '../models/UserPaymentDetails.js'
 import { PUBLIC_PROPERTY_FIELDS } from '../constants/publicFields.js'
+import {
+  applyCardListPopulates,
+  CARD_PROPERTY_FIELDS,
+  computeCardRatingFields,
+  shouldUseCardListProjection,
+} from '../utils/listingCardQuery.js'
+import { findRelatedListings } from '../utils/relatedListings.js'
 import { attachDocumentSignedUrls } from '../helper/attachDocumentSignedUrls.js'
 import {
   REQUEST_DOCUMENT_POPULATE,
@@ -369,7 +376,7 @@ const getAllProduct = asyncHandler(async (req, res) => {
     // ------------------ BASE FILTER ------------------
     const parseData = {
       isDeleted: false,
-      listing: /Public/i, // 🔐 default: PUBLIC ONLY
+      listing: 'Public', // 🔐 default: PUBLIC ONLY
     }
 
     // ------------------ SEARCH & FILTERS (SAFE) ------------------
@@ -466,9 +473,9 @@ const getAllProduct = asyncHandler(async (req, res) => {
         user.financialInfo?.status === 'Approved'
       ) {
         parseData.$or = [
-          { listing: /Public/i },
+          { listing: 'Public' },
           {
-            listing: /Private/i,
+            listing: 'Private',
             price: { $lte: Number(user.financialInfo.fundsVerification) },
           },
         ]
@@ -488,50 +495,56 @@ const getAllProduct = asyncHandler(async (req, res) => {
 
     // ------------------ QUERY BUILD ------------------
     let query = Property.find(parseData)
+    const useCardProjection = shouldUseCardListProjection(req, isAuthenticated)
 
     // 🔐 PUBLIC VS AUTH FIELD SELECTION
-    if (!isAuthenticated) {
-      query = query.select(PUBLIC_PROPERTY_FIELDS)
+    if (useCardProjection) {
+      query = query.select(CARD_PROPERTY_FIELDS)
+      query = applyCardListPopulates(query)
     } else {
-      query = query.select('-__v')
-    }
+      if (!isAuthenticated) {
+        query = query.select(PUBLIC_PROPERTY_FIELDS)
+      } else {
+        query = query.select('-__v')
+      }
 
-    query = query
-      .populate({ path: 'pictures', select: '-_id' })
-      .populate({ path: 'video', select: '-_id' })
-      .populate({ path: 'thumbnailImg', select: '-_id' })
-      .populate({ path: 'unitLayout', select: '-_id' })
-      .populate({ path: 'floorPlan', select: '-_id' })
-      .populate({ path: 'titleDeed', select: '-_id' })
-      .populate({ path: 'qrScan', select: '-_id' })
-      .populate({ path: 'userId', select: 'profileImage name uuid' })
-      .populate({ path: 'evaluationCertificate', select: '-_id' })
-      .populate({ path: 'video3DWalkthrough', select: '-_id' })
-      .populate({
-        path: 'technicalReport',
-        select: '-_id',
-        populate: { path: 'reportFile', select: '-_id' },
-      })
-
-    if (isAuthenticated) {
       query = query
-        .populate({ path: 'agencyAgreement', select: '-_id' })
-        .populate({ path: 'uploadDocument', select: '-_id' })
-        .populate(REQUEST_DOCUMENT_POPULATE)
-        .populate({ path: 'invoice', select: '-_id' })
-        .populate({ path: 'evaluator', select: 'name displayName uuid' })
-    }
+        .populate({ path: 'pictures', select: '-_id' })
+        .populate({ path: 'video', select: '-_id' })
+        .populate({ path: 'thumbnailImg', select: '-_id' })
+        .populate({ path: 'unitLayout', select: '-_id' })
+        .populate({ path: 'floorPlan', select: '-_id' })
+        .populate({ path: 'titleDeed', select: '-_id' })
+        .populate({ path: 'qrScan', select: '-_id' })
+        .populate({ path: 'userId', select: 'profileImage name uuid' })
+        .populate({ path: 'evaluationCertificate', select: '-_id' })
+        .populate({ path: 'video3DWalkthrough', select: '-_id' })
+        .populate({
+          path: 'technicalReport',
+          select: '-_id',
+          populate: { path: 'reportFile', select: '-_id' },
+        })
 
-    query = query.populate({
-      path: 'reviews',
-      match: {
-        isDeleted: false,
-        $or: [{ status: 'approved' }, { status: { $exists: false } }],
-      },
-      select: isAuthenticated
-        ? 'ratingNumber review -_id'
-        : 'ratingNumber -_id',
-    })
+      if (isAuthenticated) {
+        query = query
+          .populate({ path: 'agencyAgreement', select: '-_id' })
+          .populate({ path: 'uploadDocument', select: '-_id' })
+          .populate(REQUEST_DOCUMENT_POPULATE)
+          .populate({ path: 'invoice', select: '-_id' })
+          .populate({ path: 'evaluator', select: 'name displayName uuid' })
+      }
+
+      query = query.populate({
+        path: 'reviews',
+        match: {
+          isDeleted: false,
+          $or: [{ status: 'approved' }, { status: { $exists: false } }],
+        },
+        select: isAuthenticated
+          ? 'ratingNumber review -_id'
+          : 'ratingNumber -_id',
+      })
+    }
 
     if (req.query.sort) {
       const sortBy = req.query.sort.split(',').join(' ')
@@ -548,8 +561,9 @@ const getAllProduct = asyncHandler(async (req, res) => {
     const total = await Property.countDocuments(parseData)
     const products = await query.skip(skip).limit(limit)
 
-    // Post-find hook on Property model already refreshed signed URLs on
-    // populated media; re-run as a safety net for non-hooked paths.
+    // Asset-doc hooks already signed populated media on non-lean finds.
+    // This call is required for .lean() paths and is a cheap no-op when
+    // entries were already signed earlier in the same request.
     await refreshListingsMediaSignedUrls(products)
 
     const sellersByUuid = await getListingSellersByUuid(products)
@@ -562,11 +576,16 @@ const getAllProduct = asyncHandler(async (req, res) => {
       products.map(async (product) => {
         const obj = product.toObject()
 
-        const reviewCount = obj.reviews?.length || 0
-        const averageRating =
-          reviewCount > 0
-            ? obj.reviews.reduce((a, c) => a + c.ratingNumber, 0) / reviewCount
-            : 0
+        const { reviewCount, averageRating } = useCardProjection
+          ? computeCardRatingFields(obj)
+          : (() => {
+            const count = obj.reviews?.length || 0
+            const avg =
+              count > 0
+                ? obj.reviews.reduce((a, c) => a + c.ratingNumber, 0) / count
+                : 0
+            return { reviewCount: count, averageRating: avg }
+          })()
 
         // Seller avatar for cards (populated userId or userUUID fallback)
         const seller = resolveListingSeller(obj, sellersByUuid)
@@ -595,15 +614,19 @@ const getAllProduct = asyncHandler(async (req, res) => {
           }
         }
 
-        // Card PDFs for everyone; full docs only for authenticated users
-        if (isAuthenticated) {
-          await attachDocumentSignedUrls(obj)
-          obj.requestDocument = normalizeRequestDocumentList(obj.requestDocument)
-          await attachRequestDocumentSignedUrls(obj)
-        } else {
-          await attachDocumentSignedUrls(obj, {
-            fields: ['evaluationCertificate', 'technicalReport'],
-          })
+        // Card lists only need premium refs for badges — skip PDF URL signing.
+        if (!useCardProjection) {
+          if (isAuthenticated) {
+            await attachDocumentSignedUrls(obj)
+            obj.requestDocument = normalizeRequestDocumentList(
+              obj.requestDocument,
+            )
+            await attachRequestDocumentSignedUrls(obj)
+          } else {
+            await attachDocumentSignedUrls(obj, {
+              fields: ['evaluationCertificate', 'technicalReport'],
+            })
+          }
         }
 
         // Drop internal S3 fields before serializing (signedUrl is enough).
@@ -677,22 +700,30 @@ const getAllProductByFilter = asyncHandler(async (req, res) => {
   }
   modifiedQuery.isDeleted = false
   modifiedQuery.status = 1
-  let query = Property.find(modifiedQuery)
-    .populate('pictures')
-    .populate('video')
-    .populate('thumbnailImg')
-    .populate('evaluationCertificate')
-    .populate('video3DWalkthrough')
-    .populate('unitLayout')
-    .populate('floorPlan')
-    .populate('titleDeed')
-    .populate('qrScan')
-    .populate({ path: 'userId', select: 'profileImage name uuid' })
-    .populate({
-      path: 'technicalReport',
-      populate: { path: 'reportFile' },
-    })
-    .select('-_id')
+  const useCardProjection = shouldUseCardListProjection(req, Boolean(userId))
+  let query = Property.find(modifiedQuery).select(
+    useCardProjection ? CARD_PROPERTY_FIELDS : '-_id',
+  )
+
+  if (useCardProjection) {
+    query = applyCardListPopulates(query)
+  } else {
+    query = query
+      .populate('pictures')
+      .populate('video')
+      .populate('thumbnailImg')
+      .populate('evaluationCertificate')
+      .populate('video3DWalkthrough')
+      .populate('unitLayout')
+      .populate('floorPlan')
+      .populate('titleDeed')
+      .populate('qrScan')
+      .populate({ path: 'userId', select: 'profileImage name uuid' })
+      .populate({
+        path: 'technicalReport',
+        populate: { path: 'reportFile' },
+      })
+  }
   // sorting
   if (req.query.sort) {
     const sortBy = req.query.sort.split(',').join(' ')
@@ -702,11 +733,13 @@ const getAllProductByFilter = asyncHandler(async (req, res) => {
   }
 
   // limiting the fields
-  if (req.query.fields) {
-    const fields = req.query.fields.split(',').join(' ')
-    query = query.select(fields)
-  } else {
-    query = query.select('')
+  if (!useCardProjection) {
+    if (req.query.fields) {
+      const fields = req.query.fields.split(',').join(' ')
+      query = query.select(fields)
+    } else {
+      query = query.select('')
+    }
   }
 
   // pagination
@@ -734,20 +767,26 @@ const getAllProductByFilter = asyncHandler(async (req, res) => {
         obj.sellerName = seller.name || ''
         obj.sellerRef = getSellerRef(seller)
       }
+      if (useCardProjection) {
+        const { reviewCount, averageRating } = computeCardRatingFields(obj)
+        obj.reviewCount = reviewCount
+        obj.averageRating = averageRating
+      }
       return obj
     })
     await refreshListingsMediaSignedUrls(allProduct)
-    // Listing cards need fresh `signedUrl` on evaluation certificate / technical
-    // report. Authenticated users also get uploadDocument + invoice when present.
-    await Promise.all(
-      allProduct.map((p) =>
-        userId
-          ? attachDocumentSignedUrls(p)
-          : attachDocumentSignedUrls(p, {
-            fields: ['evaluationCertificate', 'technicalReport'],
-          }),
-      ),
-    )
+    // Card lists only need premium refs for badges — skip PDF URL signing.
+    if (!useCardProjection) {
+      await Promise.all(
+        allProduct.map((p) =>
+          userId
+            ? attachDocumentSignedUrls(p)
+            : attachDocumentSignedUrls(p, {
+              fields: ['evaluationCertificate', 'technicalReport'],
+            }),
+        ),
+      )
+    }
     // Strip server-internal S3 metadata before responding.
     sanitizeListingsMediaResponse(allProduct)
     const totalFilteredProducts =
@@ -770,35 +809,16 @@ const getAllProductByFilter = asyncHandler(async (req, res) => {
 })
 
 const getRelatedProduct = asyncHandler(async (req, res) => {
-  const assetType = getSafeStringParam(req.query, 'assetType')
-  const country = getSafeStringParam(req.query, 'country')
-  const city = getSafeStringParam(req.query, 'city')
-  const propertyType = getSafeStringParam(req.query, 'propertyType')
-  const price = getSafeStringParam(req.query, 'price')
-
-  // Construct the query object based on provided properties
-  const queryObj = {}
-  if (assetType) queryObj.assetType = assetType
-  if (country) queryObj.country = country
-  if (city) queryObj.city = city
-  if (propertyType) queryObj.propertyType = propertyType
-  if (price) queryObj.price = price
-  queryObj.isDeleted = false
   try {
-    const allProductRaw = await Property.find(queryObj)
-      .select('-_id')
-      .populate({ path: 'pictures', select: '-_id' })
-      .populate({ path: 'thumbnailImg', select: '-_id' })
-      .populate({ path: 'video', select: '-_id' })
-
-    const allProduct = allProductRaw.map((p) =>
-      typeof p.toObject === 'function' ? p.toObject() : p,
-    )
-    await refreshListingsMediaSignedUrls(allProduct)
-    sanitizeListingsMediaResponse(allProduct)
-    return res.status(200).json(allProduct)
+    const result = await findRelatedListings({
+      Model: Property,
+      cardFields: CARD_PROPERTY_FIELDS,
+      query: req.query,
+      softFields: ['assetType', 'country', 'city', 'propertyType'],
+    })
+    return res.status(200).json(result)
   } catch (err) {
-    return res.status(200).json({ message: err?.message })
+    return res.status(500).json({ message: err?.message || 'Server error' })
   }
 })
 

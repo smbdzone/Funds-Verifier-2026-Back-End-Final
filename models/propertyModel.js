@@ -1,6 +1,6 @@
 import mongoose from 'mongoose'
 import { v4 as uuidv4 } from 'uuid'
-import { attachListingMediaRefreshHook } from '../helper/refreshAssetSignedUrls.js'
+import { applyMarketplaceListingIndexes } from '../utils/listingIndexes.js'
 
 // Define property schema
 const propertySchema = new mongoose.Schema({
@@ -217,17 +217,14 @@ propertySchema.virtual('reviews', {
 propertySchema.set('toObject', { virtuals: true })
 propertySchema.set('toJSON', { virtuals: true })
 
-/**
- * Auto-refresh CloudFront signed URLs on every read so that any controller
- * (current or future) that fetches a property with populated media returns
- * working URLs instead of stale ~1-hour signatures persisted at upload time.
- *
- * No-op when the media refs are not populated, so it's safe for queries that
- * only need the bare document.
- */
-propertySchema.post('find', attachListingMediaRefreshHook)
-propertySchema.post('findOne', attachListingMediaRefreshHook)
-propertySchema.post('findOneAndUpdate', attachListingMediaRefreshHook)
+// Media signed URLs: ImageAsset/Video/Thumbnail post-find hooks sign on
+// populate; controllers call refreshListingMediaSignedUrls for .lean() paths.
+// Listing-level hooks were removed — they re-signed the same entries again.
+
+applyMarketplaceListingIndexes(propertySchema, {
+  includeSlug: true,
+  includePropertyType: true,
+})
 
 // Create Property model
 const Property = mongoose.model('Property', propertySchema)

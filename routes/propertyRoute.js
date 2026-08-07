@@ -19,6 +19,7 @@ import {
   requestOffPlanApprovalFee,
   updateOffPlanAgencyAgreement,
 } from '../controller/propertyCtrl.js'
+import { getPropertyLocations } from '../controller/listingLocationsCtrl.js'
 import { createDeveloperInquiry } from '../controller/developerInquiryCtrl.js'
 import {
   authMiddleware,
@@ -38,6 +39,12 @@ router.get(
 )
 router.get('/filter', ...listingReadAccess, getAllProductByFilter)
 router.get('/price', ...listingReadAccess, getPrice)
+router.get(
+  '/locations',
+  listingReadLimiter,
+  ...listingReadAccess,
+  getPropertyLocations,
+)
 router.get('/related-property', ...listingReadAccess, getRelatedProduct)
 router.get(
   '/admin/offplan-requests',

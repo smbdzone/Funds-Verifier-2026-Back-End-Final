@@ -10,12 +10,24 @@
  * leaves the original `url` untouched, so any code path can prefer whichever
  * one is appropriate.
  *
+ * Duplicate-sign guard: populate hooks + listing hooks + controller "safety
+ * nets" used to re-sign the same entries 2–3× per request. We mark entries /
+ * listings after a successful refresh so later passes in the same request are
+ * no-ops (no extra CloudFront/S3 crypto).
+ *
  * Implementation note: the CloudFront signer is imported lazily so that
  * modules attaching this helper as a Mongoose hook can be loaded before
  * `dotenv.config()` runs without triggering env-var validation at boot.
  */
 
 const DEFAULT_EXPIRY_SECONDS = 6 * 60 * 60 // 6 hours
+
+/** Per media entry — set after we sign in this process/request. */
+const SIGNED_AT = Symbol.for('fv.mediaSignedAt')
+/** Per listing doc — set after a full listing media refresh walk. */
+const LISTING_MEDIA_REFRESHED = Symbol.for('fv.listingMediaRefreshed')
+/** Per asset doc (ImageAsset / VideoAsset / Thumbnail). */
+const ASSET_DOC_REFRESHED = Symbol.for('fv.assetDocRefreshed')
 
 /**
  * Sign URLs against CloudFront for the images bucket (the only origin attached
@@ -54,8 +66,25 @@ async function getSigners() {
   return { cf, s3, cfBucket: getCloudFrontBucket() }
 }
 
+/**
+ * True when this entry was already signed earlier in the same request
+ * (or still has a usable signedUrl from that pass).
+ */
+function alreadySignedFresh(entry, expiresInSeconds) {
+  if (!entry || typeof entry !== 'object') return false
+  const signedAt = entry[SIGNED_AT]
+  if (!signedAt || typeof entry.signedUrl !== 'string' || !entry.signedUrl) {
+    return false
+  }
+  // Re-sign if we are within 5 minutes of the configured expiry window.
+  const freshForMs = Math.max(60, expiresInSeconds - 5 * 60) * 1000
+  return Date.now() - signedAt < freshForMs
+}
+
 async function signOne(entry, expiresInSeconds, signers) {
   if (!entry || typeof entry !== 'object' || !entry.s3Key || !signers) return
+  if (alreadySignedFresh(entry, expiresInSeconds)) return
+
   const { cf, s3, cfBucket } = signers
   try {
     if (!entry.s3Bucket || entry.s3Bucket === cfBucket) {
@@ -65,6 +94,7 @@ async function signOne(entry, expiresInSeconds, signers) {
       const { signedUrl } = await s3(entry.s3Bucket, entry.s3Key, expiresInSeconds)
       entry.signedUrl = signedUrl
     }
+    entry[SIGNED_AT] = Date.now()
   } catch (err) {
     console.warn(
       'refreshAssetSignedUrls: failed to sign',
@@ -95,6 +125,9 @@ const EXTRA_IMAGE_ASSET_KEYS = ['qrScan']
 
 async function refreshListingMediaSignedUrlsImpl(doc, expiresInSeconds, signers) {
   if (!doc || typeof doc !== 'object') return doc
+  // Same listing already walked this request (hook + controller safety net).
+  if (doc[LISTING_MEDIA_REFRESHED]) return doc
+
   await Promise.all([
     signArray(doc?.pictures?.images, expiresInSeconds, signers),
     signArray(doc?.thumbnailImg?.images, expiresInSeconds, signers),
@@ -106,15 +139,21 @@ async function refreshListingMediaSignedUrlsImpl(doc, expiresInSeconds, signers)
       signArray(doc?.[key]?.images, expiresInSeconds, signers),
     ),
   ])
+
+  doc[LISTING_MEDIA_REFRESHED] = true
   return doc
 }
 
 async function refreshAssetDocSignedUrlsImpl(doc, expiresInSeconds, signers) {
   if (!doc || typeof doc !== 'object') return doc
+  if (doc[ASSET_DOC_REFRESHED]) return doc
+
   await Promise.all([
     signArray(doc.images, expiresInSeconds, signers),
     signArray(doc.videos, expiresInSeconds, signers),
   ])
+
+  doc[ASSET_DOC_REFRESHED] = true
   return doc
 }
 
@@ -151,6 +190,9 @@ export async function refreshListingsMediaSignedUrls(
 
 /**
  * Mongoose post-find hook that refreshes signed URLs on any populated media.
+ *
+ * Prefer asset-doc hooks (ImageAsset/Video/Thumbnail) for populate paths;
+ * keep this available for any remaining listing-level attachments.
  *
  * Attach with:
  *   schema.post('find', attachListingMediaRefreshHook)

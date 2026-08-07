@@ -18,6 +18,7 @@ import {
   getAllProductByFilter,
   getApprovedListingsMetrics,
 } from '../controller/carCtrl.js'
+import { getCarLocations } from '../controller/listingLocationsCtrl.js'
 import { assetHolderCreate } from '../middlewares/assetHolderCreate.js'
 import { authorizeUserByUUID } from '../middlewares/authorizeUser.js'
 import { assetHolderUpdate } from '../middlewares/assetHolderUpdate .js'
@@ -37,6 +38,12 @@ router.get(
 router.get('/filter', ...listingReadAccess, getAllProductByFilter)
 
 router.get('/price', ...listingReadAccess, getPrice)
+router.get(
+  '/locations',
+  listingReadLimiter,
+  ...listingReadAccess,
+  getCarLocations,
+)
 router.get('/related-car', ...listingReadAccess, getRelatedProduct)
 router.get('/:id', ...listingReadAccess, getSingleProduct)
 router.put('/rating', ...listingReadAccess, addRating)

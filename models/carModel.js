@@ -1,7 +1,7 @@
 import mongoose from 'mongoose'
 const Schema = mongoose.Schema
 import { v4 as uuidv4 } from 'uuid'
-import { attachListingMediaRefreshHook } from '../helper/refreshAssetSignedUrls.js'
+import { applyMarketplaceListingIndexes } from '../utils/listingIndexes.js'
 
 // Define car advertisement schema
 const CarAdSchema = new Schema(
@@ -194,14 +194,15 @@ CarAdSchema.set('toObject', { virtuals: true })
 CarAdSchema.set('toJSON', { virtuals: true })
 
 /**
- * Auto-refresh CloudFront signed URLs on every read so that any controller
- * (current or future) that fetches a car with populated media returns working
- * URLs instead of stale ~1-hour signatures persisted at upload time. No-op
- * when media refs are not populated.
+ * Media signed URLs: ImageAsset/Video/Thumbnail hooks sign on populate;
+ * controllers refresh for .lean() paths. Listing-level hooks removed to
+ * avoid re-signing the same entries on every list/detail read.
  */
-CarAdSchema.post('find', attachListingMediaRefreshHook)
-CarAdSchema.post('findOne', attachListingMediaRefreshHook)
-CarAdSchema.post('findOneAndUpdate', attachListingMediaRefreshHook)
+
+applyMarketplaceListingIndexes(CarAdSchema, {
+  includeSlug: true,
+  includeMake: true,
+})
 
 // Create and export model
 const Car = mongoose.model('Car', CarAdSchema)

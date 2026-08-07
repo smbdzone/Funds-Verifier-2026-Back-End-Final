@@ -43,6 +43,11 @@ export const LISTING_QUERY_PARAMS = new Set([
   'evaluationPrices',
   'transactionStatus',
   'evaluatorPending',
+  'excludeUuid',
+  'excludeSlug',
+  'excludeId',
+  'excludeOffPlan',
+  'view',
 ])
 
 /** Apply admin/listing status filters from query string onto a Mongo filter object. */

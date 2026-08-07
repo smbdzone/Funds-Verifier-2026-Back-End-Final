@@ -1,7 +1,7 @@
 import mongoose from 'mongoose'
 const Schema = mongoose.Schema
 import { v4 as uuidv4 } from 'uuid'
-import { attachListingMediaRefreshHook } from '../helper/refreshAssetSignedUrls.js'
+import { applyMarketplaceListingIndexes } from '../utils/listingIndexes.js'
 
 // Define jewelry advertisement schema
 const JewelryAdSchema = new Schema(
@@ -190,14 +190,15 @@ JewelryAdSchema.set('toObject', { virtuals: true })
 JewelryAdSchema.set('toJSON', { virtuals: true })
 
 /**
- * Auto-refresh CloudFront signed URLs on every read so that any controller
- * (current or future) that fetches jewelry with populated media returns
- * working URLs instead of stale ~1-hour signatures persisted at upload time.
- * No-op when media refs are not populated.
+ * Media signed URLs: ImageAsset/Video/Thumbnail hooks sign on populate;
+ * controllers refresh for .lean() paths. Listing-level hooks removed to
+ * avoid re-signing the same entries on every list/detail read.
  */
-JewelryAdSchema.post('find', attachListingMediaRefreshHook)
-JewelryAdSchema.post('findOne', attachListingMediaRefreshHook)
-JewelryAdSchema.post('findOneAndUpdate', attachListingMediaRefreshHook)
+
+applyMarketplaceListingIndexes(JewelryAdSchema, {
+  includeSlug: false,
+  includeMake: true,
+})
 
 // Create and export model
 const Jewelry = mongoose.model('Jewelry', JewelryAdSchema)

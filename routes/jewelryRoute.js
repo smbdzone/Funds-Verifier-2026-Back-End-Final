@@ -13,6 +13,7 @@ import {
   getAllProductByFilter,
   getApprovedListingsMetrics,
 } from '../controller/jewelryCtrl.js'
+import { getJewelryLocations } from '../controller/listingLocationsCtrl.js'
 import {
   authMiddleware,
   isAdmin,
@@ -37,6 +38,12 @@ router.get(
 router.get('/filter', ...listingReadAccess, getAllProductByFilter)
 
 router.get('/price', ...listingReadAccess, getPrice)
+router.get(
+  '/locations',
+  listingReadLimiter,
+  ...listingReadAccess,
+  getJewelryLocations,
+)
 
 router.get('/related-jewelry', ...listingReadAccess, getRelatedProduct)
 router.get('/:id', ...listingReadAccess, getSingleProduct)
