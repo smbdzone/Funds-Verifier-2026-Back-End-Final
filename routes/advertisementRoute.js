@@ -21,6 +21,7 @@ import {
 } from '../controller/advertisementCtrl.js'
 import { authMiddleware } from '../middlewares/authMiddleware.js'
 import { adminOnly } from '../middlewares/adminOnly.js'
+import { publicLimiter } from '../middlewares/rateLimiter.js'
 import { assertWalletAccess } from '../middlewares/assertWalletAccess.js'
 import AdsWallet from '../models/AdsWalletModel.js'
 
@@ -32,7 +33,9 @@ router.get('/single/:id', ...adminOnly, GetOneAdvertisements)
 router.get('/getById', authMiddleware, getAll)
 router.get('/getUserAdvertisement', authMiddleware, getUserAdvertisements)
 router.get('/getAllSideBanners', authMiddleware, getAllSideBanners)
-router.get('/getAllLargeBanners', authMiddleware, getAllLargeBanners)
+// Public: served to logged-out visitors too (anonymous viewers get untargeted
+// ads only). Reads an optional Bearer token itself, so no authMiddleware here.
+router.get('/getAllLargeBanners', publicLimiter, getAllLargeBanners)
 router.get('/getAllFooterBanners', authMiddleware, getAllFooterBanners)
 router.get('/byDateAndTime', getByDateAndTime)
 router.get('/getAdvertisementById/:id', authMiddleware, getById)

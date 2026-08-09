@@ -5,3 +5,7 @@ public/
 private_key.pem
 public_key.pem
 keys/*.pem
+
+# Local-only admin/campaign account seeder — contains hardcoded credentials.
+# Must never be committed or deployed (commercial project). Keep local only.
+scripts/seed-admin-and-campaign.js
