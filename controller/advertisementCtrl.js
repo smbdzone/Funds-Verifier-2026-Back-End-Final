@@ -309,28 +309,45 @@ const getAllSideBanners = async (req, res) => {
   }
 }
 
+// Public endpoint: the banner renders for logged-out visitors too. A valid token
+// unlocks targeted ads (matched on the viewer's city / age-group / gender);
+// without one we can't match any dimension, so anonymous visitors only ever see
+// ads that constrain none of them. Impressions/clicks stay auth-gated, so
+// anonymous views are shown but never billed.
 const getAllLargeBanners = async (req, res) => {
   const authorizationHeader = req.headers['authorization']
-  if (!authorizationHeader || !authorizationHeader.startsWith('Bearer ')) {
-    return res.status(401).json({
-      success: false,
-      message: 'Bearer token not found in Authorization header',
-    })
-  }
-  const bearerToken = authorizationHeader.split(' ')[1]
-  const userId = verifyToken(bearerToken)
+  const bearerToken = authorizationHeader?.startsWith('Bearer ')
+    ? authorizationHeader.split(' ')[1]
+    : null
+  const decoded = bearerToken ? verifyToken(bearerToken) : null
+  // verifyToken falls back to the whole payload when there's no `id` claim, so
+  // only treat a plain string id as a signed-in viewer.
+  const userId = typeof decoded === 'string' ? decoded : null
+  const isAnonymous = !userId
 
   try {
     // Viewer attributes for strict targeting (from UAE Pass / onboarding).
     // Age-group is derived live from date of birth so it never goes stale.
-    const viewer = await User.findById(userId).select('city gender dateOfBirth')
-    const viewerCity = (viewer?.city || '').toString().trim()
-    const viewerGender = (viewer?.gender || '').toString().trim().toLowerCase()
-    const viewerAge = ageGroupFromDob(viewer?.dateOfBirth)
+    let viewerCity = ''
+    let viewerGender = ''
+    let viewerAge = ''
 
-    // Candidate approved Quarter-Page ads (excluding the viewer's own).
+    if (!isAnonymous) {
+      const viewer = await User.findById(userId).select(
+        'city gender dateOfBirth',
+      )
+      viewerCity = (viewer?.city || '').toString().trim()
+      viewerGender = (viewer?.gender || '').toString().trim().toLowerCase()
+      viewerAge = ageGroupFromDob(viewer?.dateOfBirth)
+    }
+
+    // Candidate approved Quarter-Page ads. A signed-in viewer never sees their
+    // own ads; an anonymous visitor has no "own" ads to exclude.
+    const baseMatch = { isDeleted: { $ne: true } }
+    if (!isAnonymous) baseMatch.userId = { $ne: userId }
+
     const candidates = await Advertisement.aggregate([
-      { $match: { userId: { $ne: userId }, isDeleted: { $ne: true } } },
+      { $match: baseMatch },
       { $unwind: '$creatives' },
       {
         $match: {
@@ -363,16 +380,27 @@ const getAllLargeBanners = async (req, res) => {
         .flat(Infinity)
         .filter(Boolean)
         .map((c) => c.toString().trim())
+
+      const adGender = (ta.gender || '').toString().trim().toLowerCase()
+      const adAge = (ta.ageGroup || '').toString().trim()
+
+      // Anonymous visitors can't be matched on any dimension, so they only see
+      // ads that target nobody in particular. This keeps the targeting an
+      // advertiser paid for honest rather than spraying their budget.
+      if (isAnonymous) {
+        const isTargeted =
+          cities.length > 0 || (!!adGender && adGender !== 'all') || !!adAge
+        return !isTargeted
+      }
+
       if (cities.length > 0) {
         if (!viewerCity || !cities.includes(viewerCity)) return false
       }
 
-      const adGender = (ta.gender || '').toString().trim().toLowerCase()
       if (adGender && adGender !== 'all') {
         if (!viewerGender || viewerGender !== adGender) return false
       }
 
-      const adAge = (ta.ageGroup || '').toString().trim()
       if (adAge) {
         if (!viewerAge || viewerAge !== adAge) return false
       }
@@ -384,10 +412,24 @@ const getAllLargeBanners = async (req, res) => {
       ? [matches[Math.floor(Math.random() * matches.length)]]
       : []
 
+    // This endpoint is public, so return only what the banner needs to render
+    // and to report an impression/click — never the advertiser's id, budget,
+    // spend or payment status.
+    const data = withSignedCreativesArray(chosen).map((ad) => ({
+      _id: ad._id,
+      creatives: (ad.creatives || []).map((c) => ({
+        _id: c._id,
+        img: c.img,
+        signedImg: c.signedImg,
+        adLink: c.adLink,
+        format: c.format,
+      })),
+    }))
+
     return res.status(200).json({
       success: true,
       message: 'Data retrieved',
-      data: withSignedCreativesArray(chosen),
+      data,
     })
   } catch (error) {
     console.error(error)

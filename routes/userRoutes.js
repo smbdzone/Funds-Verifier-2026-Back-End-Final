@@ -111,6 +111,12 @@ router.delete(
   deleteUser,
 )
 
+// Ad-targeting profile (city / DOB / gender) for the authenticated user.
+// MUST be registered before the `/:id` wildcard below — otherwise a single-
+// segment path like `/targeting-profile` is captured by `/:id` and routed to
+// updateStatus, which fails with "User not found".
+router.put('/targeting-profile', authMiddleware, updateTargetingProfile)
+
 // update user state - only for the authenticated user (id must match token user UUID)
 router.put(
   '/:id',
@@ -186,7 +192,6 @@ router.get('/verify-token', verifyUserToken)
 
 // get current user (me) - uses token to identify user, no UUID needed
 router.get('/me', authMiddleware, getCurrentUser)
-router.put('/targeting-profile', authMiddleware, updateTargetingProfile)
 
 // single user - requires auth, only admin can view any user, users can only view themselves
 router.get(
