@@ -1,7 +1,10 @@
 import sendEmail from './nodeMailer.js'
 import { safeURL } from '../controller/emailCtrl.js'
 import { formatDubaiDateTime } from './dubaiDateTime.js'
-import { resolveListingEmailPreviewUrl } from './listingEmailPreview.js'
+import {
+  buildEmailPreviewImageHtml,
+  resolveListingEmailPreviewUrl,
+} from './listingEmailPreview.js'
 
 export function getFvEmail() {
   return String(process.env.FV_EMAIL || '').trim()
@@ -57,12 +60,7 @@ function listingDetailLines(listing, assetType) {
 function buildEmailHtml({ recipientName, headline, bodyLines = [], ctaLabel, ctaUrl, previewImageUrl }) {
   const name = recipientName || 'FV Portal'
   const safeCta = safeURL(ctaUrl)
-  const safePreview = previewImageUrl ? safeURL(previewImageUrl) : '#'
-  const previewHtml =
-    previewImageUrl && safePreview !== '#'
-      ? `<img src="${safePreview}" alt="Listing preview" width="512"
-          style="display:block;width:100%;max-width:512px;height:auto;border-radius:8px;margin:0 0 16px;border:1px solid #e5e7eb;" />`
-      : ''
+  const previewHtml = buildEmailPreviewImageHtml(previewImageUrl, safeURL)
   const linesHtml = bodyLines
     .filter(Boolean)
     .map(
@@ -82,6 +80,7 @@ function buildEmailHtml({ recipientName, headline, bodyLines = [], ctaLabel, cta
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="x-apple-disable-message-reformatting" />
   </head>
   <body style="background-color:#ffffff;margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Oxygen-Sans,Ubuntu,Cantarell,'Helvetica Neue',sans-serif;">
@@ -94,11 +93,19 @@ function buildEmailHtml({ recipientName, headline, bodyLines = [], ctaLabel, cta
                 Funds Verifier
               </td>
             </tr>
+            ${
+              previewHtml
+                ? `<tr>
+              <td style="padding:0;font-size:0;line-height:0;">
+                ${previewHtml}
+              </td>
+            </tr>`
+                : ''
+            }
             <tr>
               <td style="padding:28px 24px;">
                 <p style="margin:0 0 16px;color:#111827;font-size:16px;">Hi ${name},</p>
                 <p style="margin:0 0 16px;color:#111827;font-size:16px;font-weight:600;">${headline}</p>
-                ${previewHtml}
                 ${linesHtml}
                 ${ctaHtml}
               </td>

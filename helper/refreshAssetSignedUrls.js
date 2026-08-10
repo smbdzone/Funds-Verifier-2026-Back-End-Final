@@ -81,9 +81,9 @@ function alreadySignedFresh(entry, expiresInSeconds) {
   return Date.now() - signedAt < freshForMs
 }
 
-async function signOne(entry, expiresInSeconds, signers) {
+async function signOne(entry, expiresInSeconds, signers, force = false) {
   if (!entry || typeof entry !== 'object' || !entry.s3Key || !signers) return
-  if (alreadySignedFresh(entry, expiresInSeconds)) return
+  if (!force && alreadySignedFresh(entry, expiresInSeconds)) return
 
   const { cf, s3, cfBucket } = signers
   try {
@@ -105,9 +105,11 @@ async function signOne(entry, expiresInSeconds, signers) {
   }
 }
 
-async function signArray(arr, expiresInSeconds, signers) {
+async function signArray(arr, expiresInSeconds, signers, force = false) {
   if (!Array.isArray(arr)) return
-  await Promise.all(arr.map((item) => signOne(item, expiresInSeconds, signers)))
+  await Promise.all(
+    arr.map((item) => signOne(item, expiresInSeconds, signers, force)),
+  )
 }
 
 const OFF_PLAN_LAYOUT_MEDIA_KEYS = [
@@ -123,20 +125,25 @@ const OFF_PLAN_LAYOUT_MEDIA_KEYS = [
 
 const EXTRA_IMAGE_ASSET_KEYS = ['qrScan']
 
-async function refreshListingMediaSignedUrlsImpl(doc, expiresInSeconds, signers) {
+async function refreshListingMediaSignedUrlsImpl(
+  doc,
+  expiresInSeconds,
+  signers,
+  force = false,
+) {
   if (!doc || typeof doc !== 'object') return doc
   // Same listing already walked this request (hook + controller safety net).
-  if (doc[LISTING_MEDIA_REFRESHED]) return doc
+  if (!force && doc[LISTING_MEDIA_REFRESHED]) return doc
 
   await Promise.all([
-    signArray(doc?.pictures?.images, expiresInSeconds, signers),
-    signArray(doc?.thumbnailImg?.images, expiresInSeconds, signers),
-    signArray(doc?.video?.videos, expiresInSeconds, signers),
+    signArray(doc?.pictures?.images, expiresInSeconds, signers, force),
+    signArray(doc?.thumbnailImg?.images, expiresInSeconds, signers, force),
+    signArray(doc?.video?.videos, expiresInSeconds, signers, force),
     ...OFF_PLAN_LAYOUT_MEDIA_KEYS.map((key) =>
-      signArray(doc?.[key]?.images, expiresInSeconds, signers),
+      signArray(doc?.[key]?.images, expiresInSeconds, signers, force),
     ),
     ...EXTRA_IMAGE_ASSET_KEYS.map((key) =>
-      signArray(doc?.[key]?.images, expiresInSeconds, signers),
+      signArray(doc?.[key]?.images, expiresInSeconds, signers, force),
     ),
   ])
 
@@ -164,13 +171,21 @@ async function refreshAssetDocSignedUrlsImpl(doc, expiresInSeconds, signers) {
  *   video.videos[]
  *
  * Returns the same object for chaining. Safe on `null`/partial docs.
+ * Pass `{ force: true }` to re-sign even if a shorter-lived URL was signed
+ * earlier in the same request (needed for long-lived email thumbnails).
  */
 export async function refreshListingMediaSignedUrls(
   doc,
   expiresInSeconds = DEFAULT_EXPIRY_SECONDS,
+  options = {},
 ) {
   const signers = await getSigners()
-  return refreshListingMediaSignedUrlsImpl(doc, expiresInSeconds, signers)
+  return refreshListingMediaSignedUrlsImpl(
+    doc,
+    expiresInSeconds,
+    signers,
+    Boolean(options?.force),
+  )
 }
 
 /** Apply to an array of populated listing docs. */

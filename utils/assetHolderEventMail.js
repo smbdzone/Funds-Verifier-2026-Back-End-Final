@@ -1,6 +1,7 @@
 import sendEmail from './nodeMailer.js'
 import User from '../models/userModel.js'
 import { safeURL } from '../controller/emailCtrl.js'
+import { buildEmailPreviewImageHtml } from './listingEmailPreview.js'
 
 function buildEmailHtml({
   recipientName,
@@ -12,12 +13,7 @@ function buildEmailHtml({
 }) {
   const name = recipientName || 'Asset Holder'
   const safeCta = safeURL(ctaUrl)
-  const safePreview = previewImageUrl ? safeURL(previewImageUrl) : '#'
-  const previewHtml =
-    previewImageUrl && safePreview !== '#'
-      ? `<img src="${safePreview}" alt="Listing preview" width="512"
-          style="display:block;width:100%;max-width:512px;height:auto;border-radius:8px;margin:0 0 16px;border:1px solid #e5e7eb;" />`
-      : ''
+  const previewHtml = buildEmailPreviewImageHtml(previewImageUrl, safeURL)
   const linesHtml = bodyLines
     .filter(Boolean)
     .map(
@@ -30,6 +26,7 @@ function buildEmailHtml({
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="x-apple-disable-message-reformatting" />
   </head>
   <body style="background-color:#ffffff;margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Oxygen-Sans,Ubuntu,Cantarell,'Helvetica Neue',sans-serif;">
@@ -42,11 +39,19 @@ function buildEmailHtml({
                 Funds Verifier
               </td>
             </tr>
+            ${
+              previewHtml
+                ? `<tr>
+              <td style="padding:0;font-size:0;line-height:0;">
+                ${previewHtml}
+              </td>
+            </tr>`
+                : ''
+            }
             <tr>
               <td style="padding:28px 24px;">
                 <p style="margin:0 0 16px;color:#111827;font-size:16px;">Hi ${name},</p>
                 <p style="margin:0 0 16px;color:#111827;font-size:16px;font-weight:600;">${headline}</p>
-                ${previewHtml}
                 ${linesHtml}
                 <a href="${safeCta}"
                   style="display:inline-block;background:#eab308;color:#111827;text-decoration:none;font-weight:600;font-size:14px;padding:12px 20px;border-radius:6px;">
