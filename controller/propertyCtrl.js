@@ -47,6 +47,7 @@ import {
   refreshListingPremiumFieldsForEdit,
   sanitizeUnpaidPremiumServicesForClient,
 } from '../utils/listingPremiumSync.js'
+import { sanitizeListingMediaObjectIds } from '../utils/sanitizeListingMediaIds.js'
 import {
   refreshListingMediaSignedUrls,
   refreshListingsMediaSignedUrls,
@@ -134,6 +135,7 @@ const createProduct = asyncHandler(async (req, res) => {
     })
 
     stripNullPremiumRefs(req.body)
+    sanitizeListingMediaObjectIds(req.body)
 
     const isOffPlan = isOffPlanAssetType(req.body.assetType)
     applyOffPlanAutoApproval(req.body)
@@ -896,6 +898,7 @@ const updateProduct = asyncHandler(async (req, res) => {
       //   )
       // } else {
       stripNullPremiumRefs(req.body)
+      sanitizeListingMediaObjectIds(req.body)
       updatedProduct = await Property.findByIdAndUpdate(
         product._id,
         { $set: req.body },

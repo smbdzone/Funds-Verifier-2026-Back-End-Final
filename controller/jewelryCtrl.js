@@ -44,6 +44,7 @@ import {
   refreshListingPremiumFieldsForEdit,
   sanitizeUnpaidPremiumServicesForClient,
 } from '../utils/listingPremiumSync.js'
+import { sanitizeListingMediaObjectIds } from '../utils/sanitizeListingMediaIds.js'
 import { buildListingIdQuery } from '../utils/listingIdLookup.js'
 import { isListingPrivilegedUser } from '../utils/parentEvaluator.js'
 import {
@@ -115,6 +116,7 @@ const createProduct = asyncHandler(async (req, res) => {
     })
 
     stripNullPremiumRefs(req.body)
+    sanitizeListingMediaObjectIds(req.body)
 
     const createPdt = await Jewelry.create([req.body], { session })
 
@@ -462,14 +464,14 @@ const getAllProduct = asyncHandler(async (req, res) => {
       const { reviewCount, averageRating } = useCardProjection
         ? computeCardRatingFields(obj)
         : (() => {
-            const count = product.reviews?.length || 0
-            const avg =
-              count > 0
-                ? product.reviews.reduce((s, r) => s + r.ratingNumber, 0) /
-                  count
-                : 0
-            return { reviewCount: count, averageRating: avg }
-          })()
+          const count = product.reviews?.length || 0
+          const avg =
+            count > 0
+              ? product.reviews.reduce((s, r) => s + r.ratingNumber, 0) /
+              count
+              : 0
+          return { reviewCount: count, averageRating: avg }
+        })()
 
       // Seller avatar for cards; strip other user fields for public callers
       const seller = resolveListingSeller(obj, sellersByUuid)
@@ -717,6 +719,7 @@ const updateProduct = asyncHandler(async (req, res) => {
 
       let updatedProduct
       stripNullPremiumRefs(req.body)
+      sanitizeListingMediaObjectIds(req.body)
       updatedProduct = await Jewelry.findByIdAndUpdate(
         product._id,
         { $set: req.body },

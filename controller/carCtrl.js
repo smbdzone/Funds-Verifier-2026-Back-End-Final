@@ -43,6 +43,7 @@ import {
   refreshListingPremiumFieldsForEdit,
   sanitizeUnpaidPremiumServicesForClient,
 } from '../utils/listingPremiumSync.js'
+import { sanitizeListingMediaObjectIds } from '../utils/sanitizeListingMediaIds.js'
 import { buildListingIdQuery } from '../utils/listingIdLookup.js'
 import { isListingPrivilegedUser } from '../utils/parentEvaluator.js'
 import {
@@ -118,6 +119,7 @@ const createProduct = asyncHandler(async (req, res) => {
     })
 
     stripNullPremiumRefs(req.body)
+    sanitizeListingMediaObjectIds(req.body)
 
     const createPdt = await Car.create([req.body], { session })
 
@@ -741,6 +743,7 @@ const updateProduct = asyncHandler(async (req, res) => {
 
       let updatedProduct
       stripNullPremiumRefs(req.body)
+      sanitizeListingMediaObjectIds(req.body)
       updatedProduct = await Car.findByIdAndUpdate(
         product._id,
         { $set: req.body },
