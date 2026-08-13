@@ -93,15 +93,14 @@ function buildEmailHtml({ recipientName, headline, bodyLines = [], ctaLabel, cta
                 Funds Verifier
               </td>
             </tr>
-            ${
-              previewHtml
-                ? `<tr>
+            ${previewHtml
+      ? `<tr>
               <td style="padding:0;font-size:0;line-height:0;">
                 ${previewHtml}
               </td>
             </tr>`
-                : ''
-            }
+      : ''
+    }
             <tr>
               <td style="padding:28px 24px;">
                 <p style="margin:0 0 16px;color:#111827;font-size:16px;">Hi ${name},</p>
@@ -364,6 +363,49 @@ export async function notifyFvPremiumServiceCompleted({
       `Completed by: <strong>${providerName}</strong>`,
       `Completed at: <strong>${when}</strong>`,
     ],
+    ctaLabel: 'Open Site',
+    ctaPath: '/',
+  })
+}
+
+/**
+ * User disagreed with seller success-fee obligation terms — notify FV.
+ */
+export async function notifyFvObligationDisagreed({
+  user,
+  context,
+  assetType,
+  listingTitle,
+  listingUuid,
+  amount,
+}) {
+  const name = displayName(user) || 'A user'
+  const email = user?.email || 'N/A'
+  const label = assetLabel(assetType)
+  const title = listingTitle || 'listing'
+  const fee =
+    amount != null && Number.isFinite(Number(amount))
+      ? `AED ${Number(amount).toLocaleString()}`
+      : 'N/A'
+
+  const lines = [
+    `Event: <strong>Seller obligation terms disagreed</strong>`,
+    `Context: <strong>${context || 'N/A'}</strong>`,
+    `User name: <strong>${name}</strong>`,
+    `User email: <strong>${email}</strong>`,
+    user?.uuid ? `User UUID: <strong>${user.uuid}</strong>` : null,
+    user?.role ? `User role: <strong>${user.role}</strong>` : null,
+    `Asset type: <strong>${label}</strong>`,
+    `Title: <strong>${title}</strong>`,
+    listingUuid ? `Listing UUID: <strong>${listingUuid}</strong>` : null,
+    `Obligation amount shown: <strong>${fee}</strong>`,
+    'Status: <strong>Disagreed — please follow up</strong>',
+  ].filter(Boolean)
+
+  return sendFvPortalEmail({
+    subject: `Sale obligation disagreed — ${label} — Funds Verifier`,
+    headline: `${name} disagreed with the seller obligation terms (${context || 'unknown'}).`,
+    bodyLines: lines,
     ctaLabel: 'Open Site',
     ctaPath: '/',
   })

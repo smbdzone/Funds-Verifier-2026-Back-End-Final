@@ -183,6 +183,7 @@ const buildUnitPayload = (body, { forCreate = false } = {}) => {
         ? sanitizeMongoId(body.thumbnailImg)
         : undefined,
     qrScan: body.qrScan !== undefined ? sanitizeMongoId(body.qrScan) : undefined,
+    video: body.video !== undefined ? sanitizeMongoId(body.video) : undefined,
     unitLayout:
       body.unitLayout !== undefined
         ? sanitizeMongoId(body.unitLayout)
@@ -245,11 +246,16 @@ export const getUnit = asyncHandler(async (req, res) => {
     { path: 'pictures', select: 'images' },
     { path: 'thumbnailImg', select: 'images' },
     { path: 'qrScan', select: 'images' },
+    { path: 'video', select: 'videos' },
     { path: 'unitLayout', select: 'images' },
     { path: 'floorPlan', select: 'images' },
     { path: 'agencyAgreement' },
   ])
-  return res.status(200).json({ success: true, unit })
+  return res.status(200).json({
+    success: true,
+    unit,
+    projectReviewStatus: project.reviewStatus || 'Draft',
+  })
 })
 
 export const createUnit = asyncHandler(async (req, res) => {
@@ -289,6 +295,22 @@ export const updateUnit = asyncHandler(async (req, res) => {
     return res.status(404).json({ success: false, message: 'Unit not found' })
   }
 
+  const reviewStatus = project.reviewStatus || 'Draft'
+  if (['Approved', 'Published'].includes(reviewStatus)) {
+    return res.status(400).json({
+      success: false,
+      message:
+        'This listing is approved and live. Editing is not allowed. Contact Funds Verifier if changes are needed.',
+    })
+  }
+  if (unit.status === 'Available') {
+    return res.status(400).json({
+      success: false,
+      message:
+        'This unit is published. Editing is not allowed until changes are requested.',
+    })
+  }
+
   const built = buildUnitPayload(req.body, { forCreate: false })
   if (!built.ok) {
     return res
@@ -324,6 +346,14 @@ export const submitUnitForApproval = asyncHandler(async (req, res) => {
   const unit = await findOwnedUnit(req.params.unitId, project._id)
   if (!unit) {
     return res.status(404).json({ success: false, message: 'Unit not found' })
+  }
+
+  if (['Approved', 'Published'].includes(project.reviewStatus || 'Draft')) {
+    return res.status(400).json({
+      success: false,
+      message:
+        'This listing is already approved. Editing or re-submitting is not allowed.',
+    })
   }
 
   if (!['Draft', 'Pending', 'Available'].includes(unit.status)) {

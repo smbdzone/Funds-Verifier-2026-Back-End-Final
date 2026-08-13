@@ -15,6 +15,7 @@ import {
 } from '../utils/developerProjectAccess.js'
 import { createNotification } from './notifications.controller.js'
 import sendEmail from '../utils/nodeMailer.js'
+import { getDocumentSignedUrl } from '../helper/attachDocumentSignedUrls.js'
 
 export const REVIEW_STATUSES = [
   'Draft',
@@ -144,6 +145,140 @@ const notifyDeveloperReview = async ({
       }
     })
   }
+}
+
+const escEmailHtml = (value) =>
+  String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+
+const formatUnitEmailPrice = (unit) => {
+  const from = unit?.priceFrom ?? unit?.listingPrice
+  const to = unit?.priceTo
+  if (from == null && to == null) return '—'
+  const fromLabel = `AED ${Number(from).toLocaleString()}`
+  if (
+    from != null &&
+    to != null &&
+    Number.isFinite(Number(to)) &&
+    Number(to) !== Number(from)
+  ) {
+    return `${fromLabel} – ${Number(to).toLocaleString()}`
+  }
+  return fromLabel
+}
+
+const formatUnitEmailSize = (unit) => {
+  if (unit?.builtUpArea == null && unit?.builtUpAreaTo == null) return '—'
+  const u = unit.sizeUnit || 'SQFT'
+  if (
+    unit.builtUpArea != null &&
+    unit.builtUpAreaTo != null &&
+    Number(unit.builtUpAreaTo) !== Number(unit.builtUpArea)
+  ) {
+    return `${unit.builtUpArea} – ${unit.builtUpAreaTo} ${u}`
+  }
+  return `${unit.builtUpArea ?? unit.builtUpAreaTo} ${u}`
+}
+
+const getMainAppBase = () =>
+  String(
+    process.env.MAIN_APP_URL ||
+    process.env.PUBLIC_APP_URL ||
+    process.env.FRONTEND_URL ||
+    '',
+  )
+    .trim()
+    .replace(/\/+$/, '')
+
+/** Shared project + unit detail block for developer approval/publish emails. */
+const buildListingDetailsEmailHtml = ({
+  heading,
+  greetingName,
+  introHtml,
+  project,
+  units = [],
+  publishedMeta = [],
+  note = '',
+  portalLink,
+  portalLinkLabel = 'View units in developer portal',
+}) => {
+  const projectLocation = [project?.address, project?.city, project?.country]
+    .map((v) => String(v || '').trim())
+    .filter(Boolean)
+    .join(', ')
+  const projectNumber = String(
+    project?.reraNumber || project?.developerLicenseNumber || '',
+  ).trim()
+  const mainAppBase = getMainAppBase()
+  const publishedByUnitId = new Map(
+    (publishedMeta || []).map((p) => [String(p.unitId), p]),
+  )
+
+  const unitDetailHtml = (units || [])
+    .map((unit, index) => {
+      const pub = publishedByUnitId.get(String(unit._id))
+      const listingUrl =
+        mainAppBase && pub?.propertyUuid
+          ? `${mainAppBase}/offplan/${pub.propertyUuid}`
+          : ''
+      const delivery = [unit.deliveryQuarter, unit.deliveryYear]
+        .filter(Boolean)
+        .join(' ')
+      return `
+        <div style="margin:12px 0;padding:12px;border:1px solid #e5e7eb;border-radius:8px;">
+          <p style="margin:0 0 8px;"><strong>Unit ${index + 1}: ${escEmailHtml(unit.title || unit.unitNumber || 'Listing')}</strong></p>
+          <ul style="margin:0;padding-left:18px;line-height:1.6;">
+            <li><strong>Unit number:</strong> ${escEmailHtml(unit.unitNumber || '—')}</li>
+            <li><strong>Property type:</strong> ${escEmailHtml(unit.category || '—')}</li>
+            <li><strong>Price:</strong> ${escEmailHtml(formatUnitEmailPrice(unit))}</li>
+            <li><strong>Size:</strong> ${escEmailHtml(formatUnitEmailSize(unit))}</li>
+            <li><strong>Bedrooms:</strong> ${escEmailHtml(unit.bedrooms ?? '—')}</li>
+            <li><strong>Bathrooms:</strong> ${escEmailHtml(unit.bathrooms ?? '—')}</li>
+            <li><strong>Payment plan:</strong> ${escEmailHtml(unit.paymentPlanType || unit.paymentPlan?.name || '—')}</li>
+            <li><strong>Delivery:</strong> ${escEmailHtml(delivery || '—')}</li>
+            <li><strong>DLD / Project no.:</strong> ${escEmailHtml(unit.dldNumber || projectNumber || '—')}</li>
+            <li><strong>Phone:</strong> ${escEmailHtml(unit.phoneNumber || '—')}</li>
+            <li><strong>Status:</strong> ${escEmailHtml(unit.status || '—')}</li>
+            ${listingUrl
+          ? `<li><strong>Public listing:</strong> <a href="${listingUrl}">Open listing</a></li>`
+          : ''
+        }
+          </ul>
+        </div>
+      `
+    })
+    .join('')
+
+  return `
+    <h2>${escEmailHtml(heading)}</h2>
+    <p>Hello ${escEmailHtml(greetingName || 'Developer')},</p>
+    ${introHtml || ''}
+    ${note ? `<p><strong>Note:</strong> ${escEmailHtml(note)}</p>` : ''}
+    <h3 style="margin:16px 0 8px;">Project details</h3>
+    <ul style="padding-left:18px;line-height:1.6;">
+      <li><strong>Project:</strong> ${escEmailHtml(project?.name || '—')}</li>
+      <li><strong>Location:</strong> ${escEmailHtml(projectLocation || '—')}</li>
+      <li><strong>RERA / license:</strong> ${escEmailHtml(projectNumber || '—')}</li>
+      <li><strong>Units:</strong> ${(units || []).length}</li>
+      ${project?.mapUrl
+      ? `<li><strong>Map:</strong> <a href="${escEmailHtml(project.mapUrl)}">${escEmailHtml(project.mapUrl)}</a></li>`
+      : ''
+    }
+      ${project?.description
+      ? `<li><strong>Description:</strong> ${escEmailHtml(project.description)}</li>`
+      : ''
+    }
+    </ul>
+    <h3 style="margin:16px 0 8px;">Unit details</h3>
+    ${unitDetailHtml || '<p>No unit details available.</p>'}
+    ${portalLink
+      ? `<p style="margin-top:16px;"><a href="${portalLink}">${escEmailHtml(portalLinkLabel)}</a></p>`
+      : ''
+    }
+  `
 }
 
 const notifyAdminsOfSubmission = async (project, developer) => {
@@ -402,6 +537,7 @@ const buildPropertyPayloadFromUnit = ({
   if (picturesId) payload.pictures = picturesId
   if (unit.thumbnailImg) payload.thumbnailImg = unit.thumbnailImg
   if (unit.qrScan) payload.qrScan = unit.qrScan
+  if (unit.video) payload.video = unit.video
   if (unit.unitLayout) payload.unitLayout = unit.unitLayout
   if (unit.floorPlan) payload.floorPlan = unit.floorPlan
   if (unit.agencyAgreement) payload.agencyAgreement = unit.agencyAgreement
@@ -543,18 +679,83 @@ export const listDeveloperDocumentRequests = asyncHandler(async (req, res) => {
     isDeleted: false,
     'requestedDocuments.0': { $exists: true },
   })
-    .select('name uuid requestedDocuments updatedAt')
+    .select('name uuid requestedDocuments updatedAt reraNumber developerLicenseNumber')
     .populate({
       path: 'requestedDocuments.document',
       select: 'uuid Certificate originalName name',
     })
     .sort({ updatedAt: -1 })
 
+  const projectIds = projects.map((p) => p._id)
+  const units = await DeveloperUnit.find({
+    project: { $in: projectIds },
+    isDeleted: false,
+  })
+    .select('project unitNumber title dldNumber priceFrom priceTo listingPrice')
+    .sort({ unitNumber: 1 })
+    .lean()
+
+  const unitsByProject = new Map()
+  for (const unit of units) {
+    const key = String(unit.project)
+    if (!unitsByProject.has(key)) unitsByProject.set(key, [])
+    unitsByProject.get(key).push(unit)
+  }
+
+  const formatUnitPrice = (unit) => {
+    const from = unit?.priceFrom ?? unit?.listingPrice
+    const to = unit?.priceTo
+    if (from == null && to == null) return ''
+    const fromLabel = `AED ${Number(from).toLocaleString()}`
+    if (
+      from != null &&
+      to != null &&
+      Number.isFinite(Number(to)) &&
+      Number(to) !== Number(from)
+    ) {
+      return `${fromLabel} – ${Number(to).toLocaleString()}`
+    }
+    return from != null ? fromLabel : ''
+  }
+
+  const summarizeUnits = (projectId, project) => {
+    const list = unitsByProject.get(String(projectId)) || []
+    const unitNumbers = list
+      .map((u) => String(u.unitNumber || '').trim())
+      .filter(Boolean)
+    const propertyNames = list
+      .map((u) => String(u.title || '').trim())
+      .filter(Boolean)
+    const prices = [
+      ...new Set(list.map((u) => formatUnitPrice(u)).filter(Boolean)),
+    ]
+    const projectNumber = String(
+      project.reraNumber ||
+      project.developerLicenseNumber ||
+      list.find((u) => u.dldNumber)?.dldNumber ||
+      '',
+    ).trim()
+
+    return {
+      unitNumbers,
+      propertyNames,
+      prices,
+      projectNumber,
+      units: list.map((u) => ({
+        unitNumber: u.unitNumber || '',
+        title: u.title || '',
+        dldNumber: u.dldNumber || '',
+        price: formatUnitPrice(u),
+      })),
+    }
+  }
+
   const allRows = []
   for (const project of projects) {
     const docs = Array.isArray(project.requestedDocuments)
       ? project.requestedDocuments
       : []
+    const summary = summarizeUnits(project._id, project)
     for (const doc of docs) {
       const status = String(doc.status || 'Pending')
       allRows.push({
@@ -569,7 +770,12 @@ export const listDeveloperDocumentRequests = asyncHandler(async (req, res) => {
           _id: project._id,
           uuid: project.uuid,
           name: project.name,
+          projectNumber: summary.projectNumber,
         },
+        unitNumbers: summary.unitNumbers,
+        propertyNames: summary.propertyNames,
+        prices: summary.prices,
+        units: summary.units,
       })
     }
   }
@@ -668,9 +874,19 @@ export const getAdminReviewRequest = asyncHandler(async (req, res) => {
     { path: 'requestedDocuments.document' },
   ])
 
-  const [units, plans, media, checklist] = await Promise.all([
+  const [units, plans, media] = await Promise.all([
     DeveloperUnit.find({ project: project._id, isDeleted: false })
-      .populate({ path: 'paymentPlan', select: 'name downPaymentPercent' })
+      .populate({
+        path: 'paymentPlan',
+        select: 'name downPaymentPercent milestones',
+      })
+      .populate({ path: 'pictures', select: 'images' })
+      .populate({ path: 'thumbnailImg', select: 'images' })
+      .populate({ path: 'qrScan', select: 'images' })
+      .populate({ path: 'video', select: 'videos' })
+      .populate({ path: 'unitLayout', select: 'images' })
+      .populate({ path: 'floorPlan', select: 'images' })
+      .populate({ path: 'agencyAgreement' })
       .sort({ unitNumber: 1 }),
     DeveloperPaymentPlan.find({
       project: project._id,
@@ -681,8 +897,44 @@ export const getAdminReviewRequest = asyncHandler(async (req, res) => {
       .populate({ path: 'imageAsset', select: 'images' })
       .populate({ path: 'unit', select: 'unitNumber' })
       .sort({ createdAt: -1 }),
-    buildSubmitChecklist(project),
   ])
+
+  // Attach stream/signed URLs so Super Admin View/Download works for encrypted PDFs.
+  const requested = Array.isArray(project.requestedDocuments)
+    ? project.requestedDocuments
+    : []
+  await Promise.all(
+    requested.map(async (entry) => {
+      if (!entry?.document || typeof entry.document !== 'object') return
+      const signed = await getDocumentSignedUrl(entry.document)
+      if (!signed) return
+      entry.document.signedUrl = signed
+      if (!entry.document.Certificate) entry.document.Certificate = {}
+      entry.document.Certificate.signedUrl = signed
+    }),
+  )
+  await Promise.all(
+    (media || []).map(async (item) => {
+      if (!item?.document || typeof item.document !== 'object') return
+      const signed = await getDocumentSignedUrl(item.document)
+      if (!signed) return
+      item.document.signedUrl = signed
+      if (!item.document.Certificate) item.document.Certificate = {}
+      item.document.Certificate.signedUrl = signed
+    }),
+  )
+  await Promise.all(
+    (units || []).map(async (unit) => {
+      if (!unit?.agencyAgreement || typeof unit.agencyAgreement !== 'object') {
+        return
+      }
+      const signed = await getDocumentSignedUrl(unit.agencyAgreement)
+      if (!signed) return
+      unit.agencyAgreement.signedUrl = signed
+      if (!unit.agencyAgreement.Certificate) unit.agencyAgreement.Certificate = {}
+      unit.agencyAgreement.Certificate.signedUrl = signed
+    }),
+  )
 
   const evaluators = await User.find({
     role: 'Evaluator',
@@ -699,7 +951,6 @@ export const getAdminReviewRequest = asyncHandler(async (req, res) => {
     units,
     plans,
     media,
-    checklist,
     evaluators,
   })
 })
@@ -785,7 +1036,11 @@ export const updateAdminReviewStatus = asyncHandler(async (req, res) => {
   }
 
   if (nextStatus === 'Approved') {
-    if (!['Submitted', 'UnderReview'].includes(project.reviewStatus)) {
+    if (
+      !['Submitted', 'UnderReview', 'ChangesRequested'].includes(
+        project.reviewStatus,
+      )
+    ) {
       return res.status(400).json({
         success: false,
         message: `Cannot approve from ${project.reviewStatus}`,
@@ -843,20 +1098,48 @@ export const updateAdminReviewStatus = asyncHandler(async (req, res) => {
   const reviewPath = `/dashboard/projects/${project.uuid || project._id}/units`
 
   if (nextStatus === 'Approved') {
+    const units = await DeveloperUnit.find({
+      project: project._id,
+      isDeleted: false,
+    })
+      .populate({ path: 'paymentPlan', select: 'name' })
+      .sort({ unitNumber: 1 })
+      .limit(50)
+
+    const projectLocation = [project.address, project.city, project.country]
+      .map((v) => String(v || '').trim())
+      .filter(Boolean)
+      .join(', ')
+    const projectNumber = String(
+      project.reraNumber || project.developerLicenseNumber || '',
+    ).trim()
+    const detailMessage = [
+      `“${project.name}” was approved by Funds Verifier.`,
+      projectLocation ? `Location: ${projectLocation}.` : '',
+      projectNumber ? `RERA / license: ${projectNumber}.` : '',
+      `${units.length} unit(s) included.`,
+      note ? `Note: ${note}` : '',
+    ]
+      .filter(Boolean)
+      .join(' ')
+
     await notifyDeveloperReview({
       developer,
       project,
       title: 'Listing approved',
-      message: `“${project.name}” was approved and is live on the marketplace.`,
+      message: detailMessage,
       relateRoute: reviewPath,
       emailSubject: 'Funds Verifier — listing approved',
-      emailHtml: `
-        <h2>Listing approved</h2>
-        <p>Hello ${developer?.name || 'Developer'},</p>
-        <p>Funds Verifier approved <strong>${project.name}</strong>. Your submitted units are now Available.</p>
-        ${note ? `<p><strong>Note:</strong> ${note}</p>` : ''}
-        <p><a href="${portalBase}${reviewPath}">View units</a></p>
-      `,
+      emailHtml: buildListingDetailsEmailHtml({
+        heading: 'Listing approved',
+        greetingName: developer?.name || 'Developer',
+        introHtml: `<p>Funds Verifier approved <strong>${escEmailHtml(project.name)}</strong>. Your submitted units are ready for marketplace publish.</p>`,
+        project,
+        units,
+        note,
+        portalLink: `${portalBase}${reviewPath}`,
+        portalLinkLabel: 'View units in developer portal',
+      }),
     })
   } else if (nextStatus === 'ChangesRequested') {
     await notifyDeveloperReview({
@@ -1010,19 +1293,43 @@ export const publishReviewRequest = asyncHandler(async (req, res) => {
 
   const portalBase = getDeveloperPortalBase()
   const reviewPath = `/dashboard/projects/${project.uuid || project._id}/units`
+  const projectLocation = [project.address, project.city, project.country]
+    .map((v) => String(v || '').trim())
+    .filter(Boolean)
+    .join(', ')
+  const projectNumber = String(
+    project.reraNumber || project.developerLicenseNumber || '',
+  ).trim()
+  const publishedById = new Set(published.map((p) => String(p.unitId)))
+  const publishedUnits = units.filter((u) => publishedById.has(String(u._id)))
+
+  const detailMessage = [
+    `“${project.name}” is live on the Funds Verifier marketplace.`,
+    projectLocation ? `Location: ${projectLocation}.` : '',
+    projectNumber ? `RERA / license: ${projectNumber}.` : '',
+    `${published.length} unit(s) published and marked Available.`,
+  ]
+    .filter(Boolean)
+    .join(' ')
+
   await notifyDeveloperReview({
     developer,
     project,
     title: 'Listing published',
-    message: `“${project.name}” is live on the Funds Verifier marketplace.`,
+    message: detailMessage,
     relateRoute: reviewPath,
     emailSubject: 'Funds Verifier — listing published',
-    emailHtml: `
-      <h2>Listing published</h2>
-      <p>Hello ${developer.name || 'Developer'},</p>
-      <p><strong>${project.name}</strong> (${published.length} unit(s)) is now live. Units are marked Available.</p>
-      <p><a href="${portalBase}${reviewPath}">View units</a></p>
-    `,
+    emailHtml: buildListingDetailsEmailHtml({
+      heading: 'Listing published',
+      greetingName: developer?.name || 'Developer',
+      introHtml:
+        '<p>Your project is now live on Funds Verifier. Units are marked <strong>Available</strong>.</p>',
+      project,
+      units: publishedUnits,
+      publishedMeta: published,
+      portalLink: `${portalBase}${reviewPath}`,
+      portalLinkLabel: 'View units in developer portal',
+    }),
   })
 
   return res.status(200).json({
@@ -1138,6 +1445,101 @@ export const requestProjectDocuments = asyncHandler(async (req, res) => {
   const portalBase = getDeveloperPortalBase()
   const docsPath = `/dashboard/document-storage`
 
+  const units = await DeveloperUnit.find({
+    project: project._id,
+    isDeleted: false,
+  })
+    .select('unitNumber title dldNumber priceFrom priceTo listingPrice')
+    .sort({ unitNumber: 1 })
+    .limit(50)
+    .lean()
+
+  const formatPrice = (unit) => {
+    const from = unit?.priceFrom ?? unit?.listingPrice
+    const to = unit?.priceTo
+    if (from == null && to == null) return ''
+    const fromLabel = from != null ? `AED ${Number(from).toLocaleString()}` : ''
+    if (
+      from != null &&
+      to != null &&
+      Number.isFinite(Number(to)) &&
+      Number(to) !== Number(from)
+    ) {
+      return `${fromLabel} – ${Number(to).toLocaleString()}`
+    }
+    return fromLabel
+  }
+
+  const projectNumber =
+    String(project.reraNumber || project.developerLicenseNumber || '').trim()
+  const unitNumbers = units
+    .map((u) => String(u.unitNumber || '').trim())
+    .filter(Boolean)
+  const unitProjectNumbers = [
+    ...new Set(
+      units
+        .map((u) => String(u.dldNumber || '').trim())
+        .filter(Boolean),
+    ),
+  ]
+  const priceSummary = units
+    .map((u) => formatPrice(u))
+    .filter(Boolean)
+  const uniquePrices = [...new Set(priceSummary)]
+
+  const propertyDetailsLines = [
+    `Project: ${project.name}`,
+    projectNumber ? `Project number: ${projectNumber}` : '',
+    unitProjectNumbers.length
+      ? `Unit project number(s): ${unitProjectNumbers.join(', ')}`
+      : '',
+    unitNumbers.length ? `Unit number(s): ${unitNumbers.join(', ')}` : '',
+    uniquePrices.length ? `Price: ${uniquePrices.join('; ')}` : '',
+  ].filter(Boolean)
+
+  const propertyDetailsHtml = `
+    <p><strong>Property details</strong></p>
+    <ul>
+      <li><strong>Project:</strong> ${project.name}</li>
+      ${projectNumber ? `<li><strong>Project number:</strong> ${projectNumber}</li>` : ''}
+      ${unitProjectNumbers.length
+      ? `<li><strong>Unit project number(s):</strong> ${unitProjectNumbers.join(', ')}</li>`
+      : ''
+    }
+      ${unitNumbers.length
+      ? `<li><strong>Unit number(s):</strong> ${unitNumbers.join(', ')}</li>`
+      : ''
+    }
+      ${uniquePrices.length
+      ? `<li><strong>Price:</strong> ${uniquePrices.join('; ')}</li>`
+      : ''
+    }
+      ${units.length
+      ? `<li><strong>Units:</strong><ul>${units
+        .map((u) => {
+          const label = u.unitNumber
+            ? `Unit ${u.unitNumber}`
+            : u.title || 'Unit'
+          const bits = [
+            u.dldNumber ? `Project no. ${u.dldNumber}` : '',
+            formatPrice(u),
+          ]
+            .filter(Boolean)
+            .join(' · ')
+          return `<li>${label}${bits ? ` — ${bits}` : ''}</li>`
+        })
+        .join('')}</ul></li>`
+      : ''
+    }
+    </ul>
+  `
+
+  const docsLabel = documents.map((d) => d.name).join(', ')
+  const notifyMessage = [
+    `Funds Verifier requested documents for “${project.name}”: ${docsLabel}.`,
+    ...propertyDetailsLines.slice(1),
+  ].join(' ')
+
   if (developer) {
     try {
       await createNotification({
@@ -1146,7 +1548,7 @@ export const requestProjectDocuments = asyncHandler(async (req, res) => {
           userUUID: developer.uuid,
           UserRole: 'Developer',
           title: 'Document request',
-          message: `Funds Verifier requested documents for “${project.name}”: ${documents.map((d) => d.name).join(', ')}.`,
+          message: notifyMessage,
           RelateRoute: docsPath,
         },
       })
@@ -1158,11 +1560,27 @@ export const requestProjectDocuments = asyncHandler(async (req, res) => {
       sendEmail({
         to: developer.email,
         subject: `Funds Verifier — documents requested for ${project.name}`,
+        text: [
+          `Documents requested`,
+          ``,
+          `Hello ${developer.name || 'Developer'},`,
+          ``,
+          `Funds Verifier Super Admin requested the following document(s) for ${project.name}:`,
+          ...documents.map(
+            (d) => `- ${d.name}${d.note ? ` — ${d.note}` : ''}`,
+          ),
+          ``,
+          `Property details:`,
+          ...propertyDetailsLines.map((line) => `- ${line}`),
+          ``,
+          `Open Document Storage: ${portalBase}${docsPath}`,
+        ].join('\n'),
         html: `
           <h2>Documents requested</h2>
           <p>Hello ${developer.name || 'Developer'},</p>
           <p>Funds Verifier Super Admin requested the following document(s) for <strong>${project.name}</strong>:</p>
           <ul>${documents.map((d) => `<li><strong>${d.name}</strong>${d.note ? ` — ${d.note}` : ''}</li>`).join('')}</ul>
+          ${propertyDetailsHtml}
           <p><a href="${portalBase}${docsPath}">Open Document Storage</a></p>
         `,
       }).then((result) => {

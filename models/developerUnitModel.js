@@ -140,6 +140,11 @@ const developerUnitSchema = new mongoose.Schema(
       ref: 'ImageAsset',
       default: null,
     },
+    video: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'VideoAsset',
+      default: null,
+    },
     unitLayout: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'ImageAsset',

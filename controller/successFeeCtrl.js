@@ -3,8 +3,11 @@ import Property from '../models/propertyModel.js'
 import Car from '../models/carModel.js'
 import Boat from '../models/boatModel.js'
 import Jewelry from '../models/jewelryModel.js'
+import ContactUs from '../models/Contact.js'
 import { stripe } from '../libs/stripe.js'
 import SendAssetTransferingMail from '../utils/asset-transfer/SendAssetTransferingMail.js'
+import { createNotification } from './notifications.controller.js'
+import { notifyFvObligationDisagreed } from '../utils/fvPortalMail.js'
 
 const DEFAULT_FEES = {
   propertySuccessFee: 6000,
@@ -97,6 +100,131 @@ export const getPublicFullPayDiscount = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: 'Failed to fetch full pay discount',
+      error: error.message,
+    })
+  }
+}
+
+/** Public success-fee amounts for obligation / disclosure UI (no auth). */
+export const getPublicSuccessFees = async (req, res) => {
+  try {
+    const fees = await resolveFees()
+    return res.status(200).json({
+      success: true,
+      currency: 'AED',
+      propertySuccessFee: fees.propertySuccessFee,
+      boatSuccessFee: fees.boatSuccessFee,
+      carSuccessFee: fees.carSuccessFee,
+      jewelrySuccessFee: fees.jewelrySuccessFee,
+    })
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to fetch success fees',
+      error: error.message,
+    })
+  }
+}
+
+/**
+ * User disagreed with seller success-fee obligation terms.
+ * Works for signed-in users and guests (arrange viewing before login).
+ * Stores contact message, notifies Admin in-app, emails FV_EMAIL.
+ */
+export const reportObligationDisagree = async (req, res) => {
+  try {
+    const user = req.user || null
+
+    const {
+      context = 'unknown',
+      assetType = '',
+      listingTitle = '',
+      listingUuid = '',
+      amount = null,
+      message: extraMessage = '',
+    } = req.body || {}
+
+    const fees = await resolveFees()
+    const resolvedAmount =
+      amount != null && Number.isFinite(Number(amount))
+        ? Number(amount)
+        : getFeeForAssetType(assetType, fees)
+
+    const isGuest = !user
+    const fullName =
+      user?.name ||
+      user?.displayName ||
+      user?.email ||
+      (isGuest ? 'Guest (not signed in)' : 'Funds Verifier user')
+    const email = user?.email || 'guest@fundsverifier.com'
+    const phone = user?.phone || user?.mobile || user?.phoneNumber || 'N/A'
+    const contextLabel =
+      String(context).toLowerCase() === 'viewing'
+        ? 'Arrange viewing'
+        : String(context).toLowerCase() === 'listing'
+          ? 'Asset listing (before payment)'
+          : String(context || 'Unknown')
+
+    const subject = `Sale obligation disagreed — ${contextLabel}`
+    const message = [
+      `User disagreed with the seller success-fee obligation terms.`,
+      `Context: ${contextLabel}`,
+      `Signed in: ${isGuest ? 'No (guest)' : 'Yes'}`,
+      `Asset type: ${assetType || 'N/A'}`,
+      `Listing: ${listingTitle || 'N/A'}`,
+      listingUuid ? `Listing UUID: ${listingUuid}` : null,
+      `Stated obligation amount: AED ${Number(resolvedAmount).toLocaleString()}`,
+      `User UUID: ${user?.uuid || 'N/A'}`,
+      `User role: ${user?.role || 'N/A'}`,
+      extraMessage ? `Note: ${String(extraMessage).slice(0, 1000)}` : null,
+    ]
+      .filter(Boolean)
+      .join('\n')
+
+    const contact = await ContactUs.create({
+      fullName: String(fullName).slice(0, 200),
+      email: String(email).slice(0, 200),
+      subject: String(subject).slice(0, 200),
+      phone: String(phone).slice(0, 50),
+      message: String(message).slice(0, 5000),
+    })
+
+    try {
+      await createNotification({
+        data: {
+          UserRole: 'Admin',
+          title: 'Sale obligation disagreed',
+          message: `${fullName} disagreed with seller obligation terms (${contextLabel}).`,
+          RelateRoute: 'contact',
+          RelatedUUID: contact.uuid,
+        },
+      })
+    } catch (notifyErr) {
+      console.log({ error: notifyErr?.message })
+    }
+
+    try {
+      await notifyFvObligationDisagreed({
+        user: user || { name: fullName, email },
+        context: contextLabel,
+        assetType,
+        listingTitle,
+        listingUuid,
+        amount: resolvedAmount,
+      })
+    } catch (mailErr) {
+      console.log({ error: mailErr?.message })
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: 'Your response was sent to Funds Verifier admin.',
+      contactUuid: contact.uuid,
+    })
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to notify admin',
       error: error.message,
     })
   }
