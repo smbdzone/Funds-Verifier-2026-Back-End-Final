@@ -20,6 +20,236 @@ import sendTrusteeViewingBookedEmail from '../utils/trusteeViewingMail.js'
 export const VIEWING_SLOT_CATEGORY = 'viewing'
 export const SERVICE_SLOT_CATEGORY = 'service'
 
+function formatBedBathForBooking(value) {
+  if (value === '' || value == null) return ''
+  if (Number(value) === 0) return 'Studio'
+  return String(value)
+}
+
+function formatFurnishedForBooking(value) {
+  if (value === '' || value == null) return ''
+  if (typeof value === 'boolean') return value ? 'Yes' : 'No'
+  const s = String(value).trim()
+  if (!s) return ''
+  if (/^(yes|furnished)$/i.test(s)) return 'Yes'
+  if (/^(no|unfurnished)$/i.test(s)) return 'No'
+  return s
+}
+
+function formatSizeForBooking(listing = {}) {
+  const unit = String(listing.sizeUnit || listing.sizeType || 'SQFT').toUpperCase()
+  const from =
+    unit === 'SQM'
+      ? listing.sizeSQMFrom ?? listing.sizeSQFTFrom
+      : listing.sizeSQFTFrom ?? listing.sizeSQMFrom
+  const to =
+    unit === 'SQM'
+      ? listing.sizeSQMTo ?? listing.sizeSQFTTo
+      : listing.sizeSQFTTo ?? listing.sizeSQMTo
+  if ((from != null && from !== '') || (to != null && to !== '')) {
+    if (
+      from != null &&
+      from !== '' &&
+      to != null &&
+      to !== '' &&
+      String(from) !== String(to)
+    ) {
+      return `${from} - ${to} ${unit}`
+    }
+    return `${from || to} ${unit}`
+  }
+  if (listing.sizeSQFT != null && listing.sizeSQFT !== '') {
+    return `${listing.sizeSQFT} SQFT`
+  }
+  if (listing.sizeSQM != null && listing.sizeSQM !== '') {
+    return `${listing.sizeSQM} SQM`
+  }
+  return ''
+}
+
+function formatAmenitiesList(listing = {}) {
+  const type = String(listing.assetType || '').toLowerCase()
+  const buckets = []
+  if (type.includes('car')) {
+    buckets.push(listing.technicalFeatures, listing.extras, listing.amenities)
+  } else if (type.includes('boat')) {
+    buckets.push(listing.extras, listing.amenities)
+  } else if (type.includes('jewel')) {
+    buckets.push(listing.materials, listing.amenities)
+  } else {
+    buckets.push(listing.facilities, listing.amenities)
+  }
+  const out = []
+  for (const value of buckets) {
+    if (value == null || value === '') continue
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        const s =
+          typeof item === 'object'
+            ? String(item?.name || item?.label || item?.title || '').trim()
+            : String(item).trim()
+        if (s) out.push(s)
+      }
+    } else if (typeof value === 'string') {
+      for (const part of value.split(/[,|]/)) {
+        const s = part.trim()
+        if (s) out.push(s)
+      }
+    }
+  }
+  return [...new Set(out)]
+}
+
+function formatPriceForBooking(listing = {}) {
+  const from = listing.priceFrom ?? listing.price
+  const to = listing.priceTo
+  if (from != null && to != null && String(from) !== String(to)) {
+    return `${from} - ${to}`
+  }
+  if (from != null && from !== '') return String(from)
+  if (listing.price != null && listing.price !== '') return String(listing.price)
+  return ''
+}
+
+function formatListValue(value) {
+  if (value == null || value === '') return ''
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => {
+        if (item == null) return ''
+        if (typeof item === 'object') {
+          return String(item.name || item.label || item.title || '').trim()
+        }
+        return String(item).trim()
+      })
+      .filter(Boolean)
+      .join(', ')
+  }
+  return String(value)
+}
+
+function classifyAssetType(assetType = '') {
+  const type = String(assetType || '').toLowerCase()
+  if (type.includes('car')) return 'car'
+  if (type.includes('boat')) return 'boat'
+  if (type.includes('jewel')) return 'jewelry'
+  if (type.includes('off plan') || type.includes('offplan')) return 'offplan'
+  if (type.includes('lease')) return 'lease'
+  if (type.includes('property')) return 'property'
+  return 'property'
+}
+
+/** Snapshot of listing fields stored on the booking (safe, compact). */
+function buildListingSnapshotFromAsset(asset, fallback = {}) {
+  if (!asset) return { ...fallback }
+  const lean = typeof asset.toObject === 'function' ? asset.toObject() : asset
+  return {
+    ...fallback,
+    uuid: lean.uuid || fallback.uuid,
+    slug: lean.slug || fallback.slug,
+    title: lean.title || fallback.title,
+    assetType: lean.assetType || fallback.assetType,
+    userUUID: lean.userUUID || fallback.userUUID,
+    neighbourhood: lean.neighbourhood || fallback.neighbourhood,
+    city: lean.city || fallback.city,
+    country: lean.country || fallback.country,
+    mapUrl: lean.mapUrl || fallback.mapUrl,
+    phoneNumber: lean.phoneNumber || fallback.phoneNumber,
+    price: lean.price ?? lean.priceFrom ?? fallback.price,
+    priceFrom: lean.priceFrom ?? fallback.priceFrom,
+    priceTo: lean.priceTo ?? fallback.priceTo,
+    developer: lean.developer || fallback.developer,
+    propertyType: lean.propertyType || fallback.propertyType,
+    layout: lean.layout,
+    sizeSQFT: lean.sizeSQFT,
+    sizeSQM: lean.sizeSQM,
+    sizeSQFTFrom: lean.sizeSQFTFrom,
+    sizeSQFTTo: lean.sizeSQFTTo,
+    sizeSQMFrom: lean.sizeSQMFrom,
+    sizeSQMTo: lean.sizeSQMTo,
+    sizeUnit: lean.sizeUnit || lean.sizeType,
+    sizeType: lean.sizeType || lean.sizeUnit,
+    bedrooms: lean.bedrooms,
+    bathrooms: lean.bathrooms,
+    isFurnished: lean.isFurnished,
+    occupancyStatus: lean.occupancyStatus,
+    propertyDescription: lean.propertyDescription || lean.description,
+    description: lean.description || lean.propertyDescription,
+    additionalDescription: lean.additionalDescription,
+    deliveryQuarter: lean.deliveryQuarter,
+    deliveryYear: lean.deliveryYear,
+    paymentPlanType: lean.paymentPlanType,
+    leaseNumberofCheques: lean.leaseNumberofCheques,
+    roi: lean.roi,
+    facilities: lean.facilities,
+    amenities: lean.amenities,
+    technicalFeatures: lean.technicalFeatures,
+    extras: lean.extras,
+    materials: lean.materials,
+    pictures: lean.pictures || fallback.pictures,
+    thumbnailImg: lean.thumbnailImg || fallback.thumbnailImg,
+    video: lean.video || fallback.video,
+    qrScan: lean.qrScan || fallback.qrScan,
+    make: lean.make,
+    model: lean.model,
+    year: lean.year,
+    kilometers: lean.kilometers,
+    seats: lean.seats,
+    doors: lean.doors,
+    bodyCondition: lean.bodyCondition,
+    mechanicalCondition: lean.mechanicalCondition,
+    warranty: lean.warranty,
+    fuelType: lean.fuelType,
+    noofCylinders: lean.noofCylinders,
+    horsepower: lean.horsepower,
+    steeringSide: lean.steeringSide,
+    transmissionType: lean.transmissionType,
+    engineCapacity: lean.engineCapacity,
+    carType: lean.carType,
+    category: lean.category,
+    exteriorColor: lean.exteriorColor,
+    interiorColor: lean.interiorColor,
+    length: lean.length,
+    weight: lean.weight,
+    brands: lean.brands,
+    condition: lean.condition,
+    age: lean.age,
+    usage: lean.usage,
+    jewelryMetal: lean.jewelryMetal,
+    jewelryStyles: lean.jewelryStyles,
+    grams: lean.grams,
+    sellerType: lean.sellerType,
+  }
+}
+
+async function loadPopulatedListingForBooking(booking) {
+  const { asset } = await findAssetForBooking(booking)
+  if (!asset) return null
+  try {
+    await asset.populate([
+      { path: 'pictures' },
+      { path: 'thumbnailImg' },
+      { path: 'video' },
+      { path: 'qrScan' },
+    ])
+  } catch (err) {
+    console.warn(
+      'loadPopulatedListingForBooking: populate failed',
+      err?.message,
+    )
+  }
+  const obj = asset.toObject ? asset.toObject() : asset
+  try {
+    await refreshListingMediaSignedUrls(obj)
+  } catch (err) {
+    console.warn(
+      'loadPopulatedListingForBooking: refreshListingMediaSignedUrls failed',
+      err?.message,
+    )
+  }
+  return obj
+}
+
 export const roleToSlotCategory = (role = '') => {
   const normalized = String(role).trim().toLowerCase().replace(/[\s_-]/g, '')
   if (normalized === 'trustee') return VIEWING_SLOT_CATEGORY
@@ -210,6 +440,29 @@ export const createBookingService = async (bookingData) => {
   if (!matchedTimeSlot) throw new Error('Time slot not found')
   const timeSlotObjectId = matchedTimeSlot._id
 
+  // Hydrate listing snapshot from DB so trustee/admin View has full details
+  // even when the client sends a slim productData payload (WAF-safe).
+  let listingSnapshot = {
+    ...productData,
+    userUUID:
+      productData?.userUUID ||
+      assetHolder?.uuid ||
+      normalizedAssetHolderId,
+  }
+  try {
+    const { asset: liveListing } = await findAssetForBooking({
+      productData: listingSnapshot,
+    })
+    if (liveListing) {
+      listingSnapshot = buildListingSnapshotFromAsset(
+        liveListing,
+        listingSnapshot,
+      )
+    }
+  } catch (error) {
+    console.log({ bookingListingSnapshotError: error?.message || error })
+  }
+
   // Create booking with productData and timeSlotId
   const booking = await Booking.create({
     slotId: slot._id,
@@ -220,18 +473,13 @@ export const createBookingService = async (bookingData) => {
     brokerId: broker._id,
     brokerUUID: normalizedBrokerId,
     message,
-    productData: {
-      ...productData,
-      userUUID:
-        productData?.userUUID ||
-        assetHolder?.uuid ||
-        normalizedAssetHolderId,
-    },
+    productData: listingSnapshot,
     status: 'open',
   })
 
-  const listingTitle = productData?.title || 'listing'
-  const assetType = productData?.assetType || 'property'
+  const listingTitle = listingSnapshot?.title || productData?.title || 'listing'
+  const assetType =
+    listingSnapshot?.assetType || productData?.assetType || 'property'
   const buyerName =
     broker?.name || broker?.displayName || broker?.email || 'A buyer'
   const slotDate = slot?.date
@@ -450,44 +698,86 @@ export const getAllBookingsService = async (
     }
     query.isDeleted = false
 
-    const listSelect =
-      '-_id -assetHolderId -timeSlotId -timeSlotUUID -assetHolderUUID -brokerUUID'
-
     const bookings = await Booking.find(query)
       .populate({
         path: 'slotId',
-        select: 'date times -_id', // only get date + times
+        select: 'date times',
       })
       .populate({
         path: 'brokerId',
-        select: 'name email -_id',
+        select: 'name email phone uuid',
       })
-      .select(listSelect)
+      .populate({
+        path: 'assetHolderId',
+        select: 'name email phone uuid',
+      })
+      .select(
+        'uuid status message comment viewAssignedTo productData brokerId assetHolderId assetHolderUUID slotId timeSlotUUID createdAt updatedAt',
+      )
+      .sort({ createdAt: -1 })
       .lean()
+
+    // Resolve sellers missing from populate (older bookings may only have UUID)
+    const missingSellerUuids = [
+      ...new Set(
+        bookings
+          .filter((b) => !b?.assetHolderId?.name && b?.assetHolderUUID)
+          .map((b) => b.assetHolderUUID),
+      ),
+    ]
+    const sellersByUuid = new Map()
+    if (missingSellerUuids.length) {
+      const sellers = await User.find({
+        uuid: { $in: missingSellerUuids },
+        isDeleted: false,
+      })
+        .select('name email phone uuid')
+        .lean()
+      for (const s of sellers) sellersByUuid.set(s.uuid, s)
+    }
 
     const populatedBookings = bookings.map((booking) => {
       const timeSlot = booking?.slotId?.times?.find(
-        (time) => time.uuid === booking.timeSlotUUID
+        (time) => time.uuid === booking.timeSlotUUID,
       )
 
       const date = booking?.slotId?.date
-      const listingTitle = booking?.productData?.title || ''
-      const assetType = booking?.productData?.assetType || ''
-
-      const { slotId, productData, ...rest } = booking
+      const productData = booking?.productData || {}
+      const listingTitle = productData?.title || ''
+      const assetType = productData?.assetType || ''
+      const seller =
+        booking.assetHolderId ||
+        (booking.assetHolderUUID
+          ? sellersByUuid.get(booking.assetHolderUUID)
+          : null) ||
+        null
+      const buyer = booking.brokerId || null
 
       return {
-        ...rest,
+        uuid: booking.uuid,
+        status: booking.status,
+        message: booking.message,
+        comment: booking.comment,
+        viewAssignedTo: booking.viewAssignedTo || 'myself',
         date,
         timeSlot,
         listingTitle,
         assetType,
+        buyerName: buyer?.name || '',
+        buyerEmail: buyer?.email || '',
+        sellerName: seller?.name || '',
+        sellerEmail: seller?.email || '',
+        brokerId: buyer,
+        assetHolder: seller,
         productData: {
           title: productData?.title,
+          assetType: productData?.assetType,
           transferDocuments: productData?.transferDocuments,
           dealClosed: productData?.dealClosed,
         },
-        viewAssignedTo: rest.viewAssignedTo || 'myself',
+        slotId: booking.slotId
+          ? { date: booking.slotId.date }
+          : null,
       }
     })
 
@@ -509,21 +799,25 @@ export const getBookingByIdService = async (bookingId) => {
     })
     .populate({
       path: 'brokerId',
-      select: 'name email phoneNumber id',
+      select: 'name email phone uuid id',
     })
     .populate({
       path: 'assetHolderId',
-      select: 'name email id',
+      select: 'name email phone uuid id',
     })
     .lean()
 
   if (!booking) return null
 
-  // Snapshotted listing media carries expiring CloudFront signatures; refresh
-  // from stored s3Key so viewing details always get working image URLs.
-  if (booking.productData && typeof booking.productData === 'object') {
+  // Prefer live listing (full beds/size/media) over slim booking snapshots.
+  const liveListing = await loadPopulatedListingForBooking(booking)
+  const listing = liveListing
+    ? buildListingSnapshotFromAsset(liveListing, booking.productData || {})
+    : booking.productData || {}
+
+  if (!liveListing && listing && typeof listing === 'object') {
     try {
-      await refreshListingMediaSignedUrls(booking.productData)
+      await refreshListingMediaSignedUrls(listing)
     } catch (err) {
       console.warn(
         'getBookingByIdService: refreshListingMediaSignedUrls failed',
@@ -541,15 +835,26 @@ export const getBookingByIdService = async (bookingId) => {
   const transferDocuments = await resolveTransferDocumentsForBooking(booking)
   const { asset } = await findAssetForBooking(booking)
 
+  const amenities = formatAmenitiesList(listing)
+
   const productCommon = {
-    uuid: booking.productData?.uuid,
-    title: booking.productData?.title,
-    assetType: booking.productData?.assetType,
-    neighbourhood: booking.productData?.neighbourhood,
-    phoneNumber: booking.productData?.phoneNumber,
-    price: booking.productData?.price,
-    pictures: booking.productData?.pictures,
-    thumbnailImg: booking.productData?.thumbnailImg,
+    uuid: listing?.uuid || booking.productData?.uuid,
+    title: listing?.title || booking.productData?.title,
+    assetType: listing?.assetType || booking.productData?.assetType,
+    neighbourhood: listing?.neighbourhood || booking.productData?.neighbourhood,
+    city: listing?.city || booking.productData?.city,
+    country: listing?.country || booking.productData?.country,
+    phoneNumber: listing?.phoneNumber || booking.productData?.phoneNumber,
+    price: listing?.price ?? listing?.priceFrom ?? booking.productData?.price,
+    pictures: listing?.pictures || booking.productData?.pictures,
+    thumbnailImg: listing?.thumbnailImg || booking.productData?.thumbnailImg,
+    video: listing?.video || booking.productData?.video,
+    qrScan: listing?.qrScan || booking.productData?.qrScan,
+    amenities,
+    facilities: listing?.facilities || booking.productData?.facilities || [],
+    technicalFeatures: listing?.technicalFeatures || [],
+    extras: listing?.extras || [],
+    materials: listing?.materials || [],
     dealClosed:
       booking.productData?.dealClosed ?? Boolean(asset?.dealClosed),
     successFeePaymentStatus:
@@ -568,76 +873,204 @@ export const getBookingByIdService = async (bookingId) => {
     }),
   }
 
-  // Extract asset-specific fields
-  const assetType = booking.productData?.assetType
+  // Extract asset-specific fields (live listing first) — all asset types
+  const assetType = listing?.assetType || booking.productData?.assetType || ''
+  const kind = classifyAssetType(assetType)
   let assetFields = []
 
-  switch (assetType) {
-    case 'Property For Sale':
-    case 'Property For Lease':
-    case 'Property Off Plan For Sale':
-      assetFields = [
-        { label: 'Size in sq feet', value: booking.productData?.sizeSQFT },
-        { label: 'Bedrooms', value: booking.productData?.bedrooms },
-        { label: 'Bathrooms', value: booking.productData?.bathrooms },
-        { label: 'Developer', value: booking.productData?.developer },
-        {
-          label: 'Is it Furnished',
-          value: booking.productData?.isFurnished ? 'Yes' : 'No',
-        },
-        {
-          label: 'Occupancy Status',
-          value: booking.productData?.occupancyStatus,
-        },
-      ]
-      break
+  const commonLocationFields = [
+    { label: 'Neighbourhood', value: listing?.neighbourhood || '' },
+    { label: 'City', value: listing?.city || '' },
+    { label: 'Country', value: listing?.country || '' },
+    { label: 'Map URL', value: listing?.mapUrl || '' },
+    {
+      label: 'Description',
+      value: listing?.propertyDescription || listing?.description || '',
+    },
+  ]
 
-    case 'Car For Sale':
-      assetFields = [
-        { label: 'Make', value: booking.productData?.make },
-        { label: 'Model', value: booking.productData?.model },
-        { label: 'Year', value: booking.productData?.year },
-        { label: 'Kilometers', value: booking.productData?.kilometers },
-        { label: 'Seats', value: booking.productData?.seats },
-        { label: 'Doors', value: booking.productData?.doors },
-        {
-          label: 'Body Condition',
-          value: booking.productData?.bodyCondition,
-        },
-        { label: 'Warranty', value: booking.productData?.warranty },
-        { label: 'Fuel Type', value: booking.productData?.fuelType },
-        {
-          label: 'No Of Cylinders',
-          value: booking.productData?.noofCylinders,
-        },
-      ]
-      break
-
-    case 'Boats For Sale':
-      assetFields = [
-        { label: 'Length', value: booking.productData?.length },
-        { label: 'Condition', value: booking.productData?.condition },
-        { label: 'Age', value: booking.productData?.age },
-        { label: 'Usage', value: booking.productData?.usage },
-        { label: 'Seats', value: booking.productData?.seats },
-      ]
-      break
-
-    case 'Jewellery For Sale':
-      assetFields = [
-        {
-          label: 'Metal Material',
-          value: booking.productData?.jewelryMetal,
-        },
-        {
-          label: 'Grams',
-          value: booking.productData?.grams,
-        },
-        { label: 'Condition', value: booking.productData?.condition },
-        { label: 'Age', value: booking.productData?.age },
-      ]
-      break
+  if (kind === 'car') {
+    assetFields = [
+      { label: 'Asset Type', value: assetType },
+      { label: 'Title', value: listing?.title || '' },
+      { label: 'Price', value: formatPriceForBooking(listing) },
+      { label: 'Make', value: listing?.make },
+      { label: 'Model', value: listing?.model },
+      { label: 'Category', value: listing?.category },
+      { label: 'Car Type', value: listing?.carType },
+      { label: 'Year', value: listing?.year },
+      { label: 'Kilometers', value: listing?.kilometers },
+      { label: 'Seats', value: listing?.seats },
+      { label: 'Doors', value: listing?.doors },
+      { label: 'Body Condition', value: listing?.bodyCondition },
+      { label: 'Mechanical Condition', value: listing?.mechanicalCondition },
+      { label: 'Warranty', value: listing?.warranty },
+      { label: 'Fuel Type', value: listing?.fuelType },
+      { label: 'No Of Cylinders', value: listing?.noofCylinders },
+      { label: 'Horsepower', value: listing?.horsepower },
+      { label: 'Transmission', value: listing?.transmissionType },
+      { label: 'Engine Capacity', value: listing?.engineCapacity },
+      { label: 'Steering Side', value: listing?.steeringSide },
+      {
+        label: 'Exterior Color',
+        value: formatListValue(listing?.exteriorColor),
+      },
+      {
+        label: 'Interior Color',
+        value: formatListValue(listing?.interiorColor),
+      },
+      { label: 'Seller Type', value: listing?.sellerType },
+      ...commonLocationFields,
+    ]
+  } else if (kind === 'boat') {
+    assetFields = [
+      { label: 'Asset Type', value: assetType },
+      { label: 'Title', value: listing?.title || '' },
+      { label: 'Price', value: formatPriceForBooking(listing) },
+      { label: 'Brand', value: listing?.brands },
+      { label: 'Category', value: listing?.category },
+      { label: 'Model', value: listing?.model },
+      { label: 'Length', value: listing?.length },
+      { label: 'Weight', value: listing?.weight },
+      { label: 'Condition', value: listing?.condition },
+      { label: 'Age', value: listing?.age },
+      { label: 'Usage', value: listing?.usage },
+      { label: 'Seats', value: listing?.seats },
+      { label: 'Warranty', value: listing?.warranty },
+      {
+        label: 'Exterior Color',
+        value: formatListValue(listing?.exteriorColor),
+      },
+      {
+        label: 'Interior Color',
+        value: formatListValue(listing?.interiorColor),
+      },
+      { label: 'Seller Type', value: listing?.sellerType },
+      ...commonLocationFields,
+    ]
+  } else if (kind === 'jewelry') {
+    assetFields = [
+      { label: 'Asset Type', value: assetType },
+      { label: 'Title', value: listing?.title || '' },
+      { label: 'Price', value: formatPriceForBooking(listing) },
+      { label: 'Category', value: listing?.category },
+      { label: 'Make', value: listing?.make },
+      { label: 'Model', value: listing?.model },
+      {
+        label: 'Metal Material',
+        value: formatListValue(listing?.jewelryMetal),
+      },
+      { label: 'Materials', value: formatListValue(listing?.materials) },
+      { label: 'Style', value: listing?.jewelryStyles },
+      { label: 'Grams', value: listing?.grams },
+      { label: 'Weight', value: listing?.weight },
+      { label: 'Length', value: listing?.length },
+      { label: 'Condition', value: listing?.condition },
+      { label: 'Age', value: listing?.age },
+      { label: 'Usage', value: listing?.usage },
+      { label: 'Warranty', value: listing?.warranty },
+      { label: 'Seller Type', value: listing?.sellerType },
+      ...commonLocationFields,
+    ]
+  } else {
+    // Property / lease / off-plan
+    assetFields = [
+      { label: 'Asset Type', value: assetType },
+      { label: 'Title', value: listing?.title || '' },
+      { label: 'Price', value: formatPriceForBooking(listing) },
+      { label: 'Property Type', value: listing?.propertyType || '' },
+      { label: 'Layout', value: listing?.layout || '' },
+      { label: 'Size', value: formatSizeForBooking(listing) },
+      {
+        label: 'Bedrooms',
+        value: formatBedBathForBooking(listing?.bedrooms),
+      },
+      {
+        label: 'Bathrooms',
+        value: formatBedBathForBooking(listing?.bathrooms),
+      },
+      { label: 'Developer', value: listing?.developer || '' },
+      {
+        label: 'Is it Furnished',
+        value: formatFurnishedForBooking(listing?.isFurnished),
+      },
+      {
+        label: 'Occupancy Status',
+        value: listing?.occupancyStatus || '',
+      },
+      ...commonLocationFields,
+      {
+        label: 'Additional Description',
+        value: listing?.additionalDescription || '',
+      },
+      { label: 'ROI', value: listing?.roi != null ? String(listing.roi) : '' },
+      {
+        label: 'Delivery',
+        value: [listing?.deliveryQuarter, listing?.deliveryYear]
+          .filter(Boolean)
+          .join(' '),
+      },
+      {
+        label: 'Payment Plan',
+        value: listing?.paymentPlanType || '',
+      },
+      {
+        label: 'Lease Cheques',
+        value:
+          listing?.leaseNumberofCheques != null
+            ? String(listing.leaseNumberofCheques)
+            : '',
+      },
+    ]
   }
+
+  // Drop empty optional fields so the modal stays readable
+  assetFields = assetFields.filter((f) => {
+    if (f?.value == null) return false
+    if (typeof f.value === 'object') return false
+    return String(f.value).trim() !== ''
+  })
+
+  const broker = booking.brokerId
+    ? {
+      ...booking.brokerId,
+      phone:
+        booking.brokerId.phone ||
+        booking.brokerId.phoneNumber ||
+        '',
+      phoneNumber:
+        booking.brokerId.phoneNumber ||
+        booking.brokerId.phone ||
+        '',
+    }
+    : booking.brokerId
+
+  // Seller (asset holder) contact — populate may be missing on older bookings
+  let seller = booking.assetHolderId || null
+  if (!seller?.email) {
+    const sellerUUID =
+      booking.assetHolderUUID ||
+      listing?.userUUID ||
+      booking.productData?.userUUID ||
+      null
+    if (sellerUUID) {
+      seller = await User.findOne({
+        uuid: sellerUUID,
+        isDeleted: false,
+      })
+        .select('name email phone uuid id')
+        .lean()
+    }
+  }
+  const assetHolder = seller
+    ? {
+      ...seller,
+      phone: seller.phone || seller.phoneNumber || '',
+      phoneNumber: seller.phoneNumber || seller.phone || '',
+      name: seller.name || '',
+      email: seller.email || '',
+    }
+    : null
 
   return {
     uuid: booking.uuid,
@@ -648,8 +1081,8 @@ export const getBookingByIdService = async (bookingId) => {
     viewAssignedTo: booking.viewAssignedTo || 'myself',
     date: booking.slotId?.date,
     time: timeSlot?.time,
-    brokerId: booking.brokerId,
-    assetHolder: booking.assetHolderId,
+    brokerId: broker,
+    assetHolder,
     productData: {
       ...productCommon,
       fields: assetFields,

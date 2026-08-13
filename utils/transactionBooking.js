@@ -7,34 +7,50 @@ import User from '../models/userModel.js'
 export const getAssetModelForType = (assetType = '') => {
   const type = assetType.toLowerCase()
   if (type.includes('car')) return Car
-  if (type.includes('property')) return Property
+  if (type.includes('property') || type.includes('off plan') || type.includes('offplan')) {
+    return Property
+  }
   if (type.includes('jewel')) return Jewelry
   if (type.includes('boat')) return Boat
   return Property
 }
 
+const ALL_ASSET_MODELS = [Property, Car, Boat, Jewelry]
+
 /** Bookings snapshot productData with uuid; fall back to _id when present. */
 export const findAssetForBooking = async (booking) => {
   const productData = booking?.productData || {}
-  const AssetModel = getAssetModelForType(productData.assetType)
+  const preferredModel = getAssetModelForType(productData.assetType)
 
-  if (productData.uuid) {
-    const asset = await AssetModel.findOne({
-      uuid: productData.uuid,
-      isDeleted: false,
-    })
+  const tryFind = async (AssetModel) => {
+    if (productData.uuid) {
+      const byUuid = await AssetModel.findOne({
+        uuid: productData.uuid,
+        isDeleted: false,
+      })
+      if (byUuid) return byUuid
+    }
+    if (productData._id) {
+      const byId = await AssetModel.findOne({
+        _id: productData._id,
+        isDeleted: false,
+      })
+      if (byId) return byId
+    }
+    return null
+  }
+
+  // Prefer model from assetType, then scan all collections (car/boat/jewelry/property/off-plan).
+  const preferred = await tryFind(preferredModel)
+  if (preferred) return { AssetModel: preferredModel, asset: preferred }
+
+  for (const AssetModel of ALL_ASSET_MODELS) {
+    if (AssetModel === preferredModel) continue
+    const asset = await tryFind(AssetModel)
     if (asset) return { AssetModel, asset }
   }
 
-  if (productData._id) {
-    const asset = await AssetModel.findOne({
-      _id: productData._id,
-      isDeleted: false,
-    })
-    if (asset) return { AssetModel, asset }
-  }
-
-  return { AssetModel, asset: null }
+  return { AssetModel: preferredModel, asset: null }
 }
 
 export const deriveTransactionPhase = (booking) => {
