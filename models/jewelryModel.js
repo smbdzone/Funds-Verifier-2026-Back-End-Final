@@ -29,7 +29,7 @@ const JewelryAdSchema = new Schema(
     make: { type: String },
     grams: { type: String },
     priceRange: String,
-    title: { type: String, maxlength: 50 },
+    title: { type: String, maxlength: 60 },
     condition: String,
     price: { type: Number, required: true },
     weight: String,

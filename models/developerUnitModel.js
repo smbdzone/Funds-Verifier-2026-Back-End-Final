@@ -75,7 +75,7 @@ const developerUnitSchema = new mongoose.Schema(
     /** Inventory code (auto-filled from title when omitted). */
     unitNumber: { type: String, required: true, trim: true },
     /** Off-plan style listing title (shown publicly). */
-    title: { type: String, default: '', trim: true, maxlength: 50 },
+    title: { type: String, default: '', trim: true, maxlength: 60 },
     phoneNumber: { type: String, default: '', trim: true },
     floor: { type: String, default: '', trim: true },
     category: {

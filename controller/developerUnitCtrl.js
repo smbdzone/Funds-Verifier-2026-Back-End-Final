@@ -49,7 +49,7 @@ const buildUnitPayload = (body, { forCreate = false } = {}) => {
       : undefined
 
   const title =
-    body.title !== undefined ? String(body.title || '').trim().slice(0, 50) : undefined
+    body.title !== undefined ? String(body.title || '').trim().slice(0, 60) : undefined
 
   if (forCreate && !unitNumber) {
     unitNumber = slugUnitNumber(title || body.unitNumber)

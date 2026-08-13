@@ -1,7 +1,7 @@
 /**
  * Slim list projections for marketplace / home cards.
- * Cards need identity, price, location, media thumbs, ratings, and
- * enough premium refs for badges — not layout PDFs, full video, or reviews.
+ * Cards need identity, price, location, media thumbs (+ listing video),
+ * ratings, and premium refs for badges — not layout PDFs or reviews.
  */
 
 export const CARD_PROPERTY_FIELDS = `
@@ -44,6 +44,7 @@ export const CARD_PROPERTY_FIELDS = `
   occupancyStatus
   thumbnailImg
   pictures
+  video
   qrScan
   userId
   userUUID
@@ -80,6 +81,7 @@ export const CARD_CAR_FIELDS = `
   listing
   thumbnailImg
   pictures
+  video
   qrScan
   userId
   userUUID
@@ -113,6 +115,7 @@ export const CARD_BOAT_FIELDS = `
   listing
   thumbnailImg
   pictures
+  video
   qrScan
   userId
   userUUID
@@ -145,6 +148,7 @@ export const CARD_JEWELRY_FIELDS = `
   listing
   thumbnailImg
   pictures
+  video
   qrScan
   userId
   userUUID
@@ -159,6 +163,7 @@ export const CARD_JEWELRY_FIELDS = `
 `
 
 const MEDIA_SELECT = 'images uuid -_id'
+const VIDEO_SELECT = 'videos uuid -_id'
 const CERT_SELECT = '_id uuid status payment_method_status'
 const WALKTHROUGH_SELECT = '_id uuid status payment_method_status link'
 const REPORT_SELECT = '_id uuid status payment_method_status IsRecommended'
@@ -194,6 +199,7 @@ export function applyCardListPopulates(query) {
   return query
     .populate({ path: 'thumbnailImg', select: MEDIA_SELECT })
     .populate({ path: 'pictures', select: MEDIA_SELECT })
+    .populate({ path: 'video', select: VIDEO_SELECT })
     .populate({ path: 'qrScan', select: MEDIA_SELECT })
     .populate({ path: 'userId', select: 'profileImage name uuid' })
     .populate({ path: 'evaluationCertificate', select: CERT_SELECT })

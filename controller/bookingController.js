@@ -8,6 +8,7 @@ import {
   deleteSlotService,
   getAllSlotsService,
   getAvailableSlotsByDateService,
+  getNextAvailableViewingDateService,
   getAllBookingsService,
   getBookingByIdService,
   updateSeletedSlotService,
@@ -359,6 +360,24 @@ export const getAvailableSlotsByDate = async (req, res) => {
       resolvedCategory,
     )
     res.status(200).json(availableSlots)
+  } catch (error) {
+    res.status(500).json({ message: error.message })
+  }
+}
+
+/** Next day with open viewing slots for a trustee (Arrange Viewing). */
+export const getNextAvailableViewingDate = async (req, res) => {
+  try {
+    const { userUUID, userId, fromDate } = req.query
+    const ownerUUID = userUUID || userId
+    if (!ownerUUID) {
+      return res.status(400).json({ message: 'userUUID is required' })
+    }
+    const next = await getNextAvailableViewingDateService(
+      ownerUUID,
+      fromDate || new Date().toISOString().slice(0, 10),
+    )
+    res.status(200).json(next || { date: null })
   } catch (error) {
     res.status(500).json({ message: error.message })
   }

@@ -54,7 +54,7 @@ const propertySchema = new mongoose.Schema({
   evaluationDateTime: { type: Date, required: false },
   propertyForLease: { type: String },
   leaseNumberofCheques: { type: Number },
-  title: { type: String, required: true, maxlength: 50 },
+  title: { type: String, required: true, maxlength: 60 },
   slug: { type: String },
   pictures: { type: mongoose.Schema.Types.ObjectId, ref: 'ImageAsset' },
   video: { type: mongoose.Schema.Types.ObjectId, ref: 'VideoAsset' },

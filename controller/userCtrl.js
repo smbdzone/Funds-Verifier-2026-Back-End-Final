@@ -1,5 +1,6 @@
 import asyncHandler from 'express-async-handler'
 import User from '../models/userModel.js'
+import Slot from '../models/Slot.js'
 import generateToken from '../config/jwToken.js'
 import generateRefreshToken from '../config/refreshToken.js'
 import jwt from 'jsonwebtoken'
@@ -1299,6 +1300,25 @@ const getServiceProvidersByRole = asyncHandler(async (req, res) => {
   const users = await User.find(query)
     .select('uuid name lastname role')
     .lean()
+
+  // Arrange Viewing: only return trustees who currently have open viewing slots.
+  // Legacy/empty trustee accounts (e.g. "Simo" with no slots) stay hidden.
+  if (role === 'Trustee') {
+    const today = new Date()
+    today.setUTCHours(0, 0, 0, 0)
+    const withSlots = []
+    for (const user of users) {
+      const hasSlots = await Slot.exists({
+        userUUID: user.uuid,
+        slotCategory: 'viewing',
+        isDeleted: { $ne: true },
+        date: { $gte: today },
+        'times.isBooked': false,
+      })
+      if (hasSlots) withSlots.push(user)
+    }
+    return res.json(withSlots)
+  }
 
   res.json(users)
 })

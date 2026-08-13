@@ -14,7 +14,7 @@ const createAssetsSchema = new mongoose.Schema({
   phoneNumber: { type: String, required: true },
   neighbourhood: { type: String, required: true },
   mapUrl: { type: String, default: '', trim: true },
-  title: { type: String, required: true, maxlength: 50, unique: true },
+  title: { type: String, required: true, maxlength: 60, unique: true },
   slug: { type: String, required: true },
   pictures: { type: [Object], default: [] },
   video: { type: Object, default: {} },

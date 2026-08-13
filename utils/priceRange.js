@@ -2,6 +2,7 @@ import {
   LISTING_QUERY_PARAMS,
   applyRoiRangeFilter,
   getSafeStringParam,
+  pickScalarFilters,
 } from './listingQuery.js'
 
 const RESERVED_KEYS = new Set([
@@ -27,11 +28,15 @@ function processQuery(query) {
   const modifiedQuery = {}
 
   for (const key of FILTER_PASSTHROUGH) {
+    // Bedrooms (incl. Studio → 0) handled via pickScalarFilters below.
+    if (key === 'bedrooms') continue
     const val = getSafeStringParam(query, key)
     if (val !== null) {
       modifiedQuery[key] = val
     }
   }
+
+  Object.assign(modifiedQuery, pickScalarFilters(query, new Set(['bedrooms'])))
 
   const parsedMin = parseFloat(query?.minPrice)
   const parsedMax = parseFloat(query?.maxPrice)

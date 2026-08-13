@@ -383,7 +383,7 @@ export const deleteSlotService = async (slotId) => {
 export const getAllSlotsService = async (id, role, explicitCategory) => {
   const slotCategory =
     explicitCategory === VIEWING_SLOT_CATEGORY ||
-    explicitCategory === SERVICE_SLOT_CATEGORY
+      explicitCategory === SERVICE_SLOT_CATEGORY
       ? explicitCategory
       : roleToSlotCategory(role)
   const categoryClause = await buildSlotCategoryClause(id, slotCategory)
@@ -724,6 +724,40 @@ export const getAvailableSlotsByDateService = async (
     date: dateRange,
     $and: [notDeletedClause, categoryClause],
   }).select('-_id -createdAt -isDeleted -deletedAt')
+}
+
+/** Next calendar day (UTC YYYY-MM-DD) that still has open viewing times. */
+export const getNextAvailableViewingDateService = async (
+  userUUID,
+  fromDate = new Date(),
+) => {
+  if (!userUUID) return null
+
+  const start = moment.utc(String(fromDate).slice(0, 10) || undefined)
+  if (!start.isValid()) return null
+  start.startOf('day')
+
+  const categoryClause = await buildSlotCategoryClause(
+    userUUID,
+    VIEWING_SLOT_CATEGORY,
+  )
+  if (!categoryClause) return null
+
+  const slot = await Slot.findOne({
+    userUUID,
+    date: { $gte: start.toDate() },
+    'times.isBooked': false,
+    $and: [notDeletedClause, categoryClause],
+  })
+    .sort({ date: 1 })
+    .select('date uuid times')
+    .lean()
+
+  if (!slot?.date) return null
+  return {
+    date: moment.utc(slot.date).format('YYYY-MM-DD'),
+    slotUuid: slot.uuid || null,
+  }
 }
 
 export const getSlotsByDateService = async (

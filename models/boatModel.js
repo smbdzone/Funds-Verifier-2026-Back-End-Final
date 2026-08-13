@@ -27,7 +27,7 @@ const BoatAdSchema = new Schema(
     /** Optional Google Maps share/embed URL shown on the listing. */
     mapUrl: { type: String, default: '', trim: true },
     priceRange: String,
-    title: { type: String, maxlength: 50 },
+    title: { type: String, maxlength: 60 },
     phoneNumber: { type: String, required: true },
     condition: String,
     price: { type: Number, required: true },

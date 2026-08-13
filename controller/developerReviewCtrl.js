@@ -9,6 +9,7 @@ import ImageAsset from '../models/imgModel.js'
 import User from '../models/userModel.js'
 import { sanitizeMongoId } from '../utils/nosqlSanitizer.js'
 import { mapUnitSizeToPropertyFields } from '../utils/mapUnitSizeToProperty.js'
+import { syncPublishedPropertyFromUnit } from '../utils/syncPublishedUnitProperty.js'
 import {
   assertApprovedDeveloper,
   findOwnedProject,
@@ -468,7 +469,7 @@ const buildPropertyPayloadFromUnit = ({
   const titleBase = (
     String(unit.title || '').trim() ||
     `${project.name} — Unit ${unit.unitNumber}`
-  ).slice(0, 50)
+  ).slice(0, 60)
   const priceFrom =
     Number(unit.priceFrom || unit.listingPrice || 0) ||
     Number(unit.priceTo || 0) ||
@@ -1270,6 +1271,18 @@ export const publishReviewRequest = asyncHandler(async (req, res) => {
     unit.publishedAt = new Date()
     unit.status = 'Available'
     await unit.save()
+
+    // Ensure marketplace media (esp. video) stays in sync after publish.
+    // Historical publishes sometimes missed unit.video on the Property doc.
+    await syncPublishedPropertyFromUnit(unit)
+    if (unit.video) {
+      property = await Property.findByIdAndUpdate(
+        unit.publishedPropertyId,
+        { $set: { video: unit.video } },
+        { new: true },
+      )
+    }
+
     published.push({
       unitId: unit._id,
       unitNumber: unit.unitNumber,

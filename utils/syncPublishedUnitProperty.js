@@ -63,8 +63,13 @@ export async function syncPublishedPropertyFromUnit(unit) {
   }
 
   if (unit.title) {
-    updates.title = String(unit.title).trim().slice(0, 50)
+    updates.title = String(unit.title).trim().slice(0, 60)
   }
+
+  if (unit.video) updates.video = unit.video
+  if (unit.thumbnailImg) updates.thumbnailImg = unit.thumbnailImg
+  if (unit.pictures) updates.pictures = unit.pictures
+  if (unit.qrScan) updates.qrScan = unit.qrScan
 
   if (unit.builtUpArea != null && unit.builtUpArea !== '') {
     const bua = Number(unit.builtUpArea)
@@ -83,14 +88,14 @@ export async function syncPublishedPropertyFromUnit(unit) {
   }
 
   if (unit.unitNumber) {
-    // Keep title in sync when unit number changes (prefix kept short for maxlength 50).
+    // Keep title in sync when unit number changes (prefix kept short for maxlength 60).
     const existing = await Property.findById(unit.publishedPropertyId)
       .select('title')
       .lean()
     if (existing?.title) {
       const title = String(existing.title)
       const updatedTitle = title.includes('— Unit')
-        ? `${title.split('— Unit')[0].trim()} — Unit ${unit.unitNumber}`.slice(0, 50)
+        ? `${title.split('— Unit')[0].trim()} — Unit ${unit.unitNumber}`.slice(0, 60)
         : title
       updates.title = updatedTitle
     }

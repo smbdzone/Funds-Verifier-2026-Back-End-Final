@@ -152,13 +152,36 @@ export function getSafeTitleRegex(query) {
   return { $regex: escapeRegexString(title), $options: 'i' }
 }
 
+function parseBedroomsFilterValue(raw) {
+  const parts = String(raw)
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean)
+  const nums = []
+  for (const part of parts) {
+    if (/^studio$/i.test(part)) {
+      nums.push(0)
+      continue
+    }
+    const n = Number(String(part).replace(/[^\d.-]/g, ''))
+    if (Number.isFinite(n)) nums.push(n)
+  }
+  if (!nums.length) return null
+  if (nums.length === 1) return nums[0]
+  return { $in: nums }
+}
+
 export function pickScalarFilters(query, allowedFields = LISTING_FILTER_FIELDS) {
   const filters = {}
   for (const field of allowedFields) {
     const val = getSafeStringParam(query, field)
-    if (val) {
-      filters[field] = val
+    if (!val) continue
+    if (field === 'bedrooms') {
+      const bedrooms = parseBedroomsFilterValue(val)
+      if (bedrooms !== null) filters.bedrooms = bedrooms
+      continue
     }
+    filters[field] = val
   }
   return filters
 }
