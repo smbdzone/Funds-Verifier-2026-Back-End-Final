@@ -8,6 +8,7 @@ import {
   getAllSlots,
   getAvailableSlotsByDate,
   getNextAvailableViewingDate,
+  getAvailableViewingDates,
   getAllBookings,
   getBookingById,
   getSlotById,
@@ -41,6 +42,13 @@ router.get(
   '/slots/next-available',
   authMiddleware,
   getNextAvailableViewingDate,
+)
+
+// GET all upcoming dates that still have open viewing times
+router.get(
+  '/slots/available-dates',
+  authMiddleware,
+  getAvailableViewingDates,
 )
 
 // GET single slot

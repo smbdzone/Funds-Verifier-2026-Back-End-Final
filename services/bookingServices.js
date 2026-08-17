@@ -1193,6 +1193,49 @@ export const getNextAvailableViewingDateService = async (
   }
 }
 
+/**
+ * Upcoming YYYY-MM-DD dates that still have at least one open (unbooked) viewing time.
+ * Used by Arrange Viewing calendar so empty days stay disabled.
+ */
+export const getAvailableViewingDatesService = async (
+  userUUID,
+  fromDate = new Date(),
+) => {
+  if (!userUUID) return []
+
+  const start = moment.utc(String(fromDate).slice(0, 10) || undefined)
+  if (!start.isValid()) return []
+  start.startOf('day')
+
+  const categoryClause = await buildSlotCategoryClause(
+    userUUID,
+    VIEWING_SLOT_CATEGORY,
+  )
+  if (!categoryClause) return []
+
+  const slots = await Slot.find({
+    userUUID,
+    date: { $gte: start.toDate() },
+    'times.isBooked': false,
+    $and: [notDeletedClause, categoryClause],
+  })
+    .select('date times')
+    .sort({ date: 1 })
+    .lean()
+
+  const dates = []
+  const seen = new Set()
+  for (const slot of slots) {
+    const hasOpen = (slot.times || []).some((t) => t && t.isBooked !== true)
+    if (!hasOpen || !slot.date) continue
+    const key = moment.utc(slot.date).format('YYYY-MM-DD')
+    if (seen.has(key)) continue
+    seen.add(key)
+    dates.push(key)
+  }
+  return dates
+}
+
 export const getSlotsByDateService = async (
   date,
   userUUID,
