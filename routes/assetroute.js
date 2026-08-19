@@ -3,6 +3,7 @@ const router = express.Router()
 
 import {
   uploadImgs,
+  reorderImgs,
   deleteImgs,
   uploadVideoFun,
   thumbnailImg,
@@ -100,6 +101,13 @@ router.delete(
   authMiddleware,
   authorizeUserByUUID,
   deleteEvaluationCertificate,
+)
+
+router.put(
+  '/upload-imgs/:assetId/order',
+  authMiddleware,
+  authorizeUserByUUID,
+  reorderImgs,
 )
 
 router.delete(

@@ -144,6 +144,71 @@ const uploadVideoFun = asyncHandler(async (req, res) => {
   }
 })
 
+function imageFingerprint(img = {}, { includePath = true } = {}) {
+  const name = String(img.originalName || img.public_id || '').trim()
+  const size = img.size == null ? '' : String(img.size)
+  const uploadedAt = img.uploadedAt ? String(img.uploadedAt) : ''
+  if (!includePath) return `${name}|${size}|${uploadedAt}`
+  const pathOnly = String(img.signedUrl || img.url || '')
+    .split('?')[0]
+    .trim()
+  return `${name}|${size}|${uploadedAt}|${pathOnly}`
+}
+
+function findImageIndex(existing, used, item) {
+  const wantedExact = imageFingerprint(item, { includePath: true })
+  const exact = existing.findIndex((img, i) => {
+    if (used.has(i)) return false
+    return imageFingerprint(img, { includePath: true }) === wantedExact
+  })
+  if (exact !== -1) return exact
+
+  const wantedLoose = imageFingerprint(item, { includePath: false })
+  if (!wantedLoose || wantedLoose === '||') return -1
+  return existing.findIndex((img, i) => {
+    if (used.has(i)) return false
+    return imageFingerprint(img, { includePath: false }) === wantedLoose
+  })
+}
+
+/** Replace ImageAsset.images with the client's ordered (and possibly reduced) list. */
+const reorderImgs = asyncHandler(async (req, res) => {
+  const { assetId } = req.params
+  const order = Array.isArray(req.body?.order) ? req.body.order : []
+
+  if (!assetId) {
+    return res.status(400).json({ error: 'Missing asset id' })
+  }
+
+  const imageAsset = await ImageAsset.findOne({
+    _id: assetId,
+    isDeleted: { $ne: true },
+  })
+  if (!imageAsset) {
+    return res.status(404).json({ error: 'Image gallery not found' })
+  }
+
+  const existing = Array.isArray(imageAsset.images) ? [...imageAsset.images] : []
+  const used = new Set()
+  const next = []
+
+  for (const item of order) {
+    const matchIndex = findImageIndex(existing, used, item)
+    if (matchIndex === -1) continue
+    used.add(matchIndex)
+    next.push(existing[matchIndex])
+  }
+
+  // Never wipe a gallery because fingerprints failed to match.
+  if (order.length && next.length === 0) {
+    return res.status(200).json(imageAsset)
+  }
+
+  imageAsset.images = next
+  await imageAsset.save()
+  return res.status(200).json(imageAsset)
+})
+
 const deleteImgs = asyncHandler(async (req, res) => {
   const { id } = req.params
 
@@ -312,6 +377,7 @@ const verificationCertificate = asyncHandler(async (req, res) => {
 
 export {
   uploadImgs,
+  reorderImgs,
   deleteImgs,
   uploadVideoFun,
   thumbnailImg,
