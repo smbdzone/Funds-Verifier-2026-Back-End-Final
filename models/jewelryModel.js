@@ -37,7 +37,7 @@ const JewelryAdSchema = new Schema(
     category: { type: String, required: true },
     model: { type: String, required: true },
     description: { type: String, maxlength: 300 },
-    feedback: { type: String, required: true },
+    feedback: { type: String, default: '' },
     age: String,
     usage: String,
     pictures: { type: mongoose.Schema.Types.ObjectId, ref: 'ImageAsset' },

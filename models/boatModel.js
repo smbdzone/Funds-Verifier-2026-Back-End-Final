@@ -72,7 +72,7 @@ const BoatAdSchema = new Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'EvaluationCertificate',
     },
-    feedback: { type: String, required: true },
+    feedback: { type: String, default: '' },
     evaluationDateTime: { type: Date, required: false },
     evaluationC: {
       type: String,
