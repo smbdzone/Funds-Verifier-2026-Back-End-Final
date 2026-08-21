@@ -22,10 +22,26 @@ export const LISTING_OBJECT_ID_MEDIA_FIELDS = [
 export function sanitizeListingMediaObjectIds(body) {
   if (!body || typeof body !== 'object') return body
 
+  // Explicit null = clear this media field on update (do not drop the key).
+  const CLEARABLE_WITH_NULL = new Set([
+    'unitLayout',
+    'floorPlan',
+    'titleDeed',
+    'agencyAgreement',
+  ])
+
   for (const key of LISTING_OBJECT_ID_MEDIA_FIELDS) {
     if (!(key in body)) continue
     const value = body[key]
-    if (value === null || value === undefined || value === '') {
+    if (value === null) {
+      if (CLEARABLE_WITH_NULL.has(key)) {
+        body[key] = null
+      } else {
+        delete body[key]
+      }
+      continue
+    }
+    if (value === undefined || value === '') {
       delete body[key]
       continue
     }

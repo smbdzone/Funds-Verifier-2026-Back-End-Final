@@ -899,9 +899,27 @@ const updateProduct = asyncHandler(async (req, res) => {
       // } else {
       stripNullPremiumRefs(req.body)
       sanitizeListingMediaObjectIds(req.body)
+
+      // Explicit null on layout/docs means clear that field only.
+      const unsetFields = {}
+      for (const key of ['unitLayout', 'floorPlan', 'titleDeed', 'agencyAgreement']) {
+        if (req.body && req.body[key] === null) {
+          unsetFields[key] = 1
+          delete req.body[key]
+        }
+      }
+
+      const updateOps = {}
+      if (req.body && Object.keys(req.body).length) {
+        updateOps.$set = req.body
+      }
+      if (Object.keys(unsetFields).length) {
+        updateOps.$unset = unsetFields
+      }
+
       updatedProduct = await Property.findByIdAndUpdate(
         product._id,
-        { $set: req.body },
+        Object.keys(updateOps).length ? updateOps : { $set: {} },
         { new: true },
       ).select('-_id')
 
