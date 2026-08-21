@@ -42,7 +42,9 @@ const uploadImgs = asyncHandler(async (req, res) => {
         isDeleted: { $ne: true },
       })
       if (existing) {
-        existing.images = [...(existing.images || []), ...images]
+        const current = (existing.images || []).filter((img) => !img?.isDeleted)
+        existing.images = [...current, ...images]
+        existing.markModified('images')
         await existing.save()
         return res.status(200).json(existing)
       }
@@ -209,12 +211,11 @@ const reorderImgs = asyncHandler(async (req, res) => {
     if (matchIndex === -1) continue
     used.add(matchIndex)
     const matched = existing[matchIndex]
-    // Keep only images the client still has (deletes drop out of `order`).
-    next.push({
-      ...(typeof matched?.toObject === 'function' ? matched.toObject() : matched),
-      isDeleted: false,
-      deletedAt: undefined,
-    })
+    const plain =
+      typeof matched?.toObject === 'function' ? matched.toObject() : { ...matched }
+    delete plain.isDeleted
+    delete plain.deletedAt
+    next.push(plain)
   }
 
   // Never wipe a gallery because fingerprints failed to match.
@@ -222,50 +223,87 @@ const reorderImgs = asyncHandler(async (req, res) => {
     return res.status(200).json(imageAsset)
   }
 
-  // Empty order with intentional clear: only when client sends order: []
-  // and had no images left — leave gallery empty.
   imageAsset.images = next
+  imageAsset.markModified('images')
   await imageAsset.save()
   return res.status(200).json(imageAsset)
 })
 
+const imageMatchesDeleteId = (img, id) => {
+  if (!img || !id) return false
+  const s3Key = String(img.s3Key || '').trim()
+  const publicId = String(img.public_id || '').trim()
+  if (s3Key === id || publicId === id) return true
+  // Tolerate encoded/decoded or path-suffix mismatches from older clients.
+  try {
+    const decoded = decodeURIComponent(id)
+    if (s3Key === decoded || publicId === decoded) return true
+  } catch {
+    /* ignore */
+  }
+  // Avoid matching every image when id is tiny/ambiguous.
+  if (id.length >= 8 && (s3Key.endsWith(id) || id.endsWith(s3Key))) return true
+  return false
+}
+
 const deleteImgs = asyncHandler(async (req, res) => {
   const id = String(req.query?.id || req.params?.id || '').trim()
+  const assetId = String(req.query?.assetId || req.body?.assetId || '').trim()
 
   try {
     if (!id) {
       return res.status(400).json({ error: 'Image id is required.' })
     }
 
-    // During migration, `id` may be Cloudinary public_id OR an S3 key.
-    const imageAsset = await ImageAsset.findOne({
-      $or: [{ 'images.public_id': id }, { 'images.s3Key': id }],
-    })
+    let imageAsset = null
+    if (assetId) {
+      imageAsset = await ImageAsset.findOne({
+        _id: assetId,
+        isDeleted: { $ne: true },
+      })
+    }
+    if (!imageAsset) {
+      let decoded = id
+      try {
+        decoded = decodeURIComponent(id)
+      } catch {
+        /* keep id */
+      }
+      imageAsset = await ImageAsset.findOne({
+        $or: [
+          { 'images.public_id': id },
+          { 'images.s3Key': id },
+          { 'images.public_id': decoded },
+          { 'images.s3Key': decoded },
+        ],
+      })
+    }
 
     if (!imageAsset) {
-      throw new Error('Image not found in the database.')
+      return res.status(404).json({ error: 'Image not found in the database.' })
     }
 
-    // Step 2: Find the image inside the array
-    const image = imageAsset.images.find(
-      (img) => img.public_id === id || img.s3Key === id
+    const before = Array.isArray(imageAsset.images) ? imageAsset.images.length : 0
+    const removed = (imageAsset.images || []).filter((img) =>
+      imageMatchesDeleteId(img, id),
+    )
+    imageAsset.images = (imageAsset.images || []).filter(
+      (img) => !imageMatchesDeleteId(img, id),
     )
 
-    if (!image) {
-      throw new Error('Image not found in the images array.')
+    if (imageAsset.images.length === before) {
+      return res.status(404).json({ error: 'Image not found in the images array.' })
     }
 
-    // Step 3: Soft delete the image
-    image.isDeleted = true // Make sure your image schema has this field
-    image.deletedAt = new Date() // optional timestamp
-
-    // Step 4: Save the updated document
+    // Mixed array: must markModified or Mongoose will not write the change.
+    imageAsset.markModified('images')
     await imageAsset.save()
 
     return res.json({
       success: true,
-      message: 'Image soft-deleted successfully.',
-      image,
+      message: 'Image deleted successfully.',
+      removedCount: removed.length,
+      images: imageAsset.images,
     })
   } catch (error) {
     console.error('Error deleting image:', error.message)
