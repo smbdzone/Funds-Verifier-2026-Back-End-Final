@@ -155,6 +155,8 @@ const BoatAdSchema = new Schema(
     evaludationComponents: { type: String },
     exteriorColor: [String],
     interiorColor: [String],
+    exteriorTwoTone: [String],
+    interiorTwoTone: [String],
     extras: [String],
     category: { type: String, required: true },
     model: { type: String, required: true },

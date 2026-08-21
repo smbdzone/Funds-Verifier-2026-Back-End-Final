@@ -210,9 +210,13 @@ const reorderImgs = asyncHandler(async (req, res) => {
 })
 
 const deleteImgs = asyncHandler(async (req, res) => {
-  const { id } = req.params
+  const id = String(req.query?.id || req.params?.id || '').trim()
 
   try {
+    if (!id) {
+      return res.status(400).json({ error: 'Image id is required.' })
+    }
+
     // During migration, `id` may be Cloudinary public_id OR an S3 key.
     const imageAsset = await ImageAsset.findOne({
       $or: [{ 'images.public_id': id }, { 'images.s3Key': id }],

@@ -28,6 +28,11 @@ const JewelryAdSchema = new Schema(
     mapUrl: { type: String, default: '', trim: true },
     make: { type: String },
     grams: { type: String },
+    weightUnit: {
+      type: String,
+      enum: ['gm', 'kg', 'lb', 'oz'],
+      default: 'gm',
+    },
     priceRange: String,
     title: { type: String, maxlength: 60 },
     condition: String,

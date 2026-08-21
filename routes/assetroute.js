@@ -111,6 +111,13 @@ router.put(
 )
 
 router.delete(
+  '/delete-imgs',
+  authMiddleware,
+  authorizeUserByUUID,
+  deleteImgs,
+)
+
+router.delete(
   '/delete-imgs/:id',
   authMiddleware,
   authorizeUserByUUID,
