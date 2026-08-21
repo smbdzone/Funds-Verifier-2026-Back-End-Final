@@ -87,7 +87,9 @@ export const PUBLIC_CAR_FIELDS = `
   fuelType
   size
   description
+  additionalDescription
   kilometers
+  mileageUnit
   year
   warranty
   carType
@@ -101,10 +103,18 @@ export const PUBLIC_CAR_FIELDS = `
   steeringSide
   transmissionType
   engineCapacity
+  capacityWeight
+  capacityWeightUnit
+  VIN
+  exteriorColor
   interiorColor
+  exteriorTwoTone
+  interiorTwoTone
   technicalFeatures
   extras
   evaluationPrices
+  ratings
+  totalrating
   status
   underProcess
   userUUID
@@ -138,10 +148,13 @@ pictures
  qrScan
  video3DWalkthrough
 description 
+additionalDescription
 ratings
 status
 exteriorColor
 interiorColor
+exteriorTwoTone
+interiorTwoTone
 category
 model
 condition
@@ -151,6 +164,7 @@ length
 brands
 age
 usage
+warranty
 locateBoat
 seats
 extras
@@ -196,6 +210,8 @@ export const PUBLIC_JEWELRY_FIELDS = `
   status
   underProcess
   grams
+  weightUnit
+  warranty
   materials
   userUUID
   video

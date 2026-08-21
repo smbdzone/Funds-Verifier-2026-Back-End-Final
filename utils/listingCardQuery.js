@@ -139,6 +139,7 @@ export const CARD_JEWELRY_FIELDS = `
   category
   condition
   grams
+  weightUnit
   country
   city
   neighbourhood

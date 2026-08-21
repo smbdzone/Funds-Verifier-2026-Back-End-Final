@@ -118,6 +118,10 @@ const createProduct = asyncHandler(async (req, res) => {
       price: req.body.price,
     })
 
+    if (req.body.bodyType && !req.body.carType) {
+      req.body.carType = req.body.bodyType
+    }
+
     stripNullPremiumRefs(req.body)
     sanitizeListingMediaObjectIds(req.body)
 
@@ -707,6 +711,10 @@ const updateProduct = asyncHandler(async (req, res) => {
         req.body,
         req.user,
       )
+
+      if (req.body.bodyType && !req.body.carType) {
+        req.body.carType = req.body.bodyType
+      }
 
       // Update slug if title is provided
       if (req.body.title) {
