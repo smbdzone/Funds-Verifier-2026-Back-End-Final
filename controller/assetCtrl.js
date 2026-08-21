@@ -156,6 +156,18 @@ function imageFingerprint(img = {}, { includePath = true } = {}) {
 }
 
 function findImageIndex(existing, used, item) {
+  const key = String(item?.s3Key || item?.public_id || '').trim()
+  if (key) {
+    const byKey = existing.findIndex((img, i) => {
+      if (used.has(i)) return false
+      return (
+        String(img?.s3Key || '').trim() === key ||
+        String(img?.public_id || '').trim() === key
+      )
+    })
+    if (byKey !== -1) return byKey
+  }
+
   const wantedExact = imageFingerprint(item, { includePath: true })
   const exact = existing.findIndex((img, i) => {
     if (used.has(i)) return false
@@ -196,7 +208,13 @@ const reorderImgs = asyncHandler(async (req, res) => {
     const matchIndex = findImageIndex(existing, used, item)
     if (matchIndex === -1) continue
     used.add(matchIndex)
-    next.push(existing[matchIndex])
+    const matched = existing[matchIndex]
+    // Keep only images the client still has (deletes drop out of `order`).
+    next.push({
+      ...(typeof matched?.toObject === 'function' ? matched.toObject() : matched),
+      isDeleted: false,
+      deletedAt: undefined,
+    })
   }
 
   // Never wipe a gallery because fingerprints failed to match.
@@ -204,6 +222,8 @@ const reorderImgs = asyncHandler(async (req, res) => {
     return res.status(200).json(imageAsset)
   }
 
+  // Empty order with intentional clear: only when client sends order: []
+  // and had no images left — leave gallery empty.
   imageAsset.images = next
   await imageAsset.save()
   return res.status(200).json(imageAsset)
