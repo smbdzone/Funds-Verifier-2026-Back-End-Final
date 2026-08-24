@@ -17,12 +17,21 @@ export function absoluteFrontendUrl(path) {
 }
 
 function normalizeAssetKey(assetType) {
-  const t = String(assetType || '').toLowerCase()
+  const t = String(assetType || '').toLowerCase().replace(/[_-]+/g, ' ')
+  if (t.includes('off plan') || t.includes('offplan')) return 'offplan'
   if (t.includes('car')) return 'car'
   if (t.includes('boat')) return 'boat'
   if (t.includes('jewel')) return 'jewelry'
-  if (t.includes('off plan')) return 'offplan'
   return 'property'
+}
+
+/** Public marketplace id: uuid first (matches listing cards), then slug. Never mongo _id. */
+export function getPublicListingId(listing = {}) {
+  const uuid = typeof listing?.uuid === 'string' ? listing.uuid.trim() : ''
+  if (uuid) return uuid
+  const slug = typeof listing?.slug === 'string' ? listing.slug.trim() : ''
+  if (slug) return slug
+  return ''
 }
 
 /** Evaluator / sub-evaluator detail page for a listing UUID. */
@@ -69,11 +78,12 @@ export function getAssetHolderListingPath(assetType, listingUuid) {
 
 /**
  * Public marketplace detail page (buyer-facing frontend).
- * Prefer slug; fall back to uuid so the link still opens after approval.
+ * Prefer uuid (same as listing cards); fall back to slug. Never mongo _id —
+ * public APIs look up uuid/slug only, and dashboard edit URLs require login.
  */
 export function getPublicListingPath(listing = {}, assetType) {
   const key = normalizeAssetKey(assetType || listing?.assetType)
-  const id = listing?.slug || listing?.uuid || listing?._id
+  const id = getPublicListingId(listing)
   if (!id) return '/'
 
   if (key === 'offplan') return `/offplan/${id}`

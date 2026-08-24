@@ -1,8 +1,9 @@
 /** True when asset type is an off-plan property listing. */
 export function isOffPlanAssetType(assetType) {
-  return String(assetType || '')
+  const t = String(assetType || '')
     .toLowerCase()
-    .includes('off plan')
+    .replace(/[_-]+/g, ' ')
+  return t.includes('off plan') || t.includes('offplan')
 }
 
 /**

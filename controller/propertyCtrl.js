@@ -942,7 +942,8 @@ const updateProduct = asyncHandler(async (req, res) => {
               _id: product._id,
               userUUID: updatedProduct?.userUUID || product.userUUID,
             },
-            assetType: 'property',
+            assetType:
+              updatedProduct?.assetType || product.assetType || 'property',
             evaluator: req.user,
           })
         } else {

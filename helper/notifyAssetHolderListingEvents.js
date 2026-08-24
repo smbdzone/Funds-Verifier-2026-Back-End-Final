@@ -12,8 +12,8 @@ import { formatDubaiDateTime } from '../utils/dubaiDateTime.js'
 import { resolveListingEmailPreviewUrl } from '../utils/listingEmailPreview.js'
 
 function assetLabel(assetType) {
-  const t = String(assetType || 'asset').toLowerCase()
-  if (t.includes('off plan')) return 'off-plan property'
+  const t = String(assetType || 'asset').toLowerCase().replace(/[_-]+/g, ' ')
+  if (t.includes('off plan') || t.includes('offplan')) return 'off-plan property'
   if (t.includes('property')) return 'property'
   if (t.includes('car')) return 'car'
   if (t.includes('boat')) return 'boat'
@@ -22,11 +22,12 @@ function assetLabel(assetType) {
 }
 
 function relateRouteForAsset(assetType) {
-  const t = String(assetType || '').toLowerCase()
-  if (t.includes('car')) return 'cars'
+  const t = String(assetType || '').toLowerCase().replace(/[_-]+/g, ' ')
+  if (t.includes('off plan') || t.includes('offplan')) return 'offplan'
+  if (t.includes('car')) return 'car'
   if (t.includes('boat')) return 'boat'
-  if (t.includes('jewel')) return 'jewellery'
-  return 'my-listing'
+  if (t.includes('jewel')) return 'jewelry'
+  return 'property'
 }
 
 function displayName(userOrName) {
@@ -520,7 +521,7 @@ export async function notifyAssetHolderOffPlanApproved({ listing }) {
     userUUID: listing.userUUID,
     title: 'Off-Plan Listing Approved',
     message,
-    relateRoute: 'property',
+    relateRoute: relateRouteForAsset(listing.assetType || 'off plan'),
     relatedUUID: listing.uuid,
     relatedId: listing._id,
     emailSubject: `Your off-plan listing was approved — Funds Verifier`,

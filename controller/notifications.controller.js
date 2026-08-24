@@ -457,12 +457,30 @@ export const GetRoutesForNotifications = (notification) => {
       }
     }
 
-    if (
-      ['cars', 'boat', 'property', 'jewelry', 'jewellery']?.includes(route) &&
-      notification?.RelatedId &&
-      role === 'AssetHolder'
-    ) {
-      return `/${route}/${notification.RelatedId}`
+    const publicListingId =
+      notification?.RelatedUUID || notification?.RelatedId
+    if (publicListingId && role === 'AssetHolder') {
+      const key = String(route || '').toLowerCase()
+      if (key === 'car' || key === 'cars') {
+        return `/car/${publicListingId}`
+      }
+      if (key === 'boat') {
+        return `/boat/${publicListingId}`
+      }
+      if (key === 'jewelry' || key === 'jewellery') {
+        return `/jewelry/${publicListingId}`
+      }
+      if (
+        key === 'offplan' ||
+        key.includes('offplan') ||
+        key.includes('off-plan') ||
+        key.includes('off plan')
+      ) {
+        return `/offplan/${publicListingId}`
+      }
+      if (key === 'property') {
+        return `/property/${publicListingId}`
+      }
     }
 
     return '#'
