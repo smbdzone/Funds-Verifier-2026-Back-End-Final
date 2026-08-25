@@ -171,14 +171,17 @@ const assetModels = {
   Jewelry,
 }
 
-const isServiceSubscribePost = (req) =>
-  req.method === 'POST' &&
-  (req.path === '/subscribe' || req.originalUrl?.includes('/services/subscribe'))
+const isServiceHolderRoute = (req) =>
+  (req.method === 'POST' &&
+    (req.path === '/subscribe' ||
+      req.originalUrl?.includes('/services/subscribe'))) ||
+  (req.method === 'PUT' &&
+    (req.path === '/booking' || req.originalUrl?.includes('/services/booking')))
 
 export const assetHolderCreate = async (req, res, next) => {
   try {
     // authMiddleware already validated Bearer or accessToken cookie
-    if (isServiceSubscribePost(req) && req.user?._id) {
+    if (isServiceHolderRoute(req) && req.user?._id) {
       const user = await User.findById(req.user._id, { isDeleted: false })
       if (!user) return res.status(404).json({ message: 'User not found' })
       if (user.role !== 'AssetHolder' && user.role !== 'Admin') {

@@ -137,6 +137,83 @@ export function isPremiumServiceRecordPaid(record) {
   )
 }
 
+export function isPremiumServiceRecordDelivered(record) {
+  if (!record || typeof record !== 'object') return false
+  if (String(record.status || '').toLowerCase() !== 'successful') return false
+
+  const link = typeof record.link === 'string' ? record.link.trim() : ''
+  if (link && (link.startsWith('http://') || link.startsWith('https://'))) {
+    return true
+  }
+
+  const reportFile = record.reportFile
+  if (typeof reportFile === 'string' && reportFile.trim()) return true
+  if (reportFile && typeof reportFile === 'object') {
+    return Boolean(reportFile._id || reportFile.uuid)
+  }
+  return false
+}
+
+export async function loadPaidPremiumRecord(product, service) {
+  let request3D = null
+  let reportTech = null
+  if (!product) return { request3D, reportTech }
+
+  if (['_3dwalkthrough', 'all'].includes(service) && product.video3DWalkthrough) {
+    request3D = await Request3D.findOne({
+      _id: product.video3DWalkthrough,
+      isDeleted: { $ne: true },
+    })
+    if (request3D && !isPremiumServiceRecordPaid(request3D)) request3D = null
+  }
+  if (['surveyor', 'all'].includes(service) && product.technicalReport) {
+    reportTech = await Report.findOne({
+      _id: product.technicalReport,
+      isDeleted: { $ne: true },
+    })
+    if (reportTech && !isPremiumServiceRecordPaid(reportTech)) reportTech = null
+  }
+  return { request3D, reportTech }
+}
+
+export function premiumBookingFieldsFromInput(input = {}, { applyPrice = false } = {}) {
+  const set = {}
+  if (input.dateTime) set.dateTime = input.dateTime
+  if (typeof input.category === 'string' && input.category.trim()) {
+    set.category = input.category.trim()
+  }
+  if (typeof input.subCategory === 'string' && input.subCategory.trim()) {
+    set.subCategory = input.subCategory.trim()
+  }
+  if (input.value != null && String(input.value).trim()) {
+    set.value = String(input.value).trim()
+  }
+  if (typeof input.phone === 'string' && input.phone.trim()) {
+    set.phone = input.phone.trim()
+  }
+  if (applyPrice) {
+    const fullPrice = Number(input.fullPrice ?? input.price)
+    if (Number.isFinite(fullPrice) && fullPrice > 0) set.price = fullPrice
+  }
+  return set
+}
+
+export async function applyPremiumBookingFields({
+  service,
+  request3DId,
+  reportTechId,
+  fields = {},
+}) {
+  if (!fields || !Object.keys(fields).length) return
+
+  if (['_3dwalkthrough', 'all'].includes(service) && request3DId) {
+    await Request3D.findByIdAndUpdate(request3DId, { $set: fields })
+  }
+  if (['surveyor', 'all'].includes(service) && reportTechId) {
+    await Report.findByIdAndUpdate(reportTechId, { $set: fields })
+  }
+}
+
 /**
  * Remove unpaid premium service refs so the user can pick another slot or payment method.
  */

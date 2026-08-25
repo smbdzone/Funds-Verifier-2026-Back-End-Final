@@ -15,6 +15,7 @@ import {
   fulfillServicePayment,
   resolveAssetModel,
 } from '../utils/clozerServiceHelpers.js'
+import { loadPaidPremiumRecord } from '../utils/listingPremiumSync.js'
 import { isEmiratesIdComplete } from '../utils/emiratesIdValidator.js'
 import { logClozerEvent } from '../utils/clozerAuditLog.js'
 import {
@@ -140,6 +141,11 @@ export const initiateClozerPayment = async (req, res) => {
       number_of_installments,
       listingDraft,
       purchaseMeta,
+      category,
+      subCategory,
+      value,
+      isPremiumTopUp,
+      fullPrice,
     } = req.body
 
     if (!service || !SERVICE_TYPES.includes(service)) {
@@ -187,10 +193,12 @@ export const initiateClozerPayment = async (req, res) => {
       })
     }
 
-    const installmentPlan = calculateInstallmentPlan(
+    let installmentPlan = calculateInstallmentPlan(
       amount,
       number_of_installments,
     )
+
+    let checkoutAmount = amount
 
     let serviceMetadata = {
       service,
@@ -225,25 +233,66 @@ export const initiateClozerPayment = async (req, res) => {
         })
       }
 
-      const { request3D, reportTech } = await createPendingServiceRecords({
-        GetUser,
-        product,
-        AssetModel,
-        service,
-        price: amount,
-        productTitle,
-        dateTime,
-        phone: serviceMetadata.phone,
-        assetType,
-      })
+      const { request3D: paid3D, reportTech: paidReport } =
+        await loadPaidPremiumRecord(product, service)
+      const catalogPrice =
+        Number(fullPrice) > 0 ? Number(fullPrice) : amount
+      const isTopUp =
+        Boolean(isPremiumTopUp) &&
+        ((service === '_3dwalkthrough' && paid3D) ||
+          (service === 'surveyor' && paidReport) ||
+          (service === 'all' && paid3D && paidReport))
 
-      request3DId = request3D?._id?.toString() || ''
-      reportTechId = reportTech?._id?.toString() || ''
+      if (isTopUp) {
+        const paidAmount =
+          service === 'surveyor'
+            ? Number(paidReport?.price) || 0
+            : Number(paid3D?.price) || 0
+        const extra = Math.max(0, catalogPrice - paidAmount)
+        if (extra <= 0) {
+          return res.status(400).json({
+            success: false,
+            message: 'No extra fee is due. Update the booking without payment.',
+          })
+        }
+        checkoutAmount = extra
+        installmentPlan = calculateInstallmentPlan(
+          extra,
+          number_of_installments,
+        )
+        request3DId = paid3D?._id?.toString() || ''
+        reportTechId = paidReport?._id?.toString() || ''
+      } else {
+        const { request3D, reportTech } = await createPendingServiceRecords({
+          GetUser,
+          product,
+          AssetModel,
+          service,
+          price: catalogPrice || amount,
+          productTitle,
+          dateTime,
+          phone: serviceMetadata.phone,
+          assetType,
+          category,
+          subCategory,
+          value,
+        })
+
+        request3DId = request3D?._id?.toString() || ''
+        reportTechId = reportTech?._id?.toString() || ''
+      }
+
       serviceMetadata = {
         ...serviceMetadata,
         productId: sanitizedProductId,
         request3DId,
         reportTechId,
+        category: category || '',
+        subCategory: subCategory || '',
+        value: value || '',
+        dateTime: dateTime || '',
+        isPremiumTopUp: Boolean(isTopUp),
+        fullPrice: catalogPrice,
       }
     } else if (service === 'evaluation' && listingDraft) {
       serviceMetadata.listingDraft = listingDraft
@@ -297,7 +346,7 @@ export const initiateClozerPayment = async (req, res) => {
     const { token, expiresAt } = signClozerRedirectToken(
       fvTransactionId,
       GetUser._id.toString(),
-      amount,
+      checkoutAmount,
     )
 
     const transaction = await Transaction.create({
@@ -308,7 +357,7 @@ export const initiateClozerPayment = async (req, res) => {
       clozer_status: 'pending',
       service_type: service,
       service_metadata: serviceMetadata,
-      total_amount: amount,
+      total_amount: checkoutAmount,
       monthly_installment_amount: installmentPlan.monthly_installment_amount,
       number_of_installments: installmentPlan.number_of_installments,
       redirect_token_expires: expiresAt,
@@ -324,13 +373,13 @@ export const initiateClozerPayment = async (req, res) => {
       fvTransactionId,
       userId: GetUser._id.toString(),
       service,
-      amount,
+      amount: checkoutAmount,
     })
     logClozerEvent('payment_initiated', {
       fvTransactionId,
       userId: GetUser._id.toString(),
       service,
-      amount,
+      amount: checkoutAmount,
       ip: req.ip,
     })
 
@@ -443,6 +492,7 @@ export const getClozerTransactionStatus = async (req, res) => {
           provider: 'clozer',
         },
         payment_provider: 'clozer',
+        booking: meta,
       })
       transaction = await Transaction.findByIdAndUpdate(
         transaction._id,
@@ -579,6 +629,7 @@ export const handleInstallmentUpdate = async (req, res) => {
           provider: 'clozer',
         },
         payment_provider: 'clozer',
+        booking: meta,
       })
       transaction.service_metadata = {
         ...meta,

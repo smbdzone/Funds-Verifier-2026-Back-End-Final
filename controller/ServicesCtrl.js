@@ -14,6 +14,11 @@ import {
   linkTechnicalReportToListing,
   linkWalkthroughToListing,
   clearUnpaidPremiumOnListing,
+  loadPaidPremiumRecord,
+  premiumBookingFieldsFromInput,
+  applyPremiumBookingFields,
+  isPremiumServiceRecordPaid,
+  isPremiumServiceRecordDelivered,
 } from '../utils/listingPremiumSync.js'
 import { markOffPlanApprovalFeePaidFromSession } from '../helper/notifyAssetHolderListingEvents.js'
 
@@ -65,6 +70,11 @@ const SubscribeServices = async (req, res) => {
       price,
       success_url,
       cancel_url,
+      category,
+      subCategory,
+      value,
+      isPremiumTopUp,
+      fullPrice,
     } = req.body
     const phone = typeof req.body.phone === 'string' ? req.body.phone.trim() : ''
 
@@ -85,10 +95,6 @@ const SubscribeServices = async (req, res) => {
         message: 'Service can be only _3dwalkthrough, surveyor, or all.',
       })
     }
-    if (!price)
-      return res
-        .status(400)
-        .json({ error: true, message: 'Price is required!' })
     if (!success_url)
       return res
         .status(400)
@@ -123,131 +129,162 @@ const SubscribeServices = async (req, res) => {
       return res.status(404).json({ error: true, message: 'Product not found.' })
     }
 
-    const fieldsToClear = []
-    if (service === '_3dwalkthrough') fieldsToClear.push('video3DWalkthrough')
-    else if (service === 'surveyor') fieldsToClear.push('technicalReport')
-    else if (service === 'all') {
-      fieldsToClear.push('technicalReport', 'video3DWalkthrough')
+    const { request3D: paid3D, reportTech: paidReport } =
+      await loadPaidPremiumRecord(product, service)
+    const catalogPrice =
+      Number(fullPrice) > 0 ? Number(fullPrice) : Number(price)
+    const isTopUp =
+      Boolean(isPremiumTopUp) &&
+      ((service === '_3dwalkthrough' && paid3D) ||
+        (service === 'surveyor' && paidReport) ||
+        (service === 'all' && paid3D && paidReport))
+
+    let chargeAmount = Number(price)
+    if (isTopUp) {
+      const paidAmount =
+        service === 'surveyor'
+          ? Number(paidReport?.price) || 0
+          : Number(paid3D?.price) || 0
+      const extra = Math.max(0, catalogPrice - paidAmount)
+      if (extra <= 0) {
+        return res.status(400).json({
+          error: true,
+          message: 'No extra fee is due. Update the booking without payment.',
+        })
+      }
+      chargeAmount = extra
     }
-    if (fieldsToClear.length) {
-      await clearUnpaidPremiumOnListing(product, AssetModel, fieldsToClear)
+
+    if (!Number.isFinite(chargeAmount) || chargeAmount <= 0) {
+      return res
+        .status(400)
+        .json({ error: true, message: 'Price is required!' })
     }
 
     let reportTech
     let request3D
 
-    if (service === 'all') {
-      // Create both requests
-      request3D = await Request3D.create({
-        name: GetUser?.name,
-        email: GetUser?.email,
-        dateTime,
-        phone: GetUser?.phone || phone,
-        userId: GetUser._id,
-        userUUID: GetUser.uuid,
-        assetType,
-        payment_method_status: 'unpaid',
-        status: 'pending',
-        price,
-        productTitle,
-        productId: product._id,
-        productUUID: product.uuid,
-      })
+    if (isTopUp) {
+      request3D = paid3D
+      reportTech = paidReport
+    } else {
+      const fieldsToClear = []
+      if (service === '_3dwalkthrough') fieldsToClear.push('video3DWalkthrough')
+      else if (service === 'surveyor') fieldsToClear.push('technicalReport')
+      else if (service === 'all') {
+        fieldsToClear.push('technicalReport', 'video3DWalkthrough')
+      }
+      if (fieldsToClear.length) {
+        await clearUnpaidPremiumOnListing(product, AssetModel, fieldsToClear)
+      }
 
-      reportTech = await ReportTechnical.create({
-        name: GetUser?.name,
-        email: GetUser?.email,
-        dateTime,
-        phone: GetUser.phone || phone,
-        assetType,
-        userId: GetUser._id,
-        userUUID: GetUser.uuid,
-        payment_method_status: 'unpaid',
-        status: 'pending',
-        price,
-        productTitle,
-        productId: product._id,
-        productUUID: product.uuid,
-      })
-    } else if (service === '_3dwalkthrough') {
-      request3D = await Request3D.create({
-        name: GetUser?.name,
-        email: GetUser?.email,
-        dateTime,
-        assetType,
-        phone: GetUser?.phone || phone,
-        userId: GetUser._id,
-        userUUID: GetUser.uuid,
-        payment_method_status: 'unpaid',
-        status: 'pending',
-        price,
-        productTitle,
-        productId: product._id,
-        productUUID: product.uuid,
-      })
-    } else if (service === 'surveyor') {
-      reportTech = await ReportTechnical.create({
-        name: GetUser?.name,
-        email: GetUser?.email,
-        dateTime,
-        assetType,
-        phone: GetUser.phone || phone,
-        userId: GetUser._id,
-        userUUID: GetUser.uuid,
-        payment_method_status: 'unpaid',
-        status: 'pending',
-        price,
-        productTitle,
-        productId: product._id,
-        productUUID: product.uuid,
-      })
-    }
+      const bookingFields = {
+        category,
+        subCategory,
+        value,
+      }
 
-    // Update the asset based on assetType
-    if (productId && assetType) {
-      if (AssetModel && product) {
-        const asset = await AssetModel.findById(product._id, {
-          isDeleted: false,
+      if (service === 'all') {
+        request3D = await Request3D.create({
+          name: GetUser?.name,
+          email: GetUser?.email,
+          dateTime,
+          phone: GetUser?.phone || phone,
+          userId: GetUser._id,
+          userUUID: GetUser.uuid,
+          assetType,
+          payment_method_status: 'unpaid',
+          status: 'pending',
+          price: catalogPrice || chargeAmount,
+          productTitle,
+          productId: product._id,
+          productUUID: product.uuid,
+          ...bookingFields,
         })
-        if (asset) {
-          if (service === '_3dwalkthrough') {
-            asset.video3DWalkthrough = request3D?._id
-          } else if (service === 'surveyor') {
-            asset.technicalReport = reportTech?._id
-          } else if (service === 'all') {
-            asset.technicalReport = reportTech?._id
-            asset.video3DWalkthrough = request3D?._id
+
+        reportTech = await ReportTechnical.create({
+          name: GetUser?.name,
+          email: GetUser?.email,
+          dateTime,
+          phone: GetUser.phone || phone,
+          assetType,
+          userId: GetUser._id,
+          userUUID: GetUser.uuid,
+          payment_method_status: 'unpaid',
+          status: 'pending',
+          price: catalogPrice || chargeAmount,
+          productTitle,
+          productId: product._id,
+          productUUID: product.uuid,
+          ...bookingFields,
+        })
+      } else if (service === '_3dwalkthrough') {
+        request3D = await Request3D.create({
+          name: GetUser?.name,
+          email: GetUser?.email,
+          dateTime,
+          assetType,
+          phone: GetUser?.phone || phone,
+          userId: GetUser._id,
+          userUUID: GetUser.uuid,
+          payment_method_status: 'unpaid',
+          status: 'pending',
+          price: catalogPrice || chargeAmount,
+          productTitle,
+          productId: product._id,
+          productUUID: product.uuid,
+          ...bookingFields,
+        })
+      } else if (service === 'surveyor') {
+        reportTech = await ReportTechnical.create({
+          name: GetUser?.name,
+          email: GetUser?.email,
+          dateTime,
+          assetType,
+          phone: GetUser.phone || phone,
+          userId: GetUser._id,
+          userUUID: GetUser.uuid,
+          payment_method_status: 'unpaid',
+          status: 'pending',
+          price: catalogPrice || chargeAmount,
+          productTitle,
+          productId: product._id,
+          productUUID: product.uuid,
+          ...bookingFields,
+        })
+      }
+
+      if (productId && assetType) {
+        if (AssetModel && product) {
+          const asset = await AssetModel.findById(product._id, {
+            isDeleted: false,
+          })
+          if (asset) {
+            if (service === '_3dwalkthrough') {
+              asset.video3DWalkthrough = request3D?._id
+            } else if (service === 'surveyor') {
+              asset.technicalReport = reportTech?._id
+            } else if (service === 'all') {
+              asset.technicalReport = reportTech?._id
+              asset.video3DWalkthrough = request3D?._id
+            }
+            await asset.save()
           }
-          await asset.save()
         }
       }
-    }
 
-    // For notifications
-    if (service === '_3dwalkthrough') {
-      await sendServiceNotification({
-        userId: GetUser._id,
-        userUUID: GetUser.uuid,
-        UserRole: '3dWalkthrough',
-        title: 'Request 3D',
-        message: `A new asset added for 3d walkthrough.`,
-        RelateRoute: '3dWalkthrough',
-        RelatedId: product._id,
-        RelatedUUID: product.uuid,
-      })
-    } else if (service === 'surveyor') {
-      await sendServiceNotification({
-        userId: GetUser._id,
-        userUUID: GetUser.uuid,
-        UserRole: 'TechnicalReport',
-        title: 'Technical Report Request',
-        message: `A new asset added for Technical Report.`,
-        RelateRoute: 'TechnicalReport',
-        RelatedId: product._id,
-        RelatedUUID: product.uuid,
-      })
-    } else if (service === 'all') {
-      try {
+      if (service === '_3dwalkthrough') {
+        await sendServiceNotification({
+          userId: GetUser._id,
+          userUUID: GetUser.uuid,
+          UserRole: '3dWalkthrough',
+          title: 'Request 3D',
+          message: `A new asset added for 3d walkthrough.`,
+          RelateRoute: '3dWalkthrough',
+          RelatedId: product._id,
+          RelatedUUID: product.uuid,
+        })
+      } else if (service === 'surveyor') {
         await sendServiceNotification({
           userId: GetUser._id,
           userUUID: GetUser.uuid,
@@ -258,18 +295,31 @@ const SubscribeServices = async (req, res) => {
           RelatedId: product._id,
           RelatedUUID: product.uuid,
         })
-        await sendServiceNotification({
-          userId: GetUser._id,
-          userUUID: GetUser.uuid,
-          UserRole: 'TechnicalReport',
-          title: 'Technical Report Request',
-          message: `A new asset added for Technical Report.`,
-          RelateRoute: 'TechnicalReport',
-          RelatedId: product._id,
-          RelatedUUID: product.uuid,
-        })
-      } catch (error) {
-        console.log({ error: error?.message })
+      } else if (service === 'all') {
+        try {
+          await sendServiceNotification({
+            userId: GetUser._id,
+            userUUID: GetUser.uuid,
+            UserRole: 'TechnicalReport',
+            title: 'Technical Report Request',
+            message: `A new asset added for Technical Report.`,
+            RelateRoute: 'TechnicalReport',
+            RelatedId: product._id,
+            RelatedUUID: product.uuid,
+          })
+          await sendServiceNotification({
+            userId: GetUser._id,
+            userUUID: GetUser.uuid,
+            UserRole: '3dWalkthrough',
+            title: 'Request 3D',
+            message: `A new asset added for 3d walkthrough.`,
+            RelateRoute: '3dWalkthrough',
+            RelatedId: product._id,
+            RelatedUUID: product.uuid,
+          })
+        } catch (error) {
+          console.log({ error: error?.message })
+        }
       }
     }
 
@@ -280,9 +330,11 @@ const SubscribeServices = async (req, res) => {
           price_data: {
             currency: 'aed',
             product_data: {
-              name: `Subscription for ${service} service(s)`,
+              name: isTopUp
+                ? `Extra fee for ${service} service(s)`
+                : `Subscription for ${service} service(s)`,
             },
-            unit_amount: price * 100,
+            unit_amount: Math.round(chargeAmount * 100),
           },
           quantity: 1,
         },
@@ -297,6 +349,13 @@ const SubscribeServices = async (req, res) => {
         userId: GetUser?._id?.toString() || '',
         service,
         assetType,
+        isPremiumTopUp: isTopUp ? '1' : '',
+        fullPrice: String(catalogPrice || ''),
+        dateTime: dateTime ? String(dateTime) : '',
+        category: String(category || ''),
+        subCategory: String(subCategory || ''),
+        value: String(value || ''),
+        phone,
       },
     })
     return res.status(201).json({ url: session?.url, sessionId: session?.id })
@@ -415,6 +474,26 @@ const UpdateUserForSubscribeServices = async (req, res) => {
       await linkWalkthroughToListing(request3dwalkthrough)
     }
 
+    const bookingFields = premiumBookingFieldsFromInput(
+      {
+        dateTime: session?.metadata?.dateTime,
+        category: session?.metadata?.category,
+        subCategory: session?.metadata?.subCategory,
+        value: session?.metadata?.value,
+        phone: session?.metadata?.phone,
+        fullPrice: session?.metadata?.fullPrice,
+      },
+      { applyPrice: session?.metadata?.isPremiumTopUp === '1' },
+    )
+    if (Object.keys(bookingFields).length) {
+      await applyPremiumBookingFields({
+        service,
+        request3DId,
+        reportTechId,
+        fields: bookingFields,
+      })
+    }
+
     const TransactionRequest = new Transaction({
       payment_method_status,
       payment_details,
@@ -448,4 +527,118 @@ const UpdateUserForSubscribeServices = async (req, res) => {
   }
 }
 
-export { SubscribeServices, UpdateUserForSubscribeServices }
+const UpdatePremiumServiceBooking = async (req, res) => {
+  try {
+    if (!req.user?._id) {
+      return res.status(401).json({
+        success: false,
+        message: 'Unauthorized',
+      })
+    }
+
+    const {
+      productId,
+      assetType,
+      service,
+      dateTime,
+      category,
+      subCategory,
+      value,
+      price,
+      phone,
+    } = req.body
+
+    if (!service || !['_3dwalkthrough', 'surveyor'].includes(service)) {
+      return res.status(400).json({
+        error: true,
+        message: 'Service can be only _3dwalkthrough or surveyor.',
+      })
+    }
+    if (!dateTime) {
+      return res.status(400).json({
+        error: true,
+        message: 'Date and time are required.',
+      })
+    }
+
+    const sanitizedProductId = sanitizeUUID(productId)
+    if (!sanitizedProductId) {
+      return res.status(400).json({
+        error: true,
+        message: 'Invalid product UUID format',
+      })
+    }
+
+    const AssetModel = getModelByAssetType(assetType)
+    const product = await AssetModel.findOne({
+      uuid: sanitizedProductId,
+      isDeleted: false,
+    })
+    if (!product) {
+      return res.status(404).json({ error: true, message: 'Product not found.' })
+    }
+
+    if (
+      String(product.userUUID) !== String(req.user.uuid) &&
+      req.user.role !== 'Admin'
+    ) {
+      return res.status(403).json({
+        error: true,
+        message: 'You can only update bookings for your own listings.',
+      })
+    }
+
+    const { request3D, reportTech } = await loadPaidPremiumRecord(
+      product,
+      service,
+    )
+    const record = service === '_3dwalkthrough' ? request3D : reportTech
+    if (!record || !isPremiumServiceRecordPaid(record)) {
+      return res.status(400).json({
+        error: true,
+        message: 'No paid booking found to update.',
+      })
+    }
+    if (isPremiumServiceRecordDelivered(record)) {
+      return res.status(400).json({
+        error: true,
+        message: 'This service has already been delivered and cannot be changed.',
+      })
+    }
+
+    const nextPrice = Number(price)
+    const paidAmount = Number(record.price) || 0
+    if (paidAmount > 0 && Number.isFinite(nextPrice) && nextPrice > paidAmount) {
+      return res.status(400).json({
+        error: true,
+        message: 'This change requires an extra payment.',
+      })
+    }
+
+    const fields = premiumBookingFieldsFromInput({
+      dateTime,
+      category,
+      subCategory,
+      value,
+      phone,
+    })
+    await applyPremiumBookingFields({
+      service,
+      request3DId: request3D?._id,
+      reportTechId: reportTech?._id,
+      fields,
+    })
+
+    return res.status(200).json({
+      success: true,
+      message: 'Booking updated successfully.',
+    })
+  } catch (error) {
+    return res.status(400).json({
+      error: true,
+      message: error?.message || 'Something went wrong!',
+    })
+  }
+}
+
+export { SubscribeServices, UpdateUserForSubscribeServices, UpdatePremiumServiceBooking }

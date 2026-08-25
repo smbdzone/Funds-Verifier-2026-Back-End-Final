@@ -8,6 +8,7 @@ import {
   linkTechnicalReportToListing,
   linkWalkthroughToListing,
   clearUnpaidPremiumOnListing,
+  premiumBookingFieldsFromInput,
 } from './listingPremiumSync.js'
 import { sendServiceNotification } from '../controller/ServicesCtrl.js'
 import { sanitizeUUID } from './nosqlSanitizer.js'
@@ -41,6 +42,9 @@ export async function createPendingServiceRecords({
   dateTime,
   phone,
   assetType,
+  category,
+  subCategory,
+  value,
 }) {
   let reportTech
   let request3D
@@ -71,6 +75,9 @@ export async function createPendingServiceRecords({
     productTitle,
     productId: product._id,
     productUUID: product.uuid,
+    category,
+    subCategory,
+    value,
   }
 
   if (service === 'all') {
@@ -152,6 +159,7 @@ export async function fulfillServicePayment({
   reportTechId,
   payment_details,
   payment_provider = 'clozer',
+  booking = {},
 }) {
   const payment_method_status = (() => {
     const paymentStatus = String(
@@ -181,6 +189,9 @@ export async function fulfillServicePayment({
     payment_method_status,
     isDeleted: false,
     deletedAt: null,
+    ...premiumBookingFieldsFromInput(booking, {
+      applyPrice: Boolean(booking?.isPremiumTopUp),
+    }),
   }
 
   if (service === 'all') {
