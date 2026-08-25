@@ -30,7 +30,16 @@ function stripFields(obj, fields) {
 
 function sanitizeMediaArray(arr) {
   if (!Array.isArray(arr)) return
-  for (const entry of arr) stripFields(entry, RISKY_MEDIA_FIELDS)
+  for (const entry of arr) {
+    const hasSigned =
+      typeof entry?.signedUrl === 'string' && entry.signedUrl.startsWith('http')
+    // Keep unsigned `url` when signing failed so listing cards still render
+    // every uploaded picture (car galleries were dropping those slides).
+    stripFields(
+      entry,
+      hasSigned ? RISKY_MEDIA_FIELDS : RISKY_MEDIA_FIELDS.filter((f) => f !== 'url'),
+    )
+  }
 }
 
 /** Keep unsigned `url` as fallback for QR thumbs if signing fails. */

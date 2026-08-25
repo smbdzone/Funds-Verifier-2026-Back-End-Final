@@ -81,8 +81,27 @@ function alreadySignedFresh(entry, expiresInSeconds) {
   return Date.now() - signedAt < freshForMs
 }
 
+function s3KeyFromEntry(entry = {}) {
+  const explicit = String(entry.s3Key || '').trim()
+  if (explicit) return explicit
+  const raw = String(entry.url || entry.signedUrl || '')
+    .split('?')[0]
+    .trim()
+  if (!raw) return ''
+  try {
+    return decodeURIComponent(new URL(raw).pathname.replace(/^\//, ''))
+  } catch {
+    return ''
+  }
+}
+
 async function signOne(entry, expiresInSeconds, signers, force = false) {
-  if (!entry || typeof entry !== 'object' || !entry.s3Key || !signers) return
+  if (!entry || typeof entry !== 'object' || !signers) return
+  if (!entry.s3Key) {
+    const derived = s3KeyFromEntry(entry)
+    if (derived) entry.s3Key = derived
+  }
+  if (!entry.s3Key) return
   if (!force && alreadySignedFresh(entry, expiresInSeconds)) return
 
   const { cf, s3, cfBucket } = signers

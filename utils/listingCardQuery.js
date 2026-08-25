@@ -163,8 +163,8 @@ export const CARD_JEWELRY_FIELDS = `
   dldNumber
 `
 
-const MEDIA_SELECT = 'images uuid -_id'
-const VIDEO_SELECT = 'videos uuid -_id'
+const MEDIA_SELECT = 'images uuid'
+const VIDEO_SELECT = 'videos uuid'
 const CERT_SELECT = '_id uuid status payment_method_status'
 const WALKTHROUGH_SELECT = '_id uuid status payment_method_status link'
 const REPORT_SELECT = '_id uuid status payment_method_status IsRecommended'

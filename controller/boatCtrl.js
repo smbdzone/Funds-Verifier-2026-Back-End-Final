@@ -459,7 +459,7 @@ const getAllProduct = asyncHandler(async (req, res) => {
       query = applyCardListPopulates(query).select(CARD_BOAT_FIELDS)
     } else {
       query = query
-        .populate({ path: 'pictures', select: '-_id' })
+        .populate({ path: 'pictures', select: 'images uuid' })
         .populate({ path: 'video', select: '-_id' })
         .populate({ path: 'thumbnailImg', select: '-_id' })
         .populate({ path: 'qrScan', select: '-_id' })

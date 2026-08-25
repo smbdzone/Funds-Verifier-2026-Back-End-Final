@@ -106,6 +106,13 @@ export const PUBLIC_CAR_FIELDS = `
   capacityWeight
   capacityWeightUnit
   VIN
+  evaluationDateTime
+  evaluationFeePrice
+  evaluationFeeCategory
+  evaluationFeeSubCategory
+  evaluationFeeBedrooms
+  evaluationFeePaidAmount
+  evaluatorUUID
   exteriorColor
   interiorColor
   exteriorTwoTone

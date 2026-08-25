@@ -2,6 +2,7 @@ import ImageAsset from '../models/imgModel.js'
 import VideoAsset from '../models/videoModel.js'
 import Thumbnail from '../models/thumbnailModel.js'
 import asyncHandler from 'express-async-handler'
+import mongoose from 'mongoose'
 import EvaluationCertificate from '../models/evaluationCertificateModel.js'
 import DealHunterDoc from '../models/dealHunterDocModel.js'
 import { encryptBuffer } from '../helper/encryption.js'
@@ -11,6 +12,18 @@ import {
   cloudFrontUrlForKey,
 } from '../services/cloudFrontSignedUrlService.js'
 // import validateMongoId from "../utils/validateMongodbId.js";
+
+const findImageAssetByRef = (assetRef) => {
+  const id = String(assetRef || '').trim()
+  if (!id) return null
+  const query = { isDeleted: { $ne: true } }
+  if (mongoose.isValidObjectId(id)) {
+    query.$or = [{ _id: id }, { uuid: id }]
+  } else {
+    query.uuid = id
+  }
+  return ImageAsset.findOne(query)
+}
 
 const uploadImgs = asyncHandler(async (req, res) => {
   try {
@@ -37,10 +50,7 @@ const uploadImgs = asyncHandler(async (req, res) => {
 
     // Append to an existing gallery so the listing's single pictures ref keeps all images.
     if (appendToId) {
-      const existing = await ImageAsset.findOne({
-        _id: appendToId,
-        isDeleted: { $ne: true },
-      })
+      const existing = await findImageAssetByRef(appendToId)
       if (existing) {
         const current = (existing.images || []).filter((img) => !img?.isDeleted)
         existing.images = [...current, ...images]
@@ -146,23 +156,37 @@ const uploadVideoFun = asyncHandler(async (req, res) => {
   }
 })
 
+function mediaPathKey(img = {}) {
+  const explicit = String(img?.s3Key || img?.public_id || '').trim()
+  if (explicit) return explicit
+  const raw = String(img?.signedUrl || img?.url || '')
+    .split('?')[0]
+    .trim()
+  if (!raw) return ''
+  try {
+    return decodeURIComponent(new URL(raw).pathname.replace(/^\//, ''))
+  } catch {
+    return raw.replace(/^\//, '')
+  }
+}
+
 function imageFingerprint(img = {}, { includePath = true } = {}) {
   const name = String(img.originalName || img.public_id || '').trim()
   const size = img.size == null ? '' : String(img.size)
   const uploadedAt = img.uploadedAt ? String(img.uploadedAt) : ''
   if (!includePath) return `${name}|${size}|${uploadedAt}`
-  const pathOnly = String(img.signedUrl || img.url || '')
-    .split('?')[0]
-    .trim()
+  const pathOnly = mediaPathKey(img)
   return `${name}|${size}|${uploadedAt}|${pathOnly}`
 }
 
 function findImageIndex(existing, used, item) {
-  const key = String(item?.s3Key || item?.public_id || '').trim()
+  const key = mediaPathKey(item)
   if (key) {
     const byKey = existing.findIndex((img, i) => {
       if (used.has(i)) return false
+      const existingKey = mediaPathKey(img)
       return (
+        existingKey === key ||
         String(img?.s3Key || '').trim() === key ||
         String(img?.public_id || '').trim() === key
       )
@@ -194,10 +218,7 @@ const reorderImgs = asyncHandler(async (req, res) => {
     return res.status(400).json({ error: 'Missing asset id' })
   }
 
-  const imageAsset = await ImageAsset.findOne({
-    _id: assetId,
-    isDeleted: { $ne: true },
-  })
+  const imageAsset = await findImageAssetByRef(assetId)
   if (!imageAsset) {
     return res.status(404).json({ error: 'Image gallery not found' })
   }
@@ -221,6 +242,22 @@ const reorderImgs = asyncHandler(async (req, res) => {
   // Never wipe a gallery because fingerprints failed to match.
   if (order.length && next.length === 0) {
     return res.status(200).json(imageAsset)
+  }
+
+  // Client list is sanitized (no s3Key). Unmatched rows are NOT deletions —
+  // append remaining stored images so car/jewelry galleries cannot shrink.
+  if (order.length > next.length) {
+    for (let i = 0; i < existing.length; i++) {
+      if (used.has(i)) continue
+      const matched = existing[i]
+      const plain =
+        typeof matched?.toObject === 'function'
+          ? matched.toObject()
+          : { ...matched }
+      delete plain.isDeleted
+      delete plain.deletedAt
+      next.push(plain)
+    }
   }
 
   imageAsset.images = next

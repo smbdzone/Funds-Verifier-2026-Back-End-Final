@@ -511,7 +511,7 @@ const getAllProduct = asyncHandler(async (req, res) => {
       }
 
       query = query
-        .populate({ path: 'pictures', select: '-_id' })
+        .populate({ path: 'pictures', select: 'images uuid' })
         .populate({ path: 'video', select: '-_id' })
         .populate({ path: 'thumbnailImg', select: '-_id' })
         .populate({ path: 'unitLayout', select: '-_id' })
@@ -1234,7 +1234,7 @@ const getOffPlanRequests = asyncHandler(async (req, res) => {
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
-        .populate({ path: 'pictures', select: '-_id' })
+        .populate({ path: 'pictures', select: 'images uuid' })
         .populate({ path: 'thumbnailImg', select: '-_id' })
         .populate({ path: 'agencyAgreement', select: '-_id' })
         .populate(REQUEST_DOCUMENT_POPULATE)

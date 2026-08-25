@@ -402,7 +402,7 @@ const getAllProduct = asyncHandler(async (req, res) => {
 
     // 🔐 SAFE POPULATES
     query = query
-      .populate({ path: 'pictures', select: '-_id' })
+      .populate({ path: 'pictures', select: 'images uuid' })
       .populate({ path: 'video', select: '-_id' })
       .populate({ path: 'thumbnailImg', select: '-_id' })
       .populate({ path: 'qrScan', select: '-_id' })
