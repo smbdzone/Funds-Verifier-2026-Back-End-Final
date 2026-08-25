@@ -175,6 +175,13 @@ warranty
 locateBoat
 seats
 extras
+evaluationDateTime
+evaluationFeePrice
+evaluationFeeCategory
+evaluationFeeSubCategory
+evaluationFeeBedrooms
+evaluationFeePaidAmount
+evaluatorUUID
 userUUID
   video
   pictures
@@ -220,6 +227,13 @@ export const PUBLIC_JEWELRY_FIELDS = `
   weightUnit
   warranty
   materials
+  evaluationDateTime
+  evaluationFeePrice
+  evaluationFeeCategory
+  evaluationFeeSubCategory
+  evaluationFeeBedrooms
+  evaluationFeePaidAmount
+  evaluatorUUID
   userUUID
   video
   pictures
