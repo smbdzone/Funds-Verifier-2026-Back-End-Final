@@ -74,6 +74,11 @@ const BoatAdSchema = new Schema(
     },
     feedback: { type: String, default: '' },
     evaluationDateTime: { type: Date, required: false },
+    evaluationFeePrice: { type: Number },
+    evaluationFeeCategory: { type: String },
+    evaluationFeeSubCategory: { type: String },
+    evaluationFeeBedrooms: { type: String },
+    evaluationFeePaidAmount: { type: Number },
     evaluationC: {
       type: String,
       default: 'N/A',

@@ -30,6 +30,8 @@ const ASSET_HOLDER_ALLOWED_AFTER_APPROVAL = new Set([
   'clozer_transaction_id',
   'checkoutSession',
   'checkout_session',
+  'evaluationDateTime',
+  'evaluatorUUID',
 ])
 
 /**

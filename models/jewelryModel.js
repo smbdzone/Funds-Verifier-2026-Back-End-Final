@@ -110,6 +110,11 @@ const JewelryAdSchema = new Schema(
     },
     trusteeNote: { type: String },
     evaluationDateTime: { type: Date, required: false },
+    evaluationFeePrice: { type: Number },
+    evaluationFeeCategory: { type: String },
+    evaluationFeeSubCategory: { type: String },
+    evaluationFeeBedrooms: { type: String },
+    evaluationFeePaidAmount: { type: Number },
     requestDocument: { type: [mongoose.Schema.Types.Mixed], default: [] },
     phoneNumber: { type: Number, required: true },
     uploadDocument: [

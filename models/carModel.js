@@ -129,6 +129,11 @@ const CarAdSchema = new Schema(
       ref: 'User',
     },
     evaluationDateTime: { type: Date, required: false },
+    evaluationFeePrice: { type: Number },
+    evaluationFeeCategory: { type: String },
+    evaluationFeeSubCategory: { type: String },
+    evaluationFeeBedrooms: { type: String },
+    evaluationFeePaidAmount: { type: Number },
     requestDocument: { type: [mongoose.Schema.Types.Mixed], default: [] },
     trusteeNote: { type: String },
     uploadDocument: [
