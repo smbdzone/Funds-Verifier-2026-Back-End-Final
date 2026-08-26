@@ -2,8 +2,13 @@ import express from 'express'
 import { adminOnly } from '../middlewares/adminOnly.js'
 import { validateStringLength } from '../middlewares/inputValidation.js'
 import {
+  listPublicCountries,
   listPublicCities,
   listPublicNeighbourhoods,
+  listAdminCountries,
+  createCountry,
+  updateCountry,
+  deleteCountry,
   listAdminCities,
   createCity,
   updateCity,
@@ -16,8 +21,24 @@ import {
 
 const router = express.Router()
 
+router.get('/countries', listPublicCountries)
 router.get('/cities', listPublicCities)
 router.get('/neighbourhoods', listPublicNeighbourhoods)
+
+router.get('/admin/countries', ...adminOnly, listAdminCountries)
+router.post(
+  '/admin/countries',
+  ...adminOnly,
+  validateStringLength('name', 80, 1),
+  createCountry,
+)
+router.put(
+  '/admin/countries/:id',
+  ...adminOnly,
+  validateStringLength('name', 80, 1),
+  updateCountry,
+)
+router.delete('/admin/countries/:id', ...adminOnly, deleteCountry)
 
 router.get('/admin/cities', ...adminOnly, listAdminCities)
 router.post(
