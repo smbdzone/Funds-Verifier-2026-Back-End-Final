@@ -141,7 +141,7 @@ const buildUnitPayload = (body, { forCreate = false } = {}) => {
         : undefined,
     dldNumber:
       body.dldNumber !== undefined
-        ? String(body.dldNumber || '').trim()
+        ? String(body.dldNumber || '').replace(/[^\d]/g, '').trim()
         : undefined,
     deliveryQuarter:
       body.deliveryQuarter !== undefined
@@ -254,6 +254,7 @@ export const getUnit = asyncHandler(async (req, res) => {
   return res.status(200).json({
     success: true,
     unit,
+    projectCity: project.city || '',
     projectReviewStatus: project.reviewStatus || 'Draft',
   })
 })

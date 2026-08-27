@@ -66,7 +66,7 @@ const buildProjectPayload = (body, { forCreate = false } = {}) => {
         : undefined,
     reraNumber:
       body.reraNumber !== undefined
-        ? String(body.reraNumber || '').trim()
+        ? String(body.reraNumber || '').replace(/[^\d]/g, '').trim()
         : undefined,
     escrowBankName:
       body.escrowBankName !== undefined
