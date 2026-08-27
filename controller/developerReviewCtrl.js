@@ -815,11 +815,21 @@ export const listAdminReviewRequests = asyncHandler(async (req, res) => {
   const limit = Math.min(Math.max(Number(req.query.limit) || 10, 1), 50)
   const skip = (page - 1) * limit
 
+  const pendingUnitProjectIds = await DeveloperUnit.distinct('project', {
+    isDeleted: false,
+    status: 'Pending',
+  })
+
   const query = { isDeleted: false }
   if (status === 'pending') {
-    query.reviewStatus = {
-      $in: ['Submitted', 'UnderReview', 'ChangesRequested'],
-    }
+    query.$or = [
+      {
+        reviewStatus: {
+          $in: ['Submitted', 'UnderReview', 'ChangesRequested'],
+        },
+      },
+      { _id: { $in: pendingUnitProjectIds } },
+    ]
   } else if (status === 'changes') {
     query.reviewStatus = 'ChangesRequested'
   } else if (status === 'approved') {
@@ -835,7 +845,7 @@ export const listAdminReviewRequests = asyncHandler(async (req, res) => {
     }
   }
 
-  const [total, projects] = await Promise.all([
+  const [total, projectDocs] = await Promise.all([
     DeveloperProject.countDocuments(query),
     DeveloperProject.find(query)
       .populate({
@@ -848,6 +858,43 @@ export const listAdminReviewRequests = asyncHandler(async (req, res) => {
       .skip(skip)
       .limit(limit),
   ])
+
+  const projectIds = projectDocs.map((p) => p._id)
+  const unitDocs = projectIds.length
+    ? await DeveloperUnit.find({
+      project: { $in: projectIds },
+      isDeleted: false,
+    })
+      .select('project title unitNumber dldNumber status uuid createdAt')
+      .sort({ createdAt: -1 })
+      .lean()
+    : []
+
+  const listingsByProject = new Map()
+  for (const unit of unitDocs) {
+    const key = String(unit.project)
+    if (!listingsByProject.has(key)) listingsByProject.set(key, [])
+    listingsByProject.get(key).push({
+      _id: String(unit._id),
+      uuid: unit.uuid || '',
+      title: String(unit.title || '').trim(),
+      unitNumber: String(unit.unitNumber || '').trim(),
+      dldNumber: String(unit.dldNumber || '').trim(),
+      status: unit.status || 'Draft',
+    })
+  }
+
+  const projects = projectDocs.map((doc) => {
+    const project = doc.toObject()
+    const listings = listingsByProject.get(String(doc._id)) || []
+    project.unitCount = listings.length
+    project.pendingUnitCount = listings.filter(
+      (item) => item.status === 'Pending',
+    ).length
+    project.projectNumber = String(project.reraNumber || '').trim()
+    project.listings = listings
+    return project
+  })
 
   return res.status(200).json({
     success: true,
@@ -1203,16 +1250,28 @@ export const publishReviewRequest = asyncHandler(async (req, res) => {
     return res.status(404).json({ success: false, message: 'Developer not found' })
   }
 
-  const units = await DeveloperUnit.find({
+  const requestedUnitId = String(req.body?.unitId || '').trim()
+  const unitFilter = {
     project: project._id,
     isDeleted: false,
-    status: { $in: ['Pending', 'Available'] },
-  }).populate('paymentPlan')
+  }
+
+  if (requestedUnitId) {
+    const mongoId = sanitizeMongoId(requestedUnitId)
+    unitFilter.$or = [{ uuid: requestedUnitId }]
+    if (mongoId) unitFilter.$or.push({ _id: mongoId })
+  } else {
+    unitFilter.status = 'Pending'
+  }
+
+  const units = await DeveloperUnit.find(unitFilter).populate('paymentPlan')
 
   if (!units.length) {
     return res.status(400).json({
       success: false,
-      message: 'No Pending/Available units to publish',
+      message: requestedUnitId
+        ? 'That listing was not found on this project'
+        : 'No pending listings to publish',
     })
   }
 
@@ -1299,7 +1358,9 @@ export const publishReviewRequest = asyncHandler(async (req, res) => {
   project.status = 'Active'
   pushHistory(project, {
     status: 'Published',
-    note: `Published ${published.length} unit(s) to marketplace`,
+    note: requestedUnitId
+      ? `Published listing “${units[0]?.title || units[0]?.unitNumber || 'unit'}” to marketplace`
+      : `Published ${published.length} unit(s) to marketplace`,
     actor: req.user._id,
   })
   await project.save()
@@ -1347,7 +1408,9 @@ export const publishReviewRequest = asyncHandler(async (req, res) => {
 
   return res.status(200).json({
     success: true,
-    message: 'Project published to marketplace',
+    message: requestedUnitId
+      ? 'Listing published to marketplace'
+      : 'Project published to marketplace',
     project,
     published,
   })

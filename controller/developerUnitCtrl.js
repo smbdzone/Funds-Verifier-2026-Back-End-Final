@@ -296,14 +296,6 @@ export const updateUnit = asyncHandler(async (req, res) => {
     return res.status(404).json({ success: false, message: 'Unit not found' })
   }
 
-  const reviewStatus = project.reviewStatus || 'Draft'
-  if (['Approved', 'Published'].includes(reviewStatus)) {
-    return res.status(400).json({
-      success: false,
-      message:
-        'This listing is approved and live. Editing is not allowed. Contact Funds Verifier if changes are needed.',
-    })
-  }
   if (unit.status === 'Available') {
     return res.status(400).json({
       success: false,
@@ -349,15 +341,15 @@ export const submitUnitForApproval = asyncHandler(async (req, res) => {
     return res.status(404).json({ success: false, message: 'Unit not found' })
   }
 
-  if (['Approved', 'Published'].includes(project.reviewStatus || 'Draft')) {
+  if (unit.status === 'Available') {
     return res.status(400).json({
       success: false,
       message:
-        'This listing is already approved. Editing or re-submitting is not allowed.',
+        'This unit is already published. Editing or re-submitting is not allowed.',
     })
   }
 
-  if (!['Draft', 'Pending', 'Available'].includes(unit.status)) {
+  if (!['Draft', 'Pending'].includes(unit.status)) {
     return res.status(400).json({
       success: false,
       message: `Cannot submit unit while status is ${unit.status}`,
@@ -383,22 +375,20 @@ export const submitUnitForApproval = asyncHandler(async (req, res) => {
   await unit.save()
 
   const current = project.reviewStatus || 'Draft'
-  if (['Draft', 'ChangesRequested', 'Suspended', 'Approved', 'Published'].includes(current)) {
+  project.reviewHistory = project.reviewHistory || []
+  project.reviewHistory.push({
+    status: 'Submitted',
+    note: `Unit “${title || unit.unitNumber}” submitted for approval`,
+    actor: user._id,
+    at: new Date(),
+  })
+
+  if (['Approved', 'Published', 'UnderReview', 'Submitted'].includes(current)) {
+    // Keep live / in-review projects as they are; Super Admin can publish new Pending units.
+    await project.save()
+  } else {
     project.reviewStatus = 'Submitted'
     project.submittedAt = project.submittedAt || new Date()
-    project.reviewHistory = project.reviewHistory || []
-    project.reviewHistory.push({
-      status: 'Submitted',
-      note: `Unit “${title || unit.unitNumber}” submitted for approval`,
-      actor: user._id,
-      at: new Date(),
-    })
-    await project.save()
-  } else if (current === 'UnderReview') {
-    // keep under review
-  } else if (current !== 'Submitted') {
-    project.reviewStatus = 'Submitted'
-    project.submittedAt = new Date()
     await project.save()
   }
 
