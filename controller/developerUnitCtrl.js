@@ -23,13 +23,35 @@ const parseStringArray = (value) => {
 const parsePaymentSteps = (value) => {
   if (value === undefined) return undefined
   if (!Array.isArray(value)) return []
-  return value.map((step, index) => ({
-    step: index + 1,
-    stepLabel: `Step ${index + 1}`,
-    paymentLabel: String(step?.paymentLabel || step?.milestone || '').trim(),
-    sharePercent: String(step?.sharePercent ?? '').trim(),
-    milestone: String(step?.milestone || step?.paymentLabel || '').trim(),
-  }))
+  return value
+    .map((step) => ({
+      paymentLabel: String(step?.paymentLabel || step?.milestone || '').trim(),
+      sharePercent: String(step?.sharePercent ?? '').replace(/%/g, '').trim(),
+      milestone: String(step?.milestone || step?.paymentLabel || '').trim(),
+    }))
+    .filter((step) => {
+      const n = Number(step.sharePercent)
+      return step.sharePercent !== '' && Number.isFinite(n) && n > 0
+    })
+    .map((step, index, arr) => ({
+      step: index + 1,
+      stepLabel: `Step ${index + 1}`,
+      paymentLabel:
+        step.paymentLabel ||
+        (index === 0
+          ? 'Down Payment'
+          : index === arr.length - 1
+            ? 'Final Payment'
+            : 'Payment Share'),
+      sharePercent: step.sharePercent,
+      milestone:
+        step.milestone ||
+        (index === 0
+          ? 'Down Payment'
+          : index === arr.length - 1
+            ? 'Final Payment'
+            : 'Payment Share'),
+    }))
 }
 
 const slugUnitNumber = (title) => {

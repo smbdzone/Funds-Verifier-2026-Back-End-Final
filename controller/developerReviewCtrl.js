@@ -418,24 +418,33 @@ const mapPaymentPlanToProperty = (plan) => {
     }
   }
 
-  const paymentPlan = (plan.milestones || []).map((m, index, arr) => {
-    const title =
-      String(m.label || '').trim() ||
-      String(m.dueLabel || '').trim() ||
-      (index === 0
-        ? 'Down Payment'
-        : index === arr.length - 1
-          ? 'Final Payment'
-          : 'Payment Share')
-    return {
-      step: index + 1,
-      stepLabel: `Step ${index + 1}`,
-      paymentLabel: title,
-      sharePercent: String(m.percent ?? ''),
-      // Public UI shows `milestone` under the % — use the full step title
-      milestone: title,
-    }
-  })
+  const paymentPlan = (plan.milestones || [])
+    .map((m) => ({
+      label: String(m.label || m.dueLabel || '').trim(),
+      percent: String(m.percent ?? m.sharePercent ?? '')
+        .replace(/%/g, '')
+        .trim(),
+    }))
+    .filter((m) => {
+      const n = Number(m.percent)
+      return m.percent !== '' && Number.isFinite(n) && n > 0
+    })
+    .map((m, index, arr) => {
+      const title =
+        m.label ||
+        (index === 0
+          ? 'Down Payment'
+          : index === arr.length - 1
+            ? 'Final Payment'
+            : 'Payment Share')
+      return {
+        step: index + 1,
+        stepLabel: `Step ${index + 1}`,
+        paymentLabel: title,
+        sharePercent: m.percent,
+        milestone: title,
+      }
+    })
   return { paymentPlanType, paymentPlan }
 }
 

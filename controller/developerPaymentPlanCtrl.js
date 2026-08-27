@@ -18,7 +18,7 @@ const normalizeMilestones = (raw) => {
       percent: parsePercent(item?.percent, 0),
       dueLabel: String(item?.dueLabel || '').trim(),
     }))
-    .filter((item) => item.label)
+    .filter((item) => item.percent > 0)
 }
 
 const buildPlanPayload = (body, { forCreate = false } = {}) => {
