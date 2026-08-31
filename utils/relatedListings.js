@@ -53,7 +53,7 @@ export async function findRelatedListings({
   const limit = parseRelatedLimit(query)
   const match = {
     isDeleted: false,
-    listing: 'Public',
+    listing: { $in: ['Public', 'Private'] },
   }
 
   applyListingStatusFilters(match, query)

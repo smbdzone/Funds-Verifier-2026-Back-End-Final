@@ -87,6 +87,10 @@ export async function syncPublishedPropertyFromUnit(unit) {
     updates.bathrooms = Number(unit.bathrooms)
   }
 
+  if (unit.listing === 'Private' || unit.listing === 'Public') {
+    updates.listing = unit.listing
+  }
+
   if (unit.unitNumber) {
     // Keep title in sync when unit number changes (prefix kept short for maxlength 60).
     const existing = await Property.findById(unit.publishedPropertyId)

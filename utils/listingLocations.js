@@ -15,7 +15,7 @@ const MAX_LOCATION_COMBOS = 5000
 export function buildListingLocationsMatch(query = {}) {
   const match = {
     isDeleted: false,
-    listing: 'Public',
+    listing: { $in: ['Public', 'Private'] },
   }
 
   applyListingStatusFilters(match, query)

@@ -48,6 +48,10 @@ import { sanitizeListingMediaObjectIds } from '../utils/sanitizeListingMediaIds.
 import { buildListingIdQuery } from '../utils/listingIdLookup.js'
 import { isListingPrivilegedUser } from '../utils/parentEvaluator.js'
 import {
+  MARKETPLACE_LISTING_FILTER,
+  sendLockedPrivateListingIfNeeded,
+} from '../utils/listingVisibility.js'
+import {
   blockPriceChangeIfUnderProcess,
   stripUnderProcessFromListingPayload,
 } from '../utils/listingUnderProcess.js'
@@ -61,7 +65,7 @@ import path from 'path'
 import processQuery from '../utils/priceRange.js'
 import { verifyToken } from '../middlewares/JwtAuth.js'
 import UserModel from '../models/userModel.js'
-import { AssetsListingsPricing } from '../utils/AssetsListingsPricing.js'
+import { AssetsListingsPricing, applyListingVisibility } from '../utils/AssetsListingsPricing.js'
 import { createNotification } from './notifications.controller.js'
 import { notifyEvaluatorsNewListing } from '../helper/notificationHelpers.js'
 import { notifyAssetHolderDocumentRequested } from '../helper/notifyDocumentRequested.js'
@@ -274,6 +278,10 @@ const getSingleProduct = asyncHandler(async (req, res) => {
 
     await refreshListingMediaSignedUrls(boat)
 
+    if (sendLockedPrivateListingIfNeeded(res, req.user, boat)) {
+      return
+    }
+
     const isPrivilegedUser = isListingPrivilegedUser(req.user)
 
     // Public user → return limited fields
@@ -331,6 +339,9 @@ const getSingleProductBySlug = asyncHandler(async (req, res) => {
       boatObj.sellerRef = getSellerRef(seller)
     }
     await refreshListingMediaSignedUrls(boatObj)
+    if (sendLockedPrivateListingIfNeeded(res, req.user, boatObj)) {
+      return
+    }
     sanitizeListingMediaResponse(boatObj)
 
     res.json(boatObj)
@@ -385,12 +396,10 @@ const getAllProduct = asyncHandler(async (req, res) => {
     }
 
     /* ----------------------------------------------------
-       4️⃣ VISIBILITY RULES (🔥 MOST IMPORTANT)
+       4️⃣ VISIBILITY RULES
     ---------------------------------------------------- */
-    if (!user) {
-      // PUBLIC USER
-      parseData.listing = 'Public'
-    } else {
+    parseData.listing = MARKETPLACE_LISTING_FILTER
+    if (user) {
       const isSubEvaluator = ['Sub-Evaluator', 'SubEvaluator'].includes(
         user.role
       )
@@ -405,7 +414,6 @@ const getAllProduct = asyncHandler(async (req, res) => {
         delete parseData.listing
       }
 
-      // AUTHENTICATED USER
       if (
         !isSubEvaluator &&
         user.role?.toLowerCase() === 'assetholder' &&
@@ -423,20 +431,6 @@ const getAllProduct = asyncHandler(async (req, res) => {
           roleNorm === 'superadmin'
         if (isElevatedModerator) {
           delete parseData.listing
-        } else if (
-          user.role === 'DealHunter' &&
-          user.financialInfo?.status === 'Approved'
-        ) {
-          parseData.$or = [
-            { listing: 'Public' },
-            {
-              listing: 'Private',
-              price: { $lte: Number(user.financialInfo.fundsVerification) },
-            },
-          ]
-          delete parseData.listing
-        } else {
-          parseData.listing = 'Public'
         }
       }
     }
@@ -570,26 +564,8 @@ const getAllProductByFilter = asyncHandler(async (req, res) => {
 
   if (token) {
     userId = verifyToken(token)
-    if (userId) {
-      const GetUser = await UserModel.findById(userId, {
-        isDeleted: false,
-      }).select('_id financialInfo')
-      if (
-        GetUser?.financialInfo &&
-        GetUser?.financialInfo?.status === 'Approved'
-      ) {
-        modifiedQuery.$or = [
-          { listing: 'Public' },
-          {
-            listing: 'Private',
-            price: { $lte: Number(GetUser.financialInfo.fundsVerification) },
-          },
-        ]
-      } else {
-        modifiedQuery.$or = [{ listing: 'Public' }]
-      }
-    }
   }
+  modifiedQuery.listing = MARKETPLACE_LISTING_FILTER
   // Title filtering
   if (req.query.brands) {
     const brands = getSafeStringParam(req.query, 'brands')
@@ -792,6 +768,9 @@ const updateProduct = asyncHandler(async (req, res) => {
       let updatedProduct
       stripNullPremiumRefs(req.body)
       sanitizeListingMediaObjectIds(req.body)
+      if (req.body.listing !== undefined || req.body.price !== undefined) {
+        req.body.listing = applyListingVisibility('boat', req.body, product)
+      }
       updatedProduct = await Boat.findByIdAndUpdate(
         product._id,
         { $set: req.body },

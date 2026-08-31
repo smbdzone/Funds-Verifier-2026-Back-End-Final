@@ -51,7 +51,7 @@ const authMiddleware = asyncHandler(async (req, res, next) => {
     const user = await User.findOne({
       _id: decoded.id,
       isDeleted: false,
-    }).select('_id uuid role email')
+    }).select('_id uuid role email financialInfo')
 
     if (!user) {
       await logSuspiciousActivity(req, 'Token user does not exist')
@@ -124,7 +124,7 @@ const optionalAuthMiddleware = asyncHandler(async (req, res, next) => {
     const user = await User.findOne({
       _id: decoded.id,
       isDeleted: false,
-    }).select('_id uuid role email')
+    }).select('_id uuid role email financialInfo')
 
     req.user = user || null
     return next()
