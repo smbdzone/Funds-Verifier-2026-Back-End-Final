@@ -6,11 +6,15 @@ import DeveloperUnit, {
 import { requireOwnedProject } from '../utils/developerProjectAccess.js'
 import { sanitizeMongoId } from '../utils/nosqlSanitizer.js'
 import { syncPublishedPropertyFromUnit } from '../utils/syncPublishedUnitProperty.js'
+import { AssetsListingsPricing } from '../utils/AssetsListingsPricing.js'
 
 const parseOptionalNumber = (value) => {
   if (value === undefined) return undefined
   if (value === null || value === '') return null
-  const n = Number(value)
+  const n =
+    typeof value === 'number'
+      ? value
+      : Number(String(value).replace(/,/g, '').trim())
   return Number.isNaN(n) ? null : n
 }
 
@@ -146,7 +150,15 @@ const buildUnitPayload = (body, { forCreate = false } = {}) => {
       body.currency !== undefined
         ? String(body.currency || 'AED').trim() || 'AED'
         : undefined,
-    listing: listingRaw,
+    listing:
+      listingRaw === undefined
+        ? undefined
+        : AssetsListingsPricing({
+            type: 'property',
+            listing: listingRaw || 'Public',
+            priceFrom: body.priceFrom,
+            listingPrice: body.listingPrice,
+          }),
     bedrooms: parseOptionalNumber(body.bedrooms),
     bathrooms: parseOptionalNumber(body.bathrooms),
     description:

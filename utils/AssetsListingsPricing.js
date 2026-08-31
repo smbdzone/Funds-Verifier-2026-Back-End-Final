@@ -1,15 +1,19 @@
 /** Minimum price (AED) before Public/Private is allowed. Must stay in sync with the frontend forms. */
 export const LISTING_VISIBILITY_THRESHOLDS = {
   property: 5_000_000,
-  car: 200_000,
+  car: 250_000,
   boat: 1_000_000,
-  jewelry: 100_000,
+  jewelry: 250_000,
 }
 
 export function resolveListingPrice(payload = {}) {
   const candidates = [payload.price, payload.priceFrom, payload.listingPrice]
   for (const value of candidates) {
-    const amount = Number(value)
+    if (value == null || value === '') continue
+    const amount =
+      typeof value === 'number'
+        ? value
+        : Number(String(value).replace(/,/g, '').trim())
     if (Number.isFinite(amount) && amount > 0) return amount
   }
   return 0
