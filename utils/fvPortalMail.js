@@ -132,6 +132,7 @@ export async function sendFvPortalEmail({
   bodyLines = [],
   ctaLabel,
   ctaPath,
+  ctaUrl: ctaUrlOverride,
   previewImageUrl,
 }) {
   try {
@@ -151,9 +152,11 @@ export async function sendFvPortalEmail({
     const frontendBase = String(
       process.env.FRONTEND_URL || 'https://fundsverifier.com',
     ).replace(/\/$/, '')
-    const ctaUrl = ctaPath
-      ? `${frontendBase}${ctaPath.startsWith('/') ? ctaPath : `/${ctaPath}`}`
-      : undefined
+    const ctaUrl = ctaUrlOverride
+      ? String(ctaUrlOverride).trim()
+      : ctaPath
+        ? `${frontendBase}${ctaPath.startsWith('/') ? ctaPath : `/${ctaPath}`}`
+        : undefined
 
     const result = await sendEmail({
       to,
@@ -507,4 +510,115 @@ export async function notifyFvViewingCompleted({
     ctaLabel: 'Open Site',
     ctaPath: '/',
   })
+}
+
+function financeLooksComplete(info) {
+  if (!info) return false
+  const filled = (value) => {
+    if (value == null || value === '') return false
+    if (typeof value === 'object') {
+      return Boolean(value._id || value.uuid || value.Certificate || value.id)
+    }
+    return String(value).trim().length > 0
+  }
+  return (
+    filled(info.verificationCertificate) &&
+    filled(info.fundsVerification) &&
+    filled(info.bankName) &&
+    filled(info.bankBranch) &&
+    filled(info.city) &&
+    filled(info.country)
+  )
+}
+
+/** Deal Hunter submitted the bank form and needs Super Admin approval. */
+export async function notifyFvFinanceApprovalNeeded({ user }) {
+  if (!user) return { success: false, message: 'Missing user' }
+  if (!financeLooksComplete(user.financialInfo)) {
+    return { success: false, message: 'Finance form is incomplete' }
+  }
+
+  const name = displayName(user) || 'Deal Hunter'
+  const info = user.financialInfo || {}
+  const adminBase = String(
+    process.env.SUPER_ADMIN_URL || 'https://fv.admin.fundsverifier.com',
+  ).replace(/\/$/, '')
+  const reviewPath = user._id
+    ? `/dashboard/financial-statements/${user._id}`
+    : '/dashboard/financial-statements'
+  const fundsNum = Number(String(info.fundsVerification || '').replace(/,/g, ''))
+  const fundsLabel = Number.isFinite(fundsNum) && fundsNum > 0
+    ? `AED ${fundsNum.toLocaleString()}`
+    : info.fundsVerification
+
+  return sendFvPortalEmail({
+    subject: `Finance approval needed to view private listings — ${name}`,
+    headline: `${name} submitted finance information and needs Super Admin approval to view private listings.`,
+    bodyLines: [
+      `Name: <strong>${name}</strong>`,
+      user.email ? `Email: <strong>${user.email}</strong>` : '',
+      user.phone ? `Phone: <strong>${user.phone}</strong>` : '',
+      user.uuid ? `User ID: <strong>${user.uuid}</strong>` : '',
+      fundsLabel ? `Funds verification: <strong>${fundsLabel}</strong>` : '',
+      info.bankName ? `Bank name: <strong>${info.bankName}</strong>` : '',
+      info.bankBranch ? `Bank branch: <strong>${info.bankBranch}</strong>` : '',
+      [info.city, info.country].filter(Boolean).length
+        ? `Location: <strong>${[info.city, info.country].filter(Boolean).join(', ')}</strong>`
+        : '',
+      'Please review and approve this finance statement so they can see private listings their funds cover.',
+    ],
+    ctaLabel: 'Review finance statement',
+    ctaUrl: `${adminBase}${reviewPath}`,
+  })
+}
+
+/** Buyer email after Super Admin approves their finance statement. */
+export async function notifyBuyerFinanceApproved({ user }) {
+  try {
+    const to = String(user?.email || '').trim()
+    if (!to) {
+      return { success: false, message: 'Missing buyer email' }
+    }
+    if (
+      !process.env.SMTP_HOST ||
+      !process.env.EMAIL_USER ||
+      !process.env.EMAIL_PASS
+    ) {
+      return { success: false, message: 'Email is not configured on the server' }
+    }
+
+    const name = displayName(user) || 'there'
+    const frontendBase = String(
+      process.env.FRONTEND_URL || 'https://fundsverifier.com',
+    ).replace(/\/$/, '')
+
+    const result = await sendEmail({
+      to,
+      subject: 'Your finance information is approved — Funds Verifier',
+      text: `Hi ${name},\n\nYour finance information has been approved. You can now view private listings your funds cover.\n`,
+      html: buildEmailHtml({
+        recipientName: name,
+        headline: 'Your finance information is approved.',
+        bodyLines: [
+          'Super Admin has approved your finance information.',
+          'You can now view private listings your funds verification amount covers.',
+        ],
+        ctaLabel: 'View listings',
+        ctaUrl: `${frontendBase}/`,
+      }),
+    })
+
+    return {
+      success: Boolean(result?.success),
+      message: result?.success
+        ? 'Email sent'
+        : result?.error || 'Failed to send email',
+    }
+  } catch (error) {
+    console.error('notifyBuyerFinanceApproved error:', error?.message || error)
+    return {
+      success: false,
+      message: error?.message || 'Failed to send email',
+    }
+  }
 }

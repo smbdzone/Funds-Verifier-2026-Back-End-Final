@@ -44,6 +44,10 @@ import {
   sanitizeOtpCode,
 } from '../utils/loginOtp.js'
 import sendLoginOtpEmail from '../utils/loginOtpMail.js'
+import {
+  notifyBuyerFinanceApproved,
+  notifyFvFinanceApprovalNeeded,
+} from '../utils/fvPortalMail.js'
 
 // Base cookie options object
 const isProd = process.env.NODE_ENV === 'production'
@@ -1153,16 +1157,28 @@ const UpdateUsersFinancialInfo = asyncHandler(async (req, res) => {
     }
 
     try {
+      const isApproved = String(status || '').trim() === 'Approved'
       const NotificationData = {
         userId: updatedUser?._id,
         userUUID: updatedUser?.uuid,
         UserRole: 'DealHunter',
         title: 'Financial Info',
-        message: `Your financial info status is updated to: ${status || 'Pending'}`,
+        message: isApproved
+          ? 'Your finance information is approved. You can now view private listings your funds cover.'
+          : `Your financial info status is updated to: ${status || 'Pending'}`,
       }
       await createNotification({ data: NotificationData })
     } catch (error) {
       console.log({ error: error?.message })
+    }
+
+    if (String(status || '').trim() === 'Approved') {
+      notifyBuyerFinanceApproved({ user: updatedUser }).catch((err) => {
+        console.warn(
+          'Buyer finance approved email failed:',
+          err?.message || err,
+        )
+      })
     }
 
     return res.status(200).json({ user: updatedUser, success: true })
@@ -1590,16 +1606,18 @@ const updateUser = asyncHandler(async (req, res) => {
       }
     }
 
+    let financeFormSubmitted = false
     if (
       updatePayload.financialInfo &&
       typeof updatePayload.financialInfo === 'object'
     ) {
       const fi = { ...updatePayload.financialInfo }
       delete updatePayload.financialInfo
-
-      if (fi.status === undefined) {
-        fi.status = loggedInUser?.financialInfo?.status || 'Pending'
-      }
+      // Deal hunters cannot self-approve. Saving the bank form always
+      // sends the statement back to Super Admin as Pending.
+      delete fi.status
+      fi.status = 'Pending'
+      financeFormSubmitted = true
 
       for (const [key, value] of Object.entries(fi)) {
         if (value !== undefined && value !== null) {
@@ -1631,13 +1649,24 @@ const updateUser = asyncHandler(async (req, res) => {
       const NotificationData = {
         userId: upUser?.uuid,
         UserRole: upUser?.role,
-        title: 'Update Profile',
-        message: `Your profile info has been updated.`,
+        title: financeFormSubmitted ? 'Financial Info' : 'Update Profile',
+        message: financeFormSubmitted
+          ? 'Your finance information was submitted. Super Admin must approve it before you can see private listings.'
+          : `Your profile info has been updated.`,
         RelateRoute: 'profile',
       }
       await createNotification({ data: NotificationData })
     } catch (error) {
       console.log({ error: error?.message })
+    }
+
+    if (financeFormSubmitted) {
+      notifyFvFinanceApprovalNeeded({ user: upUser }).catch((err) => {
+        console.warn(
+          'Finance approval request email failed:',
+          err?.message || err,
+        )
+      })
     }
 
     const sanitizedUser = await sanitizeUserForSelf(upUser)

@@ -50,14 +50,28 @@ const PRIVATE_UNLOCK_ROLES = new Set([
 function filledFinanceField(value) {
   if (value == null || value === '') return false
   if (typeof value === 'object') {
-    return Boolean(value._id || value.uuid || value.Certificate || value.id)
+    if (value._id || value.uuid || value.Certificate || value.id) return true
+    const asString =
+      typeof value.toString === 'function' ? String(value.toString()) : ''
+    return Boolean(asString && asString !== '[object Object]')
   }
   return String(value).trim().length > 0
 }
 
+function parseMoneyAmount(value) {
+  if (value == null || value === '') return NaN
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? value : NaN
+  }
+  const cleaned = String(value).replace(/,/g, '').trim()
+  if (!cleaned) return NaN
+  const amount = Number(cleaned)
+  return Number.isFinite(amount) ? amount : NaN
+}
+
 export function getListingUnlockPrice(listing) {
-  const from = Number(listing?.priceFrom)
-  const price = Number(listing?.price)
+  const from = parseMoneyAmount(listing?.priceFrom)
+  const price = parseMoneyAmount(listing?.price)
   if (Number.isFinite(from) && from > 0) return from
   if (Number.isFinite(price) && price > 0) return price
   return 0
@@ -84,7 +98,7 @@ export function dealHunterCanViewPrivateListing(user, listing) {
     return false
   }
 
-  const funds = Number(info.fundsVerification)
+  const funds = parseMoneyAmount(info.fundsVerification)
   const listingPrice = getListingUnlockPrice(listing)
   if (!Number.isFinite(funds) || funds <= 0 || listingPrice <= 0) return false
   return funds >= listingPrice
