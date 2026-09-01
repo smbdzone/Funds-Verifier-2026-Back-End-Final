@@ -20,6 +20,7 @@ const ASSET_HOLDER_ALLOWED_AFTER_APPROVAL = new Set([
   'priceFrom',
   'priceTo',
   'listing',
+  'video',
   'video3DWalkthrough',
   'technicalReport',
   'uploadDocument',
