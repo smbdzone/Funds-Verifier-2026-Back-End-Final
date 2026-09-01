@@ -28,6 +28,7 @@ export function sanitizeListingMediaObjectIds(body) {
     'floorPlan',
     'titleDeed',
     'agencyAgreement',
+    'video',
   ])
 
   for (const key of LISTING_OBJECT_ID_MEDIA_FIELDS) {
@@ -66,4 +67,25 @@ export function sanitizeListingMediaObjectIds(body) {
   }
 
   return body
+}
+
+/** Turn a sanitized listing body into $set / $unset so null media actually clears. */
+export function toListingUpdateOps(body) {
+  const unsetFields = {}
+  if (body && typeof body === 'object') {
+    for (const key of ['video', 'unitLayout', 'floorPlan', 'titleDeed', 'agencyAgreement']) {
+      if (body[key] === null) {
+        unsetFields[key] = 1
+        delete body[key]
+      }
+    }
+  }
+  const updateOps = {}
+  if (body && Object.keys(body).length) {
+    updateOps.$set = body
+  }
+  if (Object.keys(unsetFields).length) {
+    updateOps.$unset = unsetFields
+  }
+  return Object.keys(updateOps).length ? updateOps : { $set: {} }
 }

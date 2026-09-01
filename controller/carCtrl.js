@@ -43,7 +43,7 @@ import {
   refreshListingPremiumFieldsForEdit,
   sanitizeUnpaidPremiumServicesForClient,
 } from '../utils/listingPremiumSync.js'
-import { sanitizeListingMediaObjectIds } from '../utils/sanitizeListingMediaIds.js'
+import { sanitizeListingMediaObjectIds, toListingUpdateOps } from '../utils/sanitizeListingMediaIds.js'
 import { buildListingIdQuery } from '../utils/listingIdLookup.js'
 import { isListingPrivilegedUser } from '../utils/parentEvaluator.js'
 import {
@@ -740,7 +740,7 @@ const updateProduct = asyncHandler(async (req, res) => {
       }
       updatedProduct = await Car.findByIdAndUpdate(
         product._id,
-        { $set: req.body },
+        toListingUpdateOps(req.body),
         { new: true }
       ).select('-_id')
 

@@ -35,7 +35,6 @@ export function stripNullPremiumRefs(body) {
     'technicalReport',
     'video3DWalkthrough',
     'evaluationCertificate',
-    'video',
     'qrScan',
     'pictures',
     'thumbnailImg',

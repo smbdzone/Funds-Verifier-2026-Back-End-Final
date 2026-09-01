@@ -1,6 +1,6 @@
 /**
  * After evaluator approval, asset holders may only change listing price,
- * Public/Private visibility, and premium-service requests — not the
+ * Public/Private visibility, 3D walkthrough, and technical report — not the
  * evaluator-finalized property details.
  */
 
@@ -20,7 +20,6 @@ const ASSET_HOLDER_ALLOWED_AFTER_APPROVAL = new Set([
   'priceFrom',
   'priceTo',
   'listing',
-  'video',
   'video3DWalkthrough',
   'technicalReport',
   'uploadDocument',
