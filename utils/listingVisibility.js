@@ -131,6 +131,7 @@ export function toLockedPrivateListingPayload(listing = {}) {
     country: listing.country,
     city: listing.city,
     neighbourhood: listing.neighbourhood,
+    roi: listing.roi,
     propertyType: listing.propertyType,
     thumbnailImg: listing.thumbnailImg || null,
   }
