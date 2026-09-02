@@ -191,12 +191,6 @@
 // };
 import multer from 'multer'
 import sharp from 'sharp'
-import { spawnSync } from 'child_process'
-import path from 'path'
-import os from 'os'
-import { randomBytes } from 'crypto'
-import ffmpeg from 'fluent-ffmpeg'
-import fs from 'fs-extra'
 import NodeClam from 'clamscan'
 
 import validateMagicBytes from '../services/validateMagicBytes.js'
@@ -306,136 +300,8 @@ const resizeImages =
     }
 
 // ------------------- Video Conversion -------------------
-let ffmpegAvailable = null
-
-function hasFfmpeg() {
-  if (ffmpegAvailable !== null) return ffmpegAvailable
-  try {
-    const result = spawnSync('ffmpeg', ['-version'], { timeout: 8000, encoding: 'utf8' })
-    ffmpegAvailable = result.status === 0
-  } catch {
-    ffmpegAvailable = false
-  }
-  if (!ffmpegAvailable) {
-    console.warn('[upload] FFmpeg is not installed; videos will be stored as uploaded')
-  }
-  return ffmpegAvailable
-}
-
-const SKIP_COMPRESS_UNDER_BYTES = 3 * 1024 * 1024
-
-function isFtypContainer(buffer) {
-  if (!buffer || buffer.length < 12) return false
-  const bytes = Buffer.isBuffer(buffer) ? buffer : Buffer.from(buffer)
-  return bytes.slice(4, 8).toString('ascii') === 'ftyp'
-}
-
-function skipVideoConversion(file) {
-  const size = Number(file?.size || file?.buffer?.length || 0)
-  if (size <= 0) return true
-  // Already small enough for listing cards — skip encode to keep upload fast.
-  if (size <= SKIP_COMPRESS_UNDER_BYTES) {
-    const name = String(file.originalname || '').toLowerCase()
-    const mime = String(file.mimetype || '').toLowerCase()
-    if (
-      name.endsWith('.mp4') ||
-      mime === 'video/mp4' ||
-      isFtypContainer(file.buffer)
-    ) {
-      return true
-    }
-  }
-  return false
-}
-
-function reencodeVideoToMp4(file) {
-  const token = `${Date.now()}-${randomBytes(4).toString('hex')}`
-  const tmpIn = path.join(os.tmpdir(), `fv-video-in-${token}`)
-  const tmpOut = path.join(os.tmpdir(), `fv-video-out-${token}.mp4`)
-
-  return (async () => {
-    await fs.writeFile(tmpIn, file.buffer)
-    try {
-      await new Promise((resolve, reject) => {
-        ffmpeg(tmpIn)
-          .videoFilters("scale='min(854,iw)':-2,fps=24")
-          .outputOptions([
-            '-c:v libx264',
-            '-preset veryfast',
-            '-crf 32',
-            '-maxrate 700k',
-            '-bufsize 1400k',
-            '-pix_fmt yuv420p',
-            '-map 0:v:0',
-            '-map 0:a?',
-            '-c:a aac',
-            '-b:a 64k',
-            '-ac 1',
-            '-movflags +faststart',
-          ])
-          .output(tmpOut)
-          .on('end', resolve)
-          .on('error', reject)
-          .run()
-      })
-      const outBuffer = await fs.readFile(tmpOut)
-      const originalSize = file.buffer?.length || file.size || 0
-      if (
-        !outBuffer.length ||
-        outBuffer.length > VIDEO_MAX_BYTES ||
-        (originalSize > 0 && outBuffer.length >= originalSize)
-      ) {
-        return file
-      }
-      const base = path.basename(file.originalname || 'video', path.extname(file.originalname || ''))
-      return {
-        ...file,
-        buffer: outBuffer,
-        mimetype: 'video/mp4',
-        size: outBuffer.length,
-        originalname: `${base || 'video'}.mp4`,
-      }
-    } finally {
-      await fs.remove(tmpIn).catch(() => { })
-      await fs.remove(tmpOut).catch(() => { })
-    }
-  })()
-}
-
-const convertVideos = async (req, res, next) => {
-  try {
-    if (!req.files) return next()
-
-    req.files = await Promise.all(
-      req.files.map(async (file) => {
-        if (skipVideoConversion(file)) {
-          return {
-            ...file,
-            mimetype: file.mimetype?.startsWith('video/') ? file.mimetype : 'video/mp4',
-          }
-        }
-        if (!hasFfmpeg()) {
-          return file
-        }
-        try {
-          return await reencodeVideoToMp4(file)
-        } catch (err) {
-          console.warn(
-            '[upload] FFmpeg conversion failed; storing original video',
-            err?.message,
-          )
-          return file
-        }
-      }),
-    )
-
-    next()
-  } catch (err) {
-    console.error('Video conversion error:', err)
-    // Never block listing upload on conversion — store the original file.
-    next()
-  }
-}
+// Keep listing videos as uploaded. No transcode / quality loss.
+const convertVideos = async (req, res, next) => next()
 
 // ------------------- Secure Upload Middleware -------------------
 const secureUploadMiddleware = async (req, res, next) => {
