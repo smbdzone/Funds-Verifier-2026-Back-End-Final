@@ -133,6 +133,12 @@ export function toLockedPrivateListingPayload(listing = {}) {
     neighbourhood: listing.neighbourhood,
     roi: listing.roi,
     propertyType: listing.propertyType,
+    carType: listing.carType,
+    make: listing.make,
+    model: listing.model,
+    brands: listing.brands,
+    category: listing.category,
+    boatType: listing.boatType,
     thumbnailImg: listing.thumbnailImg || null,
   }
 }

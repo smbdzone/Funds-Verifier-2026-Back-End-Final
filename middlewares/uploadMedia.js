@@ -322,6 +322,8 @@ function hasFfmpeg() {
   return ffmpegAvailable
 }
 
+const SKIP_COMPRESS_UNDER_BYTES = 3 * 1024 * 1024
+
 function isFtypContainer(buffer) {
   if (!buffer || buffer.length < 12) return false
   const bytes = Buffer.isBuffer(buffer) ? buffer : Buffer.from(buffer)
@@ -329,12 +331,21 @@ function isFtypContainer(buffer) {
 }
 
 function skipVideoConversion(file) {
-  const name = String(file.originalname || '').toLowerCase()
-  const mime = String(file.mimetype || '').toLowerCase()
-  // Already browser-playable — do not run FFmpeg (pipe-to-mp4 also fails).
-  if (name.endsWith('.mp4') || name.endsWith('.m4v') || name.endsWith('.webm') || name.endsWith('.mov')) return true
-  if (mime === 'video/mp4' || mime === 'video/webm' || mime === 'video/quicktime') return true
-  return isFtypContainer(file.buffer)
+  const size = Number(file?.size || file?.buffer?.length || 0)
+  if (size <= 0) return true
+  // Already small enough for listing cards — skip encode to keep upload fast.
+  if (size <= SKIP_COMPRESS_UNDER_BYTES) {
+    const name = String(file.originalname || '').toLowerCase()
+    const mime = String(file.mimetype || '').toLowerCase()
+    if (
+      name.endsWith('.mp4') ||
+      mime === 'video/mp4' ||
+      isFtypContainer(file.buffer)
+    ) {
+      return true
+    }
+  }
+  return false
 }
 
 function reencodeVideoToMp4(file) {
@@ -347,11 +358,19 @@ function reencodeVideoToMp4(file) {
     try {
       await new Promise((resolve, reject) => {
         ffmpeg(tmpIn)
+          .videoFilters("scale='min(854,iw)':-2,fps=24")
           .outputOptions([
             '-c:v libx264',
-            '-crf 23',
             '-preset veryfast',
+            '-crf 32',
+            '-maxrate 700k',
+            '-bufsize 1400k',
+            '-pix_fmt yuv420p',
+            '-map 0:v:0',
+            '-map 0:a?',
             '-c:a aac',
+            '-b:a 64k',
+            '-ac 1',
             '-movflags +faststart',
           ])
           .output(tmpOut)
@@ -360,7 +379,12 @@ function reencodeVideoToMp4(file) {
           .run()
       })
       const outBuffer = await fs.readFile(tmpOut)
-      if (!outBuffer.length || outBuffer.length > VIDEO_MAX_BYTES) {
+      const originalSize = file.buffer?.length || file.size || 0
+      if (
+        !outBuffer.length ||
+        outBuffer.length > VIDEO_MAX_BYTES ||
+        (originalSize > 0 && outBuffer.length >= originalSize)
+      ) {
         return file
       }
       const base = path.basename(file.originalname || 'video', path.extname(file.originalname || ''))
