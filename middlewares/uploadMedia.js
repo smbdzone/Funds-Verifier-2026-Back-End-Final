@@ -191,7 +191,10 @@
 // };
 import multer from 'multer'
 import sharp from 'sharp'
-import { Readable, PassThrough } from 'stream'
+import { spawnSync } from 'child_process'
+import path from 'path'
+import os from 'os'
+import { randomBytes } from 'crypto'
 import ffmpeg from 'fluent-ffmpeg'
 import fs from 'fs-extra'
 import NodeClam from 'clamscan'
@@ -303,58 +306,76 @@ const resizeImages =
     }
 
 // ------------------- Video Conversion -------------------
-function isMp4Container(buffer) {
+let ffmpegAvailable = null
+
+function hasFfmpeg() {
+  if (ffmpegAvailable !== null) return ffmpegAvailable
+  try {
+    const result = spawnSync('ffmpeg', ['-version'], { timeout: 8000, encoding: 'utf8' })
+    ffmpegAvailable = result.status === 0
+  } catch {
+    ffmpegAvailable = false
+  }
+  if (!ffmpegAvailable) {
+    console.warn('[upload] FFmpeg is not installed; videos will be stored as uploaded')
+  }
+  return ffmpegAvailable
+}
+
+function isFtypContainer(buffer) {
   if (!buffer || buffer.length < 12) return false
-  return buffer.slice(4, 8).toString('ascii') === 'ftyp'
+  const bytes = Buffer.isBuffer(buffer) ? buffer : Buffer.from(buffer)
+  return bytes.slice(4, 8).toString('ascii') === 'ftyp'
 }
 
 function skipVideoConversion(file) {
   const name = String(file.originalname || '').toLowerCase()
-  if (name.endsWith('.mp4')) return true
-  if (file.mimetype === 'video/mp4') return true
-  return isMp4Container(file.buffer)
+  const mime = String(file.mimetype || '').toLowerCase()
+  // Already browser-playable — do not run FFmpeg (pipe-to-mp4 also fails).
+  if (name.endsWith('.mp4') || name.endsWith('.m4v') || name.endsWith('.webm') || name.endsWith('.mov')) return true
+  if (mime === 'video/mp4' || mime === 'video/webm' || mime === 'video/quicktime') return true
+  return isFtypContainer(file.buffer)
 }
 
 function reencodeVideoToMp4(file) {
-  return new Promise((resolve, reject) => {
-    const inputStream = new Readable()
-    inputStream.push(file.buffer)
-    inputStream.push(null)
+  const token = `${Date.now()}-${randomBytes(4).toString('hex')}`
+  const tmpIn = path.join(os.tmpdir(), `fv-video-in-${token}`)
+  const tmpOut = path.join(os.tmpdir(), `fv-video-out-${token}.mp4`)
 
-    const outputStream = new PassThrough()
-    const chunks = []
-
-    outputStream.on('data', (chunk) => chunks.push(chunk))
-    outputStream.on('end', () => {
-      const finalBuffer = Buffer.concat(chunks)
-      resolve({
+  return (async () => {
+    await fs.writeFile(tmpIn, file.buffer)
+    try {
+      await new Promise((resolve, reject) => {
+        ffmpeg(tmpIn)
+          .outputOptions([
+            '-c:v libx264',
+            '-crf 23',
+            '-preset veryfast',
+            '-c:a aac',
+            '-movflags +faststart',
+          ])
+          .output(tmpOut)
+          .on('end', resolve)
+          .on('error', reject)
+          .run()
+      })
+      const outBuffer = await fs.readFile(tmpOut)
+      if (!outBuffer.length || outBuffer.length > VIDEO_MAX_BYTES) {
+        return file
+      }
+      const base = path.basename(file.originalname || 'video', path.extname(file.originalname || ''))
+      return {
         ...file,
-        buffer: finalBuffer,
+        buffer: outBuffer,
         mimetype: 'video/mp4',
-        size: finalBuffer.length,
-      })
-    })
-    outputStream.on('error', reject)
-
-    ffmpeg(inputStream)
-      .outputOptions('-c:v libx264', '-crf 20', '-preset fast')
-      .format('mp4')
-      .on('error', (ffmpegErr) => {
-        if (skipVideoConversion(file)) {
-          console.warn(
-            '[upload] FFmpeg unavailable; uploading original MP4 without re-encode',
-            ffmpegErr.message,
-          )
-          resolve({
-            ...file,
-            mimetype: 'video/mp4',
-          })
-          return
-        }
-        reject(ffmpegErr)
-      })
-      .pipe(outputStream, { end: true })
-  })
+        size: outBuffer.length,
+        originalname: `${base || 'video'}.mp4`,
+      }
+    } finally {
+      await fs.remove(tmpIn).catch(() => { })
+      await fs.remove(tmpOut).catch(() => { })
+    }
+  })()
 }
 
 const convertVideos = async (req, res, next) => {
@@ -366,22 +387,29 @@ const convertVideos = async (req, res, next) => {
         if (skipVideoConversion(file)) {
           return {
             ...file,
-            mimetype: 'video/mp4',
+            mimetype: file.mimetype?.startsWith('video/') ? file.mimetype : 'video/mp4',
           }
         }
-        return reencodeVideoToMp4(file)
+        if (!hasFfmpeg()) {
+          return file
+        }
+        try {
+          return await reencodeVideoToMp4(file)
+        } catch (err) {
+          console.warn(
+            '[upload] FFmpeg conversion failed; storing original video',
+            err?.message,
+          )
+          return file
+        }
       }),
     )
 
     next()
   } catch (err) {
     console.error('Video conversion error:', err)
-    res.status(500).json({
-      message: 'Video conversion failed',
-      error: err.message,
-      hint:
-        'Upload an MP4 file under 30MB, or install full FFmpeg on the server (apt install ffmpeg).',
-    })
+    // Never block listing upload on conversion — store the original file.
+    next()
   }
 }
 
