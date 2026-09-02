@@ -380,7 +380,7 @@ const convertVideos = async (req, res, next) => {
       message: 'Video conversion failed',
       error: err.message,
       hint:
-        'Upload an MP4 file under 5MB, or install full FFmpeg on the server (apt install ffmpeg).',
+        'Upload an MP4 file under 30MB, or install full FFmpeg on the server (apt install ffmpeg).',
     })
   }
 }

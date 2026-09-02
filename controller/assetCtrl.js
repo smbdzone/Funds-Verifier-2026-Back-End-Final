@@ -11,6 +11,7 @@ import {
   generateCloudFrontSignedUrl,
   cloudFrontUrlForKey,
 } from '../services/cloudFrontSignedUrlService.js'
+import { VIDEO_MAX_COUNT } from '../utils/uploadLimits.js'
 // import validateMongoId from "../utils/validateMongodbId.js";
 
 const findImageAssetByRef = (assetRef) => {
@@ -107,6 +108,18 @@ const thumbnailImg = asyncHandler(async (req, res) => {
   }
 })
 
+const findVideoAssetByRef = (assetRef) => {
+  const id = String(assetRef || '').trim()
+  if (!id) return null
+  const query = { isDeleted: { $ne: true } }
+  if (mongoose.isValidObjectId(id)) {
+    query.$or = [{ _id: id }, { uuid: id }]
+  } else {
+    query.uuid = id
+  }
+  return VideoAsset.findOne(query)
+}
+
 const uploadVideoFun = asyncHandler(async (req, res) => {
   try {
     const files = req.files?.length
@@ -119,6 +132,7 @@ const uploadVideoFun = asyncHandler(async (req, res) => {
     }
 
     const userUUID = req.user?.uuid || req.query.userId
+    const appendToId = String(req.body?.assetId || req.query?.assetId || '').trim()
     const SIGNED_URL_EXPIRES_IN_SECONDS = 60 * 60 // 1 hour
 
     const videos = files.map((file) => ({
@@ -132,6 +146,31 @@ const uploadVideoFun = asyncHandler(async (req, res) => {
       uploadedAt: file.uploadedAt,
       url: file.cloudFrontUrl,
     }))
+
+    if (appendToId) {
+      const existing = await findVideoAssetByRef(appendToId)
+      if (existing) {
+        const current = (existing.videos || []).filter((clip) => !clip?.isDeleted)
+        if (current.length + videos.length > VIDEO_MAX_COUNT) {
+          return res.status(400).json({
+            error: `Maximum ${VIDEO_MAX_COUNT} videos allowed.`,
+          })
+        }
+        existing.videos = [...current, ...videos]
+        existing.markModified('videos')
+        await existing.save()
+        const firstKey = existing.videos[0]?.s3Key
+        const signed = firstKey
+          ? generateCloudFrontSignedUrl(firstKey, SIGNED_URL_EXPIRES_IN_SECONDS)
+          : {}
+        return res.json({
+          ...existing.toObject(),
+          signedUrl: signed.signedUrl,
+          expiresAt: signed.expiresAt,
+          expiresInSeconds: signed.expiresInSeconds,
+        })
+      }
+    }
 
     const createVideo = await VideoAsset.create({
       userUUID,

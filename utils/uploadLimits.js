@@ -1,5 +1,5 @@
 export const IMAGE_MAX_BYTES = 2 * 1024 * 1024 // 2MB per image
-export const VIDEO_MAX_BYTES = 5 * 1024 * 1024 // 5MB per video
+export const VIDEO_MAX_BYTES = 30 * 1024 * 1024 // 30MB per video
 export const PDF_MAX_BYTES = 10 * 1024 * 1024 // 10MB per PDF
 export const IMAGE_MAX_COUNT = 10
 export const VIDEO_MAX_COUNT = 2
