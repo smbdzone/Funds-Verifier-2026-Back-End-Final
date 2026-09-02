@@ -31,11 +31,34 @@ import { authMiddleware } from '../middlewares/authMiddleware.js'
 import { authorizeUserByUUID } from '../middlewares/authorizeUser.js'
 import { fileUploadLimiter } from '../middlewares/rateLimiter.js'
 import { VIDEO_MAX_COUNT } from '../utils/uploadLimits.js'
+import {
+  uploadVideoChunk,
+  saveVideoChunk,
+  completeVideoChunkUpload,
+} from '../controller/videoChunkCtrl.js'
 
 // Decrypted PDF for listing/detail (encrypted-at-rest S3 objects)
 router.get(
   '/evaluation-certificate/:certificateUuid/pdf',
   streamEvaluationCertificatePdf,
+)
+
+// Chunked video upload — keeps each request under the reverse-proxy body limit
+router.post(
+  '/upload-video/chunk',
+  authMiddleware,
+  fileUploadLimiter,
+  authorizeUserByUUID,
+  uploadVideoChunk,
+  saveVideoChunk,
+)
+
+router.post(
+  '/upload-video/complete',
+  authMiddleware,
+  fileUploadLimiter,
+  authorizeUserByUUID,
+  completeVideoChunkUpload,
 )
 
 // Upload videos

@@ -3,6 +3,9 @@ export const VIDEO_MAX_BYTES = 30 * 1024 * 1024 // 30MB per video
 export const PDF_MAX_BYTES = 10 * 1024 * 1024 // 10MB per PDF
 export const IMAGE_MAX_COUNT = 10
 export const VIDEO_MAX_COUNT = 2
+// Stay at the image size so chunks pass the same reverse-proxy body limit.
+export const VIDEO_CHUNK_MAX_BYTES = IMAGE_MAX_BYTES
+export const VIDEO_MAX_CHUNKS = Math.ceil(VIDEO_MAX_BYTES / VIDEO_CHUNK_MAX_BYTES)
 
 export const IMAGE_MAX_MB = IMAGE_MAX_BYTES / (1024 * 1024)
 export const VIDEO_MAX_MB = VIDEO_MAX_BYTES / (1024 * 1024)

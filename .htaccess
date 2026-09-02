@@ -1,0 +1,2 @@
+# Allow listing video uploads (30MB) through Apache / LiteSpeed reverse proxy.
+LimitRequestBody 52428800
