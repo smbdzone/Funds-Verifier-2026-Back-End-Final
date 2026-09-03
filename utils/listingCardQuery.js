@@ -26,6 +26,7 @@ export const CARD_PROPERTY_FIELDS = `
   bedrooms
   bathrooms
   developer
+  projectName
   sizeSQFT
   sizeSQM
   sizeUnit

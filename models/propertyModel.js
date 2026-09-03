@@ -179,6 +179,7 @@ const propertySchema = new mongoose.Schema({
   bedrooms: { type: Number },
   evaluationCompanies: { type: String },
   developer: { type: String },
+  projectName: { type: String, trim: true },
   bathrooms: { type: Number },
   isFurnished: { type: String },
   sellerTransferFee: { type: Number },

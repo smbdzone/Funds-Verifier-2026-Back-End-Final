@@ -210,6 +210,7 @@ export const getReportById = async (req, res) => {
           sizeSQFT: 1,
           bedrooms: 1,
           bathrooms: 1,
+          projectName: 1,
           developer: 1,
           isFurnished: 1,
           occupancyStatus: 1,

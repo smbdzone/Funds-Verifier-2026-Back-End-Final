@@ -28,6 +28,7 @@ export const PUBLIC_PROPERTY_FIELDS = `
   bedrooms
   evaluationCompanies
   developer
+  projectName
   bathrooms
   isFurnished
   occupancyStatus
