@@ -9,6 +9,7 @@ const execFile = promisify(execFileCb)
 import { readdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import os from 'node:os'
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url))
 const root = join(__dirname, '..')
@@ -21,8 +22,18 @@ const SKIP_DIRS = new Set([
   'dist',
 ])
 
-/** Parallel `node --check` calls (Windows AV is slow per process). */
-const CONCURRENCY = 12
+/**
+ * Parallel `node --check` calls (Windows AV is slow per process, hence
+ * wanting more of them in flight there). A fixed 12 is unsafe on small
+ * hosts — confirmed (2026-09-07) that running this on a 2-vCPU EC2
+ * instance already running other live services caused *different*
+ * files to fail an isolated re-check each run, i.e. false positives
+ * from resource contention, not real syntax errors. `cpus * 2` still
+ * flaked there; plain `cpus` (verified clean across 4 consecutive runs
+ * on that box) is the safe floor. Scale with the host's actual core
+ * count instead of a constant tuned for one dev machine.
+ */
+const CONCURRENCY = Math.max(2, os.cpus().length)
 
 async function collectJsFiles(dir) {
   const out = []
