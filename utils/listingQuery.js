@@ -20,6 +20,7 @@ export const LISTING_QUERY_PARAMS = new Set([
   'city',
   'neighbourhood',
   'propertyType',
+  'projectName',
   'propertyForSale',
   'propertyForLease',
   'facilities',
@@ -150,6 +151,14 @@ export function getSafeTitleRegex(query) {
     return null
   }
   return { $regex: escapeRegexString(title), $options: 'i' }
+}
+
+export function getSafeProjectNameRegex(query) {
+  const projectName = getSafeStringParam(query, 'projectName')
+  if (!projectName) {
+    return null
+  }
+  return { $regex: escapeRegexString(projectName), $options: 'i' }
 }
 
 export function pickScalarFilters(query, allowedFields = LISTING_FILTER_FIELDS) {

@@ -67,6 +67,7 @@ import {
 import {
   getSafeStringParam,
   getSafeTitleRegex,
+  getSafeProjectNameRegex,
   pickScalarFilters,
   applyListingStatusFilters,
   applyEvaluatorPendingFilter,
@@ -383,6 +384,11 @@ const getAllProduct = asyncHandler(async (req, res) => {
     const titleFilter = getSafeTitleRegex(req.query)
     if (titleFilter) {
       parseData.title = titleFilter
+    }
+
+    const projectNameFilter = getSafeProjectNameRegex(req.query)
+    if (projectNameFilter) {
+      parseData.projectName = projectNameFilter
     }
 
     Object.assign(parseData, pickScalarFilters(req.query))
