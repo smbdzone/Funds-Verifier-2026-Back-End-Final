@@ -1,0 +1,64 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main, fv-abbas]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  # false, not true: a queued run should wait its turn, not SIGTERM a
+  # deploy that's already mid-flight on the EC2 box.
+  cancel-in-progress: false
+
+jobs:
+  build-and-verify:
+    name: Install & verify (Node)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build (syntax-checks every .js file — see scripts/build.mjs)
+        run: npm run build
+
+  deploy:
+    name: Deploy to EC2
+    needs: build-and-verify
+    # Manual-only for now — switch to auto-deploy-on-push-to-main once a
+    # manual run has been verified clean (same phased approach used for
+    # the frontend repo).
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Plain OpenSSH via webfactory/ssh-agent — not appleboy/ssh-action.
+      # Learned on the frontend repo (2026-09-07): appleboy/ssh-action
+      # v1.2.0 (drone-ssh) reliably killed the session a few seconds in,
+      # matching a known v1.2.0 regression. Plain ssh has been reliable.
+      - name: Load deploy key into ssh-agent
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.EC2_SSH_KEY }}
+
+      - name: Trust EC2 host key
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H "${{ secrets.EC2_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Deploy to EC2
+        run: |
+          ssh -o BatchMode=yes "${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}" 'bash -s' < .github/workflows/scripts/deploy-backend.sh
