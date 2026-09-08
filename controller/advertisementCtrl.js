@@ -500,12 +500,18 @@ const create = async (req, res) => {
   }
 }
 
-// Flat click fee, same for every ad format. Impressions are recorded for
-// analytics but are NOT billed (clicks-only pricing).
+// Flat ad pricing, same for every format (same currency/units as `budget`).
+// Click fee: 0.30 per click. Impression fee: 0.1 per 1000 impressions =
+// 0.0001 per impression.
 const CLICK_PRICE_AED = 0.3
+const IMPRESSION_PRICE_AED = 0.1 / 1000
 
 function getCurrentPrice() {
   return CLICK_PRICE_AED
+}
+
+function getImpressionPrice() {
+  return IMPRESSION_PRICE_AED
 }
 
 const updatedClicks = async (req, res) => {
@@ -718,11 +724,24 @@ const updatedImpressions = async (req, res) => {
         })
       }
 
-      // Impressions are analytics-only under clicks-only pricing: record the
-      // view, never touch totalBudgetUsed or the wallet.
+      // Impression fee: 0.1 per 1000 impressions. Budget is a hard cap (no
+      // wallet) — stop billing once the prepaid budget is spent; serving already
+      // excludes exhausted ads, so this only guards the boundary/races.
+      const impressionPrice = getImpressionPrice()
+      const budget = Number(advertisementFound?.budget)
+      const used = Number(advertisementFound?.totalBudgetUsed) || 0
+      if (Number.isFinite(budget) && used >= budget) {
+        return res.status(200).json({
+          success: true,
+          message: 'Advertisement budget exhausted',
+        })
+      }
+
+      // Atomic spend increment + impression record — no read-then-write race.
       const result = await Advertisement.findByIdAndUpdate(
         body.advertisementId,
         {
+          $inc: { totalBudgetUsed: impressionPrice },
           $push: { 'creatives.$[element].impressions': obj },
         },
         {
