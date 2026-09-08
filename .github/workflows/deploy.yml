@@ -36,10 +36,10 @@ jobs:
   deploy:
     name: Deploy to EC2
     needs: build-and-verify
-    # Manual-only for now — switch to auto-deploy-on-push-to-main once a
-    # manual run has been verified clean (same phased approach used for
-    # the frontend repo).
-    if: github.event_name == 'workflow_dispatch'
+    # Auto-deploys on push to main (verified clean via manual runs on
+    # 2026-09-07, same phased approach used for the frontend repo).
+    # Also runnable by hand via workflow_dispatch.
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
     steps:
       - name: Checkout

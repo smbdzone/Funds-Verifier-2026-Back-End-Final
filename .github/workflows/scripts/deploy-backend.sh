@@ -6,9 +6,9 @@ echo "Starting Backend Deployment"
 cd /home/ubuntu/Funds-Verifier-2026-Back-End-Final
 
 echo "Getting latest code"
-git fetch origin fv-abbas
-git checkout -B fv-abbas origin/fv-abbas
-git reset --hard origin/fv-abbas
+git fetch origin main
+git checkout -B main origin/main
+git reset --hard origin/main
 
 # Install + syntax-check run in their own session (setsid), not just
 # nohup'd, and polled via a marker file — not as a foreground command
