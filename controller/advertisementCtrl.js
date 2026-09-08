@@ -269,7 +269,11 @@ const getAllFooterBanners = async (req, res) => {
           isDeleted: { $ne: true },
           Approval: 'Approved',
           paymentStatus: 1,
-          userId: { $ne: userId },
+          // ===== TEST BYPASS (own-ad gate disabled so you can see your own ad) =====
+          // REVERT FOR PRODUCTION: uncomment the next line to re-exclude the
+          // viewer's own ads.
+          // userId: { $ne: userId },
+          // ===== END TEST BYPASS =====
         },
       },
       { $unwind: '$creatives' },
@@ -560,13 +564,16 @@ const updatedClicks = async (req, res) => {
           .json({ success: false, message: 'Advertisement not found' })
       }
 
+      // ===== TEST BYPASS (own-ad click block disabled so you can test clicks on your own ad) =====
+      // REVERT FOR PRODUCTION: uncomment this block to stop owners billing their own ad.
       // Check if the user is the creator of the advertisement
-      if (userIdFromToken === advertisementFound.userId.toString()) {
-        return res.status(403).json({
-          success: false,
-          message: 'User cannot add click to their own advertisement',
-        })
-      }
+      // if (userIdFromToken === advertisementFound.userId.toString()) {
+      //   return res.status(403).json({
+      //     success: false,
+      //     message: 'User cannot add click to their own advertisement',
+      //   })
+      // }
+      // ===== END TEST BYPASS =====
 
       // Server-side de-dup: at most one billable click per user, per creative,
       // per 24h. The frontend localStorage guard is clearable, so this is the
@@ -696,13 +703,16 @@ const updatedImpressions = async (req, res) => {
           .json({ success: false, message: 'Advertisement not found' })
       }
 
+      // ===== TEST BYPASS (own-ad impression block disabled so you can test impressions on your own ad) =====
+      // REVERT FOR PRODUCTION: uncomment this block to stop owners billing their own ad.
       // Check if the user is the creator of the advertisement
-      if (userIdFromToken === advertisementFound?.userId?.toString()) {
-        return res.status(403).json({
-          success: false,
-          message: 'User cannot add impression to their own advertisement',
-        })
-      }
+      // if (userIdFromToken === advertisementFound?.userId?.toString()) {
+      //   return res.status(403).json({
+      //     success: false,
+      //     message: 'User cannot add impression to their own advertisement',
+      //   })
+      // }
+      // ===== END TEST BYPASS =====
 
       // Check if userId is already present in the advertisement's impressions within the last 24 hours
       const isUserIdPresent = (advertisementFound.creatives || []).some(
