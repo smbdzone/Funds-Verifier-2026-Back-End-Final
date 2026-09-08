@@ -195,22 +195,27 @@ export const createContact = async (req, res) => {
     })
 
     // Nodemailer Configuration
-    sendEmail({
-      to: email,
-      subject: clean(subject),
-      html: `
-        <h2>You have a new contact request</h2>
-        <p><strong>Full Name:</strong> ${clean(fullName)}</p>
-        <p><strong>Email:</strong> ${clean(email)}</p>
-        <p><strong>Phone:</strong> ${clean(phone)}</p>
-        <p><strong>Subject:</strong> ${clean(subject)}</p>
-        <p><strong>Message:</strong> ${clean(message)}</p>
-      `,
-    }).then((result) => {
-      if (!result.success) {
-        console.warn(`Contact notification email failed: ${result.error}`)
-      }
-    })
+    const contactUsEmail = String(process.env.CONTACT_US_EMAIL || '').trim()
+    if (!contactUsEmail) {
+      console.warn('Contact notification email not sent: CONTACT_US_EMAIL is not configured')
+    } else {
+      sendEmail({
+        to: contactUsEmail,
+        subject: clean(subject),
+        html: `
+          <h2>You have a new contact request</h2>
+          <p><strong>Full Name:</strong> ${clean(fullName)}</p>
+          <p><strong>Email:</strong> ${clean(email)}</p>
+          <p><strong>Phone:</strong> ${clean(phone)}</p>
+          <p><strong>Subject:</strong> ${clean(subject)}</p>
+          <p><strong>Message:</strong> ${clean(message)}</p>
+        `,
+      }).then((result) => {
+        if (!result.success) {
+          console.warn(`Contact notification email failed: ${result.error}`)
+        }
+      })
+    }
 
     res
       .status(200)
