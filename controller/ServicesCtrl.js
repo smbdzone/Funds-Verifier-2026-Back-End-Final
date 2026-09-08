@@ -4,13 +4,18 @@ import ReportTechnical from '../models/reportModel.js'
 import { stripe } from '../libs/stripe.js'
 import Transaction from '../models/transactionModel.js'
 import validateMongoId from '../utils/validateMongodbId.js'
-import { verifyToken } from '../middlewares/JwtAuth.js'
 import Property from '../models/propertyModel.js'
 import Cars from '../models/carModel.js'
 import Boats from '../models/boatModel.js'
 import Jewelry from '../models/jewelryModel.js'
 import { createNotification } from './notifications.controller.js'
 import { sanitizeUUID } from '../utils/nosqlSanitizer.js'
+import {
+  linkTechnicalReportToListing,
+  linkWalkthroughToListing,
+  clearUnpaidPremiumOnListing,
+} from '../utils/listingPremiumSync.js'
+import { markOffPlanApprovalFeePaidFromSession } from '../helper/notifyAssetHolderListingEvents.js'
 
 export const sendServiceNotification = async (data) => {
   try {
@@ -43,19 +48,11 @@ function getModelByAssetType(assetType) {
 // subscibe a new serice
 const SubscribeServices = async (req, res) => {
   try {
-    const authorizationHeader = req.headers['authorization']
-    if (!authorizationHeader || !authorizationHeader.startsWith('Bearer ')) {
+    if (!req.user?._id) {
       return res.status(401).json({
         success: false,
-        message: 'Bearer token not found in Authorization header',
+        message: 'Unauthorized',
       })
-    }
-    const bearerToken = authorizationHeader.split(' ')[1]
-    const userIdFromToken = verifyToken(bearerToken)
-    if (!userIdFromToken) {
-      return res
-        .status(401)
-        .json({ success: false, message: 'User ID not found in token.' })
     }
 
     const {
@@ -69,7 +66,7 @@ const SubscribeServices = async (req, res) => {
       success_url,
       cancel_url,
     } = req.body
-    const phone = req.body.phone.trim()
+    const phone = typeof req.body.phone === 'string' ? req.body.phone.trim() : ''
 
     if (!req.user._id)
       return res.status(401).json({
@@ -99,21 +96,21 @@ const SubscribeServices = async (req, res) => {
 
     const sanitizedUserUUID = sanitizeUUID(userUUID)
     const sanitizedProductId = sanitizeUUID(productId)
-    
+
     if (!sanitizedUserUUID) {
       return res.status(400).json({
         error: true,
         message: 'Invalid user UUID format',
       })
     }
-    
+
     if (!sanitizedProductId) {
       return res.status(400).json({
         error: true,
         message: 'Invalid product UUID format',
       })
     }
-    
+
     const GetUser = await User.findOne({ uuid: sanitizedUserUUID, isDeleted: false })
     if (!GetUser)
       return res.status(400).json({ error: true, message: 'User not found.' })
@@ -122,6 +119,20 @@ const SubscribeServices = async (req, res) => {
       uuid: sanitizedProductId,
       isDeleted: false,
     })
+    if (!product) {
+      return res.status(404).json({ error: true, message: 'Product not found.' })
+    }
+
+    const fieldsToClear = []
+    if (service === '_3dwalkthrough') fieldsToClear.push('video3DWalkthrough')
+    else if (service === 'surveyor') fieldsToClear.push('technicalReport')
+    else if (service === 'all') {
+      fieldsToClear.push('technicalReport', 'video3DWalkthrough')
+    }
+    if (fieldsToClear.length) {
+      await clearUnpaidPremiumOnListing(product, AssetModel, fieldsToClear)
+    }
+
     let reportTech
     let request3D
 
@@ -319,6 +330,28 @@ const UpdateUserForSubscribeServices = async (req, res) => {
         .json({ error: true, message: 'Payment not completed yet.' })
     }
 
+    if (session?.metadata?.paymentType === 'off_plan_approval_fee') {
+      const listing = await markOffPlanApprovalFeePaidFromSession(session)
+      if (!listing) {
+        return res.status(404).json({
+          error: true,
+          message: 'Off-plan listing not found for this payment.',
+        })
+      }
+
+      return res.status(200).json({
+        message: 'Off-plan approval fee paid successfully.',
+        success: true,
+        payload: {
+          payment_status: 'paid',
+          amount_total: (session?.amount_total || 0) / 100,
+          currency: session?.currency,
+          paymentType: 'off_plan_approval_fee',
+          listingUuid: listing.uuid,
+        },
+      })
+    }
+
     // Read metadata from session
     const userId = session?.metadata?.userId
     const service = session?.metadata?.service
@@ -343,29 +376,43 @@ const UpdateUserForSubscribeServices = async (req, res) => {
     let request3dwalkthrough
     let reportTech
 
+    const paymentUpdate = {
+      payment_details,
+      payment_method_status,
+      isDeleted: false,
+      deletedAt: null,
+    }
+
     if (service === 'all') {
-      request3dwalkthrough = await Request3D.findByIdAndUpdate(request3DId, {
-        status: 'successful',
-        payment_details,
-        payment_method_status,
-      })
-      reportTech = await ReportTechnical.findByIdAndUpdate(reportTechId, {
-        status: 'successful',
-        payment_details,
-        payment_method_status,
-      })
+      request3dwalkthrough = await Request3D.findByIdAndUpdate(
+        request3DId,
+        paymentUpdate,
+        { new: true },
+      )
+      reportTech = await ReportTechnical.findByIdAndUpdate(
+        reportTechId,
+        paymentUpdate,
+        { new: true },
+      )
     } else if (service === 'surveyor') {
-      reportTech = await ReportTechnical.findByIdAndUpdate(reportTechId, {
-        status: 'successful',
-        payment_details,
-        payment_method_status,
-      })
+      reportTech = await ReportTechnical.findByIdAndUpdate(
+        reportTechId,
+        paymentUpdate,
+        { new: true },
+      )
     } else if (service === '_3dwalkthrough') {
-      request3dwalkthrough = await Request3D.findByIdAndUpdate(request3DId, {
-        status: 'successful',
-        payment_details,
-        payment_method_status,
-      })
+      request3dwalkthrough = await Request3D.findByIdAndUpdate(
+        request3DId,
+        paymentUpdate,
+        { new: true },
+      )
+    }
+
+    if (reportTech) {
+      await linkTechnicalReportToListing(reportTech)
+    }
+    if (request3dwalkthrough) {
+      await linkWalkthroughToListing(request3dwalkthrough)
     }
 
     const TransactionRequest = new Transaction({

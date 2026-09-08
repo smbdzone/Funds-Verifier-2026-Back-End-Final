@@ -10,7 +10,16 @@ import { assertListingApprovedForPremium } from '../utils/listingApprovalHelper.
 import {
   linkTechnicalReportToListing,
   listingMetaFromApproval,
+  clearUnpaidPremiumOnListing,
+  modelForAssetType,
+  isPremiumServiceRecordPaid,
 } from '../utils/listingPremiumSync.js'
+import {
+  notifyAssetHolderTechnicalReportCompleted,
+  resolveListingFromPremiumRecord,
+} from '../helper/notifyAssetHolderListingEvents.js'
+import { notifyFvPremiumServiceRequested } from '../utils/fvPortalMail.js'
+import { notifyPremiumProviderRequest } from '../utils/premiumProviderMail.js'
 
 export const createReport = async (req, res) => {
   try {
@@ -32,6 +41,7 @@ export const createReport = async (req, res) => {
       productId,
     } = req.body
 
+    let listingMeta = {}
     if (productUUID || productId) {
       const approval = await assertListingApprovedForPremium({
         productUUID,
@@ -40,6 +50,13 @@ export const createReport = async (req, res) => {
       })
       if (!approval.ok) {
         return res.status(approval.status).json({ message: approval.message })
+      }
+      listingMeta = listingMetaFromApproval(approval)
+      const AssetModel = modelForAssetType(assetType)
+      if (AssetModel && approval.listing) {
+        await clearUnpaidPremiumOnListing(approval.listing, AssetModel, [
+          'technicalReport',
+        ])
       }
     }
 
@@ -95,6 +112,42 @@ export const createReport = async (req, res) => {
       console.log({ error: error?.message })
     }
 
+    try {
+      await notifyFvPremiumServiceRequested({
+        serviceType: 'technical_report',
+        request: newReport,
+        listing: listingMeta?.productTitle
+          ? {
+            title: listingMeta.productTitle,
+            assetType,
+            uuid: listingMeta.productUUID,
+            _id: listingMeta.productId,
+          }
+          : null,
+      })
+    } catch (error) {
+      console.log({ fvPortalTechnicalRequestEmailError: error?.message || error })
+    }
+
+    try {
+      await notifyPremiumProviderRequest({
+        serviceType: 'technical_report',
+        request: newReport,
+        listing: listingMeta?.productTitle
+          ? {
+            title: listingMeta.productTitle,
+            assetType,
+            uuid: listingMeta.productUUID,
+            _id: listingMeta.productId,
+          }
+          : null,
+      })
+    } catch (error) {
+      console.log({
+        premiumTechnicalRequestEmailError: error?.message || error,
+      })
+    }
+
     res
       .status(201)
       .json({ message: 'Request submitted successfully', report: newReport })
@@ -106,9 +159,18 @@ export const createReport = async (req, res) => {
 export const getReports = async (req, res) => {
   try {
     const reports = await Report.find({ isDeleted: false })
-      .select('-_id -isDeleted -deletedAt -createdAt -updatedAt')
+      .sort({ createdAt: -1 })
       .populate('reportFile')
-    res.status(200).json(reports)
+      .lean()
+
+    const paidReports = reports.filter(isPremiumServiceRecordPaid)
+
+    const payload = paidReports.map(
+      ({ _id, productId, userId, createdAt, updatedAt, isDeleted, deletedAt, ...rest }) =>
+        rest,
+    )
+
+    res.status(200).json(payload)
   } catch (error) {
     res.status(500).json({ message: 'Error fetching requests', error })
   }
@@ -148,6 +210,7 @@ export const getReportById = async (req, res) => {
           sizeSQFT: 1,
           bedrooms: 1,
           bathrooms: 1,
+          projectName: 1,
           developer: 1,
           isFurnished: 1,
           occupancyStatus: 1,
@@ -240,6 +303,14 @@ export const updateReport = async (req, res) => {
       delete data.assetId
     }
 
+    const existingReport = await Report.findOne({
+      uuid: sanitizedUUID,
+      isDeleted: false,
+    })
+    if (!existingReport) {
+      return res.status(404).json({ message: 'Report not found' })
+    }
+
     const updatedReport = await Report.findOneAndUpdate(
       { uuid: sanitizedUUID },
       data,
@@ -252,20 +323,49 @@ export const updateReport = async (req, res) => {
       return res.status(404).json({ message: 'Report not found' })
     }
 
-    await linkTechnicalReportToListing(updatedReport)
+    const reportForLink = await Report.findOne({
+      uuid: sanitizedUUID,
+      isDeleted: false,
+    })
+    if (reportForLink) {
+      await linkTechnicalReportToListing(reportForLink)
+    }
+
+    const becameSuccessful =
+      existingReport.status !== 'successful' &&
+      updatedReport.status === 'successful'
 
     try {
-      const NotificationData = {
-        userId: updatedReport?.userId,
-        userUUID: updatedReport?.userUUID,
-        UserRole: 'AssetHolder',
-        title: 'Technical Report',
-        message: `report for technical report is updated.`,
-        RelateRoute: 'TechnicalReport',
-        RelatedId: updatedReport?.productId,
-        RelatedUUID: updatedReport?.productUUID,
+      if (becameSuccessful) {
+        const listing =
+          (await resolveListingFromPremiumRecord(
+            reportForLink || updatedReport,
+          )) || null
+        await notifyAssetHolderTechnicalReportCompleted({
+          listing: listing || {
+            userUUID: updatedReport?.userUUID || existingReport.userUUID,
+            title:
+              updatedReport?.productTitle || existingReport.productTitle,
+            uuid: updatedReport?.productUUID || existingReport.productUUID,
+            _id: updatedReport?.productId || existingReport.productId,
+            assetType: updatedReport?.assetType || existingReport.assetType,
+          },
+          assetType: updatedReport?.assetType || existingReport.assetType,
+          provider: req.user || { name: updatedReport?.name },
+        })
+      } else {
+        const NotificationData = {
+          userId: updatedReport?.userId,
+          userUUID: updatedReport?.userUUID,
+          UserRole: 'AssetHolder',
+          title: 'Technical Report',
+          message: `report for technical report is updated.`,
+          RelateRoute: 'TechnicalReport',
+          RelatedId: updatedReport?.productId,
+          RelatedUUID: updatedReport?.productUUID,
+        }
+        await createNotification({ data: NotificationData })
       }
-      await createNotification({ data: NotificationData })
     } catch (error) {
       console.log({ error: error?.message })
     }

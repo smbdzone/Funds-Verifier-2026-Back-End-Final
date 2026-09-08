@@ -2,6 +2,8 @@ import express from 'express'
 import jwt from 'jsonwebtoken'
 import crypto from 'crypto'
 import { publicTokenMiddleware } from '../middlewares/publicTokenMiddleware.js'
+import { requireAuthOrPublicToken } from '../middlewares/requireAuthOrPublicToken.js'
+import { optionalAuthMiddleware } from '../middlewares/authMiddleware.js'
 import { publicTokenLimiter } from '../middlewares/rateLimiter.js'
 
 const router = express.Router()
@@ -20,16 +22,18 @@ router.get('/get-public-token', publicTokenLimiter, (req, res) => {
   res.json({ success: true, token })
 })
 
-router.get('/data', publicTokenMiddleware, (req, res) => {
-  if (req.user) {
-    return res.json({ data: 'AUTHENTICATED USER DATA' })
-  }
+router.get(
+  '/data',
+  optionalAuthMiddleware,
+  publicTokenMiddleware,
+  requireAuthOrPublicToken,
+  (req, res) => {
+    if (req.user) {
+      return res.json({ data: 'AUTHENTICATED USER DATA' })
+    }
 
-  if (req.publicUser) {
     return res.json({ data: 'PUBLIC USER DATA' })
-  }
-
-  return res.status(401).json({ message: 'Access denied' })
-})
+  },
+)
 
 export default router

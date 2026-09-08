@@ -22,8 +22,34 @@ import {
   sanitizeListingMediaResponse,
   sanitizeListingsMediaResponse,
 } from '../helper/sanitizeListingResponse.js'
+import {
+  recordListingClick,
+} from '../helper/listingAnalytics.js'
+import {
+  getListingSellersByUuid,
+  resolveListingSeller,
+  getSellerRef,
+  attachListingSellerContact,
+} from '../helper/listingSellerInfo.js'
 import { attachDocumentSignedUrls } from '../helper/attachDocumentSignedUrls.js'
-import { stripNullPremiumRefs } from '../utils/listingPremiumSync.js'
+import {
+  REQUEST_DOCUMENT_POPULATE,
+  applyRequestDocumentUpdate,
+  attachRequestDocumentSignedUrls,
+  normalizeRequestDocumentList,
+} from '../helper/requestDocumentHelpers.js'
+import {
+  stripNullPremiumRefs,
+  refreshListingPremiumFieldsForEdit,
+  sanitizeUnpaidPremiumServicesForClient,
+} from '../utils/listingPremiumSync.js'
+import { buildListingIdQuery } from '../utils/listingIdLookup.js'
+import { isListingPrivilegedUser } from '../utils/parentEvaluator.js'
+import {
+  blockPriceChangeIfUnderProcess,
+  stripUnderProcessFromListingPayload,
+} from '../utils/listingUnderProcess.js'
+import { restrictAssetHolderBodyAfterApproval } from '../utils/listingEditLock.js'
 import upload from '../middlewares/Multer.js'
 import express from 'express'
 
@@ -35,9 +61,29 @@ import { verifyToken } from '../middlewares/JwtAuth.js'
 import UserModel from '../models/userModel.js'
 import { AssetsListingsPricing } from '../utils/AssetsListingsPricing.js'
 import { createNotification } from './notifications.controller.js'
+import { notifyEvaluatorsNewListing } from '../helper/notificationHelpers.js'
+import { notifyAssetHolderDocumentRequested } from '../helper/notifyDocumentRequested.js'
+import {
+  listingBecameEvaluatorApproved,
+  notifyAssetHolderListingApproved,
+} from '../helper/notifyAssetHolderListingEvents.js'
 import { AddPaymentJob } from '../utils/jobs/index.js'
 import UserPaymentDetails from '../models/UserPaymentDetails.js'
 import { PUBLIC_CAR_FIELDS } from '../constants/publicFields.js'
+import {
+  applyCardListPopulates,
+  CARD_CAR_FIELDS,
+  computeCardRatingFields,
+  shouldUseCardListProjection,
+} from '../utils/listingCardQuery.js'
+import { findRelatedListings } from '../utils/relatedListings.js'
+import {
+  getSafeStringParam,
+  getSafeTitleRegex,
+  pickScalarFilters,
+  applyListingStatusFilters,
+  applyEvaluatorPendingFilter,
+} from '../utils/listingQuery.js'
 
 const app = express()
 const __filename = fileURLToPath(import.meta.url)
@@ -71,48 +117,54 @@ const createProduct = asyncHandler(async (req, res) => {
       price: req.body.price,
     })
 
+    stripNullPremiumRefs(req.body)
+
     const createPdt = await Car.create([req.body], { session })
 
-    // add evaluation payment message queue
-    try {
-      const PaymentDetails = await UserPaymentDetails.create({
-        userId: user?._id,
-        userUUID: user?.uuid,
-        assetTitle: createPdt?.[0]?.title,
-        assetType: 'property',
-        customerId: req?.body?.customerId,
-        paymentMethod: req?.body?.paymentMethod,
-      })
-      await AddPaymentJob({
-        jobId: PaymentDetails?._id,
-        assetId: createPdt?.[0]?._id,
-        assetType: 'car',
-        PaymentDetailsId: PaymentDetails?._id,
-        userId: createPdt?.[0]?.userId,
-      })
-    } catch (error) {
-      // Keep error logging for queue failures
-      console.log(`Error adding job to queue: ${error.message}`)
+    const paidViaClozer =
+      req.body?.payment_provider === 'clozer' ||
+      Boolean(req.body?.clozer_transaction_id)
+
+    if (!paidViaClozer) {
+      try {
+        const PaymentDetails = await UserPaymentDetails.create({
+          userId: user?._id,
+          userUUID: user?.uuid,
+          assetTitle: createPdt?.[0]?.title,
+          assetType: 'property',
+          customerId: req?.body?.customerId,
+          paymentMethod: req?.body?.paymentMethod,
+        })
+        await AddPaymentJob({
+          jobId: PaymentDetails?._id,
+          assetId: createPdt?.[0]?._id,
+          assetType: 'car',
+          PaymentDetailsId: PaymentDetails?._id,
+          userId: createPdt?.[0]?.userId,
+        })
+      } catch (error) {
+        console.log(`Error adding job to queue: ${error.message}`)
+      }
     }
 
     // Try to find and update the latest pending 3D Request
     const pendingRequest = await Request3D.findOneAndUpdate(
-      { status: 'pending' },
+      { status: 'pending', isDeleted: { $ne: true } },
       {
         productId: createPdt[0]._id,
+        productUUID: createPdt[0].uuid,
         productTitle: createPdt[0].title,
         assetType: createPdt[0].assetType,
-        status: 'successful',
       },
       { new: true, sort: { createdAt: -1 }, session }
     )
     const pendingReport = await Report.findOneAndUpdate(
-      { status: 'pending' },
+      { status: 'pending', isDeleted: { $ne: true } },
       {
         productId: createPdt[0]._id,
+        productUUID: createPdt[0].uuid,
         productTitle: createPdt[0].title,
         assetType: createPdt[0].assetType,
-        status: 'successful',
       },
       { new: true, sort: { createdAt: -1 }, session }
     )
@@ -128,27 +180,24 @@ const createProduct = asyncHandler(async (req, res) => {
     } else {
       // If no pending request was found, just return the created product
       await session.commitTransaction()
-
-      try {
-        const NotificationData = {
-          userId: user._id,
-          userUUID: user.uuid,
-          UserRole: 'Evaluator',
-          title: 'Evaluation',
-          message: `New Car (${createPdt[0]?.title}) added for evaluation.`,
-          RelateRoute: 'evaluation',
-          RelatedId: createPdt[0]?._id,
-        }
-        await createNotification({ data: NotificationData })
-      } catch (error) {
-        console.log({ error: error?.message })
-      }
-
       res.json({
         car: createPdt[0],
         message:
           'Car created successfully, but no pending 3D request or but no pending 3D report was found to update.',
       })
+    }
+
+    try {
+      await notifyEvaluatorsNewListing({
+        message: `New Car (${createPdt[0]?.title}) added for evaluation.`,
+        assetType: createPdt[0]?.assetType || 'car',
+        relatedId: createPdt[0]?._id,
+        relatedUUID: createPdt[0]?.uuid,
+        listing: createPdt[0],
+        assetHolder: user,
+      })
+    } catch (error) {
+      console.log({ error: error?.message })
     }
   } catch (err) {
     await session.abortTransaction()
@@ -161,26 +210,32 @@ const createProduct = asyncHandler(async (req, res) => {
   }
 })
 
-// get single product
+// get single product by id or slug
 const getSingleProduct = asyncHandler(async (req, res) => {
   const { id } = req.params
 
+  if (!id) {
+    return res.status(400).json({ message: 'Invalid car ID' })
+  }
+
   const { sanitizeUUID } = await import('../utils/nosqlSanitizer.js')
-  const sanitizedId = sanitizeUUID(id)
-  if (!sanitizedId) {
-    return res.status(400).json({
-      success: false,
-      message: 'Invalid UUID format',
-    })
+  const sanitizedUuid = sanitizeUUID(id)
+  const lookupQuery = { isDeleted: false }
+
+  if (sanitizedUuid) {
+    lookupQuery.$or = [{ uuid: sanitizedUuid }, { slug: id }]
+  } else {
+    lookupQuery.slug = id
   }
 
   try {
-    const car = await Car.findOne({ uuid: sanitizedId, isDeleted: false })
+    const car = await Car.findOne(lookupQuery)
       .populate('pictures')
       .populate('video')
-      .populate('thumbnailImg')
+      .populate('thumbnailImg').populate('qrScan')
       .populate('video3DWalkthrough')
       .populate('uploadDocument')
+      .populate(REQUEST_DOCUMENT_POPULATE)
       .populate('transactionDepositDocument')
       .populate('transactionId')
       .populate('userId')
@@ -196,21 +251,33 @@ const getSingleProduct = asyncHandler(async (req, res) => {
       return res.status(404).json({ message: 'Car not found' })
     }
 
-    await refreshListingMediaSignedUrls(car)
-    // Strip server-internal S3 fields before responding (signedUrl is all the
-    // client needs — see helper/sanitizeListingResponse.js for the rationale).
-    sanitizeListingMediaResponse(car)
+    car.requestDocument = normalizeRequestDocumentList(car.requestDocument)
 
-    const isPrivilegedUser =
-      req.user &&
-      ['Admin', 'AssetHolder', 'Evaluator', 'Sub-Evaluator'].includes(
-        req.user.role,
-      )
+    await refreshListingMediaSignedUrls(car)
+
+    const isPrivilegedUser = isListingPrivilegedUser(req.user)
 
     if (!isPrivilegedUser) {
-      return res.json(pickFields(car, PUBLIC_CAR_FIELDS.trim().split(/\s+/)))
+      recordListingClick(Car, car)
+      await attachDocumentSignedUrls(car, {
+        fields: ['evaluationCertificate', 'technicalReport'],
+      })
+      const publicCar = pickFields(car, PUBLIC_CAR_FIELDS.trim().split(/\s+/))
+      const sellersByUuid = await getListingSellersByUuid([car])
+      const seller = resolveListingSeller(car, sellersByUuid)
+      if (seller) {
+        publicCar.sellerRef = getSellerRef(seller)
+      }
+      sanitizeListingMediaResponse(publicCar)
+      sanitizeUnpaidPremiumServicesForClient(publicCar)
+      return res.json(publicCar)
     }
 
+    await attachDocumentSignedUrls(car)
+    await attachRequestDocumentSignedUrls(car)
+    sanitizeListingMediaResponse(car)
+    await refreshListingPremiumFieldsForEdit(car)
+    await attachListingSellerContact(car)
     res.json(car)
   } catch (err) {
     console.error('Error fetching car:', err.message)
@@ -235,41 +302,14 @@ const getSingleProductBySlug = asyncHandler(async (req, res) => {
 
 // // get all product
 const getAllProduct = asyncHandler(async (req, res) => {
-  const queryObj = { ...req.query }
-
-  // ---------------- AUTH (SAFE) ----------------
-  let user = null
-  const header = req.headers['authorization']
-  const token = header?.split(' ')[1]
-
-  if (token) {
-    const userId = verifyToken(token)
-    if (userId) {
-      user = await UserModel.findById(userId)
-    }
-  }
-
+  // ---------------- AUTH — optionalAuthMiddleware (Bearer + cookie) ----------------
+  const user = req.user || null
   const isAuthenticated = !!user
 
-  // ---------------- QUERY CLEANUP ----------------
-  const excludeField = [
-    'page',
-    'sort',
-    'limit',
-    'fields',
-    'date',
-    'minPrice',
-    'maxPrice',
-    'statusFilter',
-    'title',
-    'dashboard',
-  ]
-
-  excludeField.forEach((el) => delete queryObj[el])
-
-  let queryStr = JSON.stringify(queryObj)
-  queryStr = queryStr.replace(/\b(gte|gt|lte|lt)\b/g, (m) => `$${m}`)
-  const parseData = JSON.parse(queryStr)
+  // ---------------- SAFE FILTER PARAMS ----------------
+  const parseData = {
+    ...pickScalarFilters(req.query),
+  }
 
   // ---------------- PUBLIC DEFAULT ----------------
   parseData.isDeleted = false
@@ -283,8 +323,14 @@ const getAllProduct = asyncHandler(async (req, res) => {
   }
 
   if (req.query.title) {
-    parseData.title = { $regex: req.query.title, $options: 'i' }
+    const titleFilter = getSafeTitleRegex(req.query)
+    if (titleFilter) {
+      parseData.title = titleFilter
+    }
   }
+
+  applyListingStatusFilters(parseData, req.query)
+  applyEvaluatorPendingFilter(parseData, req.query)
 
   // ---------------- AUTHENTICATED LOGIC ----------------
   if (isAuthenticated) {
@@ -300,7 +346,7 @@ const getAllProduct = asyncHandler(async (req, res) => {
       .toLowerCase()
       .replace(/[\s_-]/g, '')
     const isElevatedModerator =
-      ['Admin', 'Evaluator'].includes(user.role) || roleNorm === 'superadmin'
+      ['Admin', 'Evaluator', 'Trustee'].includes(user.role) || roleNorm === 'superadmin'
 
     if (!isSubEvaluator && isElevatedModerator) {
       delete parseData.listing
@@ -335,31 +381,48 @@ const getAllProduct = asyncHandler(async (req, res) => {
 
   // ---------------- QUERY BUILD ----------------
   let query = Car.find(parseData)
+  const useCardProjection = shouldUseCardListProjection(req, isAuthenticated)
 
-  // 🔐 FIELD SELECTION
-  if (!isAuthenticated) {
-    query = query.select(PUBLIC_CAR_FIELDS)
+  if (useCardProjection) {
+    query = query.select(CARD_CAR_FIELDS)
+    query = applyCardListPopulates(query)
   } else {
-    query = query.select('-__v')
-  }
+    // 🔐 FIELD SELECTION
+    if (!isAuthenticated) {
+      query = query.select(PUBLIC_CAR_FIELDS)
+    } else {
+      query = query.select('-__v')
+    }
 
-  // 🔐 SAFE POPULATES
-  query = query
-    .populate({ path: 'pictures', select: '-_id' })
-    .populate({ path: 'video', select: '-_id' })
-    .populate({ path: 'thumbnailImg', select: '-_id' })
-
-  // ❗ Only authenticated users get sensitive data
-  if (isAuthenticated) {
+    // 🔐 SAFE POPULATES
     query = query
+      .populate({ path: 'pictures', select: '-_id' })
+      .populate({ path: 'video', select: '-_id' })
+      .populate({ path: 'thumbnailImg', select: '-_id' })
+      .populate({ path: 'qrScan', select: '-_id' })
       .populate({ path: 'evaluationCertificate', select: '-_id' })
-      .populate({ path: 'uploadDocument', select: '-_id' })
-      .populate({ path: 'invoice', select: '-_id' })
+      .populate({ path: 'video3DWalkthrough', select: '-_id' })
+      .populate({ path: 'userId', select: 'profileImage name uuid' })
       .populate({
         path: 'technicalReport',
         populate: { path: 'reportFile', select: '-_id' },
       })
-      .populate({ path: 'ratings.postedBy', select: '-_id' })
+
+    if (isAuthenticated) {
+      query = query
+        .populate({ path: 'uploadDocument', select: '-_id' })
+        .populate(REQUEST_DOCUMENT_POPULATE)
+        .populate({ path: 'invoice', select: '-_id' })
+        .populate({ path: 'evaluator', select: 'name displayName uuid' })
+        .populate({ path: 'ratings.postedBy', select: '-_id' })
+    }
+  }
+
+  if (req.query.sort) {
+    const sortBy = req.query.sort.split(',').join(' ')
+    query = query.sort(sortBy)
+  } else {
+    query = query.sort('-createdAt')
   }
 
   // ---------------- PAGINATION ----------------
@@ -374,25 +437,52 @@ const getAllProduct = asyncHandler(async (req, res) => {
   // media; re-run as a safety net for non-hooked paths (e.g. legacy lean).
   await refreshListingsMediaSignedUrls(products)
 
+  const sellersByUuid = await getListingSellersByUuid(products)
+
   // ---------------- RESPONSE SANITIZATION ----------------
   const finalProducts = await Promise.all(
     products.map(async (product) => {
       const obj = product.toObject()
+      const { reviewCount, averageRating } = computeCardRatingFields(obj)
 
       // ratings → stars only for public
       if (!isAuthenticated && Array.isArray(obj.ratings)) {
         obj.ratings = obj.ratings.map((r) => ({ star: r.star }))
       }
 
-      if (isAuthenticated) {
-        await attachDocumentSignedUrls(obj)
+      // Seller avatar for cards; strip other user fields for public callers
+      const seller = resolveListingSeller(obj, sellersByUuid)
+      if (seller) {
+        obj.sellerAvatar = seller.profileImage || ''
+        obj.sellerName = seller.name || ''
+        obj.sellerRef = getSellerRef(seller)
+        if (!isAuthenticated) {
+          obj.userId = {
+            profileImage: seller.profileImage || '',
+            name: seller.name || '',
+          }
+        }
+      }
+
+      if (!useCardProjection) {
+        if (isAuthenticated) {
+          await attachDocumentSignedUrls(obj)
+        } else {
+          await attachDocumentSignedUrls(obj, {
+            fields: ['evaluationCertificate', 'technicalReport'],
+          })
+        }
       }
 
       // Drop server-internal S3 metadata (s3Bucket/s3Key/s3VersionId/s3ETag/url)
       // — signedUrl is the only URL the client needs.
       sanitizeListingMediaResponse(obj)
 
-      return obj
+      return {
+        ...obj,
+        reviewCount,
+        averageRating,
+      }
     }),
   )
 
@@ -492,7 +582,7 @@ const getAllProductByFilter = asyncHandler(async (req, res) => {
   let query = Car.find(modifiedQuery)
     .populate('pictures')
     .populate('video')
-    .populate('thumbnailImg')
+    .populate('thumbnailImg').populate('qrScan')
     .populate('uploadDocument')
     .populate('evaluationCertificate')
     .populate('invoice')
@@ -538,6 +628,15 @@ const getAllProductByFilter = asyncHandler(async (req, res) => {
       typeof p.toObject === 'function' ? p.toObject() : p,
     )
     await refreshListingsMediaSignedUrls(allProduct)
+    await Promise.all(
+      allProduct.map((p) =>
+        userId
+          ? attachDocumentSignedUrls(p)
+          : attachDocumentSignedUrls(p, {
+            fields: ['evaluationCertificate', 'technicalReport'],
+          }),
+      ),
+    )
     sanitizeListingsMediaResponse(allProduct)
     const totalFilteredProducts = await Car.countDocuments(modifiedQuery)
 
@@ -559,24 +658,16 @@ const getAllProductByFilter = asyncHandler(async (req, res) => {
 // get Related product
 
 const getRelatedProduct = asyncHandler(async (req, res) => {
-  const { assetType, country, city, model, price } = req.query
-
-  // Construct the query object based on provided properties
-  const queryObj = {}
-  if (assetType) queryObj.assetType = assetType
-  if (country) queryObj.country = country
-  if (city) queryObj.city = city
-  if (model) queryObj.model = model
-  if (price) queryObj.price = price
-  queryObj.isDeleted = false
   try {
-    // Execute the query with the constructed query object
-    const allProduct = await Car.find(queryObj).select('-_id')
-    sanitizeListingsMediaResponse(allProduct)
-    res.json(allProduct)
+    const result = await findRelatedListings({
+      Model: Car,
+      cardFields: CARD_CAR_FIELDS,
+      query: req.query,
+      softFields: ['assetType', 'country', 'city', 'model', 'make'],
+    })
+    return res.status(200).json(result)
   } catch (err) {
-    // Handle errors appropriately
-    throw new Error(err)
+    return res.status(500).json({ message: err?.message || 'Server error' })
   }
 })
 
@@ -596,15 +687,35 @@ const updateProduct = asyncHandler(async (req, res) => {
 
     try {
       // Find the existing product
-      const product = await Car.findOne({ uuid: moduleId, isDeleted: false })
+      const product = await Car.findOne(buildListingIdQuery(moduleId)).populate(
+        'uploadDocument',
+      )
       if (!product) {
         return res.status(404).json({ message: 'car not found' })
       }
+
+      stripUnderProcessFromListingPayload(req.body)
+      const priceBlock = blockPriceChangeIfUnderProcess(product, req.body)
+      if (priceBlock) {
+        return res.status(403).json({ message: priceBlock })
+      }
+
+      req.body = restrictAssetHolderBodyAfterApproval(
+        product,
+        req.body,
+        req.user,
+      )
 
       // Update slug if title is provided
       if (req.body.title) {
         req.body.slug = slugify(req.body.title)
       }
+
+      const documentFulfilled = Boolean(req.body.fulfillRequestDocument)
+      applyRequestDocumentUpdate(product, req.body)
+
+      const requestedDocumentsUpdated =
+        Boolean(req.body.requestDocument) && !documentFulfilled
 
       // Handle technicalReport upload
       if (req.files && req.files.technicalReport) {
@@ -616,12 +727,15 @@ const updateProduct = asyncHandler(async (req, res) => {
         req.body.evaluationC = req.files.evaluationC[0].path
       }
 
-      // Handle uploadDocument upload and append to existing array
-      if (req.files && req.files.uploadDocument) {
-        const uploadedDocs = req.files.uploadDocument.map((file) => file.path)
+      // Handle uploadDocument IDs (from frontend)
+      if (req.body.uploadDocument && !documentFulfilled) {
+        const newDocumentIds = Array.isArray(req.body.uploadDocument)
+          ? req.body.uploadDocument
+          : [req.body.uploadDocument]
+
         req.body.uploadDocument = [
-          ...(product.uploadDocument || []),
-          ...uploadedDocs,
+          ...(product.uploadDocument || []).map((doc) => doc._id || doc),
+          ...newDocumentIds,
         ]
       }
 
@@ -634,15 +748,42 @@ const updateProduct = asyncHandler(async (req, res) => {
       ).select('-_id')
 
       try {
-        const NotificationData = {
-          userUUID: updatedProduct?.userUUID,
-          UserRole: 'AssetHolder',
-          title: 'Assets Car',
-          message: `Your car (${updatedProduct?.title}) has been updated.`,
-          RelateRoute: 'cars',
-          RelatedId: updatedProduct?._id,
+        if (requestedDocumentsUpdated) {
+          await notifyAssetHolderDocumentRequested({
+            listing: updatedProduct,
+            assetType: 'car',
+            requesterRole: req.user?.role,
+            title: 'Document Request',
+          })
+        } else if (
+          listingBecameEvaluatorApproved(product, updatedProduct)
+        ) {
+          await notifyAssetHolderListingApproved({
+            listing: {
+              ...(updatedProduct?.toObject?.() || updatedProduct),
+              _id: product._id,
+              userUUID: updatedProduct?.userUUID || product.userUUID,
+            },
+            assetType: 'car',
+            evaluator: req.user,
+          })
+        } else {
+          const NotificationData = {
+            userUUID: updatedProduct?.userUUID,
+            UserRole: 'AssetHolder',
+            title: 'Assets Car',
+            message: `Your car (${updatedProduct?.title}) has been updated.`,
+            RelateRoute: 'cars',
+            RelatedId: updatedProduct?._id,
+          }
+          if (documentFulfilled) {
+            NotificationData.UserRole = 'Evaluator'
+            NotificationData.userUUID = updatedProduct?.evaluatorUUID
+            NotificationData.message = `Seller uploaded a requested document for car (${updatedProduct?.title}).`
+            NotificationData.RelateRoute = 'evaluation'
+          }
+          await createNotification({ data: NotificationData })
         }
-        await createNotification({ data: NotificationData })
       } catch (error) {
         console.log({ error: error?.message })
       }

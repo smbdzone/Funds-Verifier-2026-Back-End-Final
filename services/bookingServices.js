@@ -4,6 +4,95 @@ import { Types } from 'mongoose'
 import User from '../models/userModel.js'
 import { createNotification } from '../controller/notifications.controller.js'
 import { refreshListingMediaSignedUrls } from '../helper/refreshAssetSignedUrls.js'
+import moment from 'moment'
+import {
+  syncListingUnderProcessFlag,
+} from '../utils/listingUnderProcess.js'
+import {
+  deriveTransactionPhase,
+  findAssetForBooking,
+  isTransactionBooking,
+  resolveTransferDocumentsForBooking,
+} from '../utils/transactionBooking.js'
+import { notifyAssetHolderViewingBooked } from '../helper/notifyAssetHolderViewingBooked.js'
+import sendTrusteeViewingBookedEmail from '../utils/trusteeViewingMail.js'
+
+export const VIEWING_SLOT_CATEGORY = 'viewing'
+export const SERVICE_SLOT_CATEGORY = 'service'
+
+export const roleToSlotCategory = (role = '') => {
+  const normalized = String(role).trim().toLowerCase().replace(/[\s_-]/g, '')
+  if (normalized === 'trustee') return VIEWING_SLOT_CATEGORY
+  if (normalized === 'assetholder' || normalized === 'dealhunter') {
+    return VIEWING_SLOT_CATEGORY
+  }
+  return SERVICE_SLOT_CATEGORY
+}
+
+/** Slots are stored as UTC midnight from YYYY-MM-DD — query the same UTC day. */
+const buildDateRange = (date) => {
+  if (!date) return null
+  const day = String(date).trim().slice(0, 10)
+  if (/^\d{4}-\d{2}-\d{2}$/.test(day)) {
+    return {
+      $gte: new Date(`${day}T00:00:00.000Z`),
+      $lte: new Date(`${day}T23:59:59.999Z`),
+    }
+  }
+  const parsedDate = moment.utc(date)
+  if (!parsedDate.isValid()) return null
+  return {
+    $gte: parsedDate.clone().startOf('day').toDate(),
+    $lte: parsedDate.clone().endOf('day').toDate(),
+  }
+}
+
+/** Include docs created before isDeleted existed. */
+const notDeletedClause = {
+  $or: [{ isDeleted: false }, { isDeleted: { $exists: false } }],
+}
+
+const buildSlotCategoryClause = async (userUUID, slotCategory) => {
+  const user = await User.findOne({ uuid: userUUID, isDeleted: false }).select(
+    'role uuid',
+  )
+  if (!user) return null
+
+  const inferred = roleToSlotCategory(user.role)
+  const normalizedRole = String(user.role || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[\s_-]/g, '')
+  const canOwnViewing =
+    inferred === VIEWING_SLOT_CATEGORY ||
+    normalizedRole === 'assetholder' ||
+    normalizedRole === 'dealhunter' ||
+    normalizedRole === 'trustee'
+
+  if (slotCategory === VIEWING_SLOT_CATEGORY) {
+    if (!canOwnViewing) return null
+    return {
+      $or: [
+        { slotCategory: VIEWING_SLOT_CATEGORY },
+        { slotCategory: { $exists: false } },
+      ],
+    }
+  }
+
+  return {
+    $or: [
+      { slotCategory: SERVICE_SLOT_CATEGORY },
+      {
+        slotCategory: { $exists: false },
+        creatorRole: { $ne: 'Trustee' },
+      },
+      {
+        slotCategory: { $exists: false },
+        creatorRole: { $exists: false },
+      },
+    ],
+  }
+}
 
 // Fetch available slots
 export const getAvailableSlotsService = async (date) => {
@@ -23,13 +112,14 @@ export const createBookingService = async (bookingData) => {
 
   if (!timeSlotId) throw new Error('timeSlotId is required')
   if (!brokerId) throw new Error('brokerId is required')
-  if (!assetHolderId) throw new Error('assetHolderId is required')
   if (!productData) throw new Error('productData is required')
 
   const resolveIdentifier = (value) => {
     if (!value) return ''
     if (typeof value === 'string' && value !== '[object Object]') {
-      return value.trim()
+      const trimmed = value.trim()
+      if (trimmed === 'undefined' || trimmed === 'null') return ''
+      return trimmed
     }
     if (typeof value === 'object') {
       return (
@@ -44,18 +134,30 @@ export const createBookingService = async (bookingData) => {
   }
 
   const normalizedBrokerId = resolveIdentifier(brokerId)
-  const normalizedAssetHolderId =
+  let normalizedAssetHolderId =
     resolveIdentifier(assetHolderId) ||
     resolveIdentifier(productData?.userUUID) ||
     resolveIdentifier(productData?.userId)
 
-  // Check if the specific time slot is available
   const slot = await Slot.findOne({
     'times.uuid': timeSlotId,
     'times.isBooked': false,
     isDeleted: false,
   })
   if (!slot) throw new Error('Time slot not available')
+
+  if (slot.slotCategory === SERVICE_SLOT_CATEGORY) {
+    throw new Error('This time slot is not available for property viewing')
+  }
+
+  const slotOwner = await User.findOne({
+    uuid: slot.userUUID,
+    isDeleted: false,
+  }).select('role uuid name email')
+
+  if (roleToSlotCategory(slotOwner?.role) !== VIEWING_SLOT_CATEGORY) {
+    throw new Error('This time slot is not available for property viewing')
+  }
 
   // Ensure broker exists
   const brokerQuery = { isDeleted: false, $or: [{ uuid: normalizedBrokerId }] }
@@ -65,7 +167,7 @@ export const createBookingService = async (bookingData) => {
   const broker = await User.findOne(brokerQuery)
   if (!broker) throw new Error('Broker not found')
 
-  // Ensure asset holder exists
+  // Ensure asset holder exists — fall back to listing owner from DB when needed.
   let assetHolder = null
   if (normalizedAssetHolderId) {
     const assetHolderQuery = {
@@ -76,6 +178,22 @@ export const createBookingService = async (bookingData) => {
       assetHolderQuery.$or.push({ _id: normalizedAssetHolderId })
     }
     assetHolder = await User.findOne(assetHolderQuery)
+  }
+
+  if (!assetHolder) {
+    const { asset: listing } = await findAssetForBooking({ productData })
+    const ownerUUID = resolveIdentifier(listing?.userUUID)
+    if (ownerUUID) {
+      normalizedAssetHolderId = ownerUUID
+      assetHolder = await User.findOne({
+        uuid: ownerUUID,
+        isDeleted: false,
+      })
+    }
+  }
+
+  if (!assetHolder?.uuid && !normalizedAssetHolderId) {
+    throw new Error('assetHolderId is required')
   }
 
   // Mark the time slot as booked
@@ -98,35 +216,97 @@ export const createBookingService = async (bookingData) => {
     timeSlotId: timeSlotObjectId,
     timeSlotUUID: timeSlotId,
     assetHolderId: assetHolder?._id,
-    assetHolderUUID: normalizedAssetHolderId,
+    assetHolderUUID: assetHolder?.uuid || normalizedAssetHolderId,
     brokerId: broker._id,
     brokerUUID: normalizedBrokerId,
     message,
-    productData,
+    productData: {
+      ...productData,
+      userUUID:
+        productData?.userUUID ||
+        assetHolder?.uuid ||
+        normalizedAssetHolderId,
+    },
+    status: 'open',
   })
 
+  const listingTitle = productData?.title || 'listing'
+  const assetType = productData?.assetType || 'property'
+  const buyerName =
+    broker?.name || broker?.displayName || broker?.email || 'A buyer'
+  const slotDate = slot?.date
+    ? moment(slot.date).format('DD MMM YYYY')
+    : ''
+  const slotTime = matchedTimeSlot?.time || ''
+
+  // Notify Trustee (slot owner) — dashboard + email
   try {
-    const NotificationData = {
-      userUUID: brokerId,
-      UserRole: 'Trustee',
-      title: 'Booking',
-      message: `A new booking for trustee added.`,
-      RelateRoute: 'Trustee',
-      RelatedId: booking?._id,
-      RelatedUUID: booking?.uuid,
+    const trusteeUUID = slotOwner?.uuid || slot.userUUID
+    if (trusteeUUID) {
+      await createNotification({
+        data: {
+          userUUID: trusteeUUID,
+          UserRole: 'Trustee',
+          title: 'Viewing Booked',
+          message: `${buyerName} booked a viewing for ${listingTitle}.`,
+          RelateRoute: 'Trustee',
+          RelatedId: booking?._id,
+          RelatedUUID: booking?.uuid,
+        },
+      })
+
+      await sendTrusteeViewingBookedEmail({
+        trusteeUUID,
+        buyerName,
+        buyerEmail: broker?.email || '',
+        assetHolderName: assetHolder?.name || assetHolder?.displayName || '',
+        assetHolderEmail: assetHolder?.email || '',
+        listingTitle,
+        assetType,
+        slotDate,
+        slotTime,
+        message,
+      })
     }
-    await createNotification({ data: NotificationData })
   } catch (error) {
-    console.log({ error: error?.message })
+    console.log({ trusteeViewingNotifyError: error?.message || error })
+  }
+
+  // Notify Asset Holder + FV (dashboard + email) for property / off-plan / car / boat / jewelry.
+  try {
+    const ownerUUID = assetHolder?.uuid || normalizedAssetHolderId
+    await notifyAssetHolderViewingBooked({
+      assetHolderUUID: ownerUUID,
+      assetHolder,
+      buyerName,
+      buyerEmail: broker?.email || '',
+      listingTitle,
+      assetType,
+      listingUUID: productData?.uuid,
+      bookingId: booking?._id,
+      bookingUUID: booking?.uuid,
+      slotDate,
+      slotTime,
+      message,
+    })
+  } catch (error) {
+    console.log({ assetHolderViewingNotifyError: error?.message })
   }
 
   return { booking, broker }
 }
 
 // Add a new slot with time slots
-export const addSlotService = async (date, timeSlots, userUUID) => {
-  // Check if a slot with the provided date already exists
-  const existingSlot = await Slot.findOne({ date, userUUID, isDeleted: false })
+export const addSlotService = async (date, timeSlots, userUUID, metadata = {}) => {
+  const slotCategory = metadata.slotCategory || SERVICE_SLOT_CATEGORY
+  const creatorRole = metadata.creatorRole || ''
+
+  const existingSlot = await Slot.findOne({
+    date,
+    userUUID,
+    slotCategory,
+    isDeleted: false,
+  })
 
   // If the slot already exists, return an error
   if (existingSlot) {
@@ -137,6 +317,8 @@ export const addSlotService = async (date, timeSlots, userUUID) => {
   const newSlot = new Slot({
     userUUID,
     date,
+    slotCategory,
+    creatorRole,
     times: timeSlots.map((time) => ({ time })),
   })
   return newSlot.save()
@@ -159,20 +341,27 @@ export const updateSeletedSlotService = async (slotId, newTimeSlot) => {
   )
 }
 
-// Delete slot
+// Delete slot (idempotent — deleting an already-deleted slot still succeeds)
 export const deleteSlotService = async (slotId) => {
-  const slot = await Slot.findOne({ uuid: slotId, isDeleted: false })
-
-  if (!slot || slot.isDeleted) {
-    throw new Error('Slot not found or already deleted')
+  if (!slotId || typeof slotId !== 'string') {
+    throw new Error('Slot id is required')
   }
 
-  // Soft delete
+  const slot = await Slot.findOne({ uuid: slotId.trim() })
+
+  if (!slot) {
+    throw new Error('Slot not found')
+  }
+
+  if (slot.isDeleted) {
+    return { slot, alreadyDeleted: true }
+  }
+
   slot.isDeleted = true
   slot.deletedAt = new Date()
   await slot.save()
 
-  // Send notification
+  // Send notification (non-blocking — must not fail the delete)
   try {
     const NotificationData = {
       userId: slot.userId,
@@ -184,25 +373,38 @@ export const deleteSlotService = async (slotId) => {
     }
     await createNotification({ data: NotificationData })
   } catch (error) {
-    console.log({ error: error?.message })
+    console.log({ error: error?.message || error })
   }
 
-  return slot
+  return { slot, alreadyDeleted: false }
 }
 
 // Get all slots
-export const getAllSlotsService = async (id, role) => {
+export const getAllSlotsService = async (id, role, explicitCategory) => {
+  const slotCategory =
+    explicitCategory === VIEWING_SLOT_CATEGORY ||
+    explicitCategory === SERVICE_SLOT_CATEGORY
+      ? explicitCategory
+      : roleToSlotCategory(role)
+  const categoryClause = await buildSlotCategoryClause(id, slotCategory)
 
-  if (role === "Admin") {
-    return Slot.find({ isDeleted: false }).sort({ createdAt: -1 })
-  } else {
-    return Slot.find({ userUUID: id, isDeleted: false }).sort({ createdAt: -1 })
-
+  if (role === 'Admin') {
+    return Slot.find({ ...notDeletedClause }).sort({ createdAt: -1 })
   }
+
+  const query = { userUUID: id, $and: [notDeletedClause] }
+  if (categoryClause) query.$and.push(categoryClause)
+
+  return Slot.find(query).sort({ createdAt: -1 })
 }
 
 // Get all bookings
-export const getAllBookingsService = async (userId, userRole, userUUID) => {
+export const getAllBookingsService = async (
+  userId,
+  userRole,
+  userUUID,
+  options = {},
+) => {
   try {
     let query = {}
     const normalizedRole = (userRole || '')
@@ -216,8 +418,23 @@ export const getAllBookingsService = async (userId, userRole, userUUID) => {
       normalizedRole === 'admin' ||
       normalizedRole === 'superadmin' ||
       normalizedRole === 'trustee'
+
+    const assignedTo = options?.assignedTo
+    if (assignedTo) {
+      if (!elevated) {
+        return []
+      }
+      if (!['fv_admin', 'myself'].includes(assignedTo)) {
+        throw new Error('Invalid assignedTo filter')
+      }
+      query.viewAssignedTo = assignedTo
+    }
+
     if (!elevated) {
-      if (normalizedRole === 'broker') {
+      const isBroker =
+        normalizedRole === 'broker' || normalizedRole === 'dealhunter'
+
+      if (isBroker) {
         query.$or = []
         if (userId) query.$or.push({ brokerId: userId })
         if (userUUID) query.$or.push({ brokerUUID: userUUID })
@@ -232,6 +449,10 @@ export const getAllBookingsService = async (userId, userRole, userUUID) => {
       }
     }
     query.isDeleted = false
+
+    const listSelect =
+      '-_id -assetHolderId -timeSlotId -timeSlotUUID -assetHolderUUID -brokerUUID'
+
     const bookings = await Booking.find(query)
       .populate({
         path: 'slotId',
@@ -241,9 +462,7 @@ export const getAllBookingsService = async (userId, userRole, userUUID) => {
         path: 'brokerId',
         select: 'name email -_id',
       })
-      .select(
-        '-_id -productData -assetHolderId -timeSlotId -timeSlotUUID -assetHolderUUID -brokerUUID'
-      )
+      .select(listSelect)
       .lean()
 
     const populatedBookings = bookings.map((booking) => {
@@ -252,14 +471,23 @@ export const getAllBookingsService = async (userId, userRole, userUUID) => {
       )
 
       const date = booking?.slotId?.date
+      const listingTitle = booking?.productData?.title || ''
+      const assetType = booking?.productData?.assetType || ''
 
-      // Remove slotId from return object
-      const { slotId, ...rest } = booking
+      const { slotId, productData, ...rest } = booking
 
       return {
         ...rest,
         date,
         timeSlot,
+        listingTitle,
+        assetType,
+        productData: {
+          title: productData?.title,
+          transferDocuments: productData?.transferDocuments,
+          dealClosed: productData?.dealClosed,
+        },
+        viewAssignedTo: rest.viewAssignedTo || 'myself',
       }
     })
 
@@ -310,13 +538,34 @@ export const getBookingByIdService = async (bookingId) => {
   )
 
   // Extract common fields
+  const transferDocuments = await resolveTransferDocumentsForBooking(booking)
+  const { asset } = await findAssetForBooking(booking)
+
   const productCommon = {
     uuid: booking.productData?.uuid,
     title: booking.productData?.title,
+    assetType: booking.productData?.assetType,
+    neighbourhood: booking.productData?.neighbourhood,
     phoneNumber: booking.productData?.phoneNumber,
     price: booking.productData?.price,
     pictures: booking.productData?.pictures,
     thumbnailImg: booking.productData?.thumbnailImg,
+    dealClosed:
+      booking.productData?.dealClosed ?? Boolean(asset?.dealClosed),
+    successFeePaymentStatus:
+      booking.productData?.successFeePaymentStatus ||
+      asset?.successFeePaymentStatus,
+    hasDepositReceipt: booking.productData?.hasDepositReceipt,
+    transferDocuments,
+    transactionPhase: deriveTransactionPhase({
+      ...booking,
+      productData: {
+        ...(booking.productData || {}),
+        transferDocuments,
+        dealClosed:
+          booking.productData?.dealClosed ?? Boolean(asset?.dealClosed),
+      },
+    }),
   }
 
   // Extract asset-specific fields
@@ -394,6 +643,9 @@ export const getBookingByIdService = async (bookingId) => {
     uuid: booking.uuid,
     message: booking.message,
     comment: booking.comment,
+    buyerAttended: booking.buyerAttended,
+    sellerAttended: booking.sellerAttended,
+    viewAssignedTo: booking.viewAssignedTo || 'myself',
     date: booking.slotId?.date,
     time: timeSlot?.time,
     brokerId: booking.brokerId,
@@ -406,23 +658,22 @@ export const getBookingByIdService = async (bookingId) => {
 }
 
 // Get booking by ID
-export const getBookingByIdAssetValue = async (assetId) => {
+export const getBookingByIdAssetValue = async (assetUuid) => {
   try {
     const booking = await Booking.findOne({
-      assetId: new Types.ObjectId(assetId), // Use parameter
+      'productData.uuid': assetUuid,
       isDeleted: false,
     })
       .populate('slotId')
       .populate('brokerId')
       .populate('assetHolderId')
-      .populate('timeSlotId')
 
     if (!booking) {
       return null
     }
 
-    const timeSlot = booking?.slotId?.times?.find((time) =>
-      time._id.equals(booking.timeSlotId)
+    const timeSlot = booking?.slotId?.times?.find(
+      (time) => time.uuid === booking.timeSlotUUID,
     )
 
     return { ...booking.toObject(), timeSlot }
@@ -454,13 +705,140 @@ export const deleteBookingByIdService = async (bookingUUID) => {
   return booking
 }
 
-// Get available slots by date
-export const getAvailableSlotsByDateService = async (date, userId) => {
-  const selectedDate = new Date(date)
+// Get available slots by date (arrange viewing uses slotCategory=viewing)
+export const getAvailableSlotsByDateService = async (
+  date,
+  userUUID,
+  slotCategory = VIEWING_SLOT_CATEGORY,
+) => {
+  if (!userUUID || !date) return []
+
+  const dateRange = buildDateRange(date)
+  if (!dateRange) return []
+
+  const categoryClause = await buildSlotCategoryClause(userUUID, slotCategory)
+  if (!categoryClause) return []
+
   return Slot.find({
-    date: selectedDate,
-    'times.isBooked': false,
-    userId: userId,
-    isDeleted: false,
+    userUUID,
+    date: dateRange,
+    $and: [notDeletedClause, categoryClause],
+  }).select('-_id -createdAt -isDeleted -deletedAt')
+}
+
+export const getSlotsByDateService = async (
+  date,
+  userUUID,
+  slotCategory = SERVICE_SLOT_CATEGORY,
+) => {
+  if (!userUUID || !date) return []
+
+  const dateRange = buildDateRange(date)
+  if (!dateRange) return []
+
+  const categoryClause = await buildSlotCategoryClause(userUUID, slotCategory)
+  if (!categoryClause) return []
+
+  return Slot.find({
+    userUUID,
+    date: dateRange,
+    $and: [notDeletedClause, categoryClause],
   })
+    .select('-_id -createdAt -isDeleted -deletedAt')
+    .lean()
+}
+
+export const toggleBookingUnderProcessService = async (bookingId, underProcess) => {
+  const booking = await Booking.findOne({ uuid: bookingId, isDeleted: false })
+  if (!booking) throw new Error('Booking not found')
+
+  booking.status = underProcess ? 'under_process' : 'open'
+  await booking.save()
+
+  const assetUuid = booking.productData?.uuid
+  const assetType = booking.productData?.assetType
+  await syncListingUnderProcessFlag(assetType, assetUuid)
+
+  return booking
+}
+
+export const getTransactionBookingsService = async () => {
+  const bookings = await Booking.find({ isDeleted: false })
+    .populate({ path: 'slotId', select: 'date times' })
+    .populate({ path: 'brokerId', select: 'name email' })
+    .populate({ path: 'assetHolderId', select: 'name email' })
+    .sort({ updatedAt: -1 })
+    .lean()
+
+  const rows = []
+
+  for (const booking of bookings) {
+    if (!isTransactionBooking(booking)) continue
+
+    const timeSlot = booking?.slotId?.times?.find(
+      (time) => time.uuid === booking.timeSlotUUID,
+    )
+    const productData = booking.productData || {}
+    const transferDocuments = productData.transferDocuments || {}
+    const phase = deriveTransactionPhase(booking)
+
+    let hasDepositReceipt = false
+    try {
+      const { asset } = await findAssetForBooking(booking)
+      hasDepositReceipt = Boolean(asset?.transactionDepositDocument)
+    } catch {
+      hasDepositReceipt = false
+    }
+
+    rows.push({
+      bookingUuid: booking.uuid,
+      assetUuid: productData.uuid,
+      assetType: productData.assetType,
+      title: productData.title,
+      neighbourhood: productData.neighbourhood,
+      sellerName: booking.assetHolderId?.name || '—',
+      buyerName: booking.brokerId?.name || '—',
+      viewingDate: booking.slotId?.date,
+      viewingTime: timeSlot?.time,
+      phase,
+      successFee: transferDocuments.successFee ?? null,
+      hasTransferDoc: Boolean(transferDocuments.assetTransferDocument),
+      hasPaymentProof: Boolean(transferDocuments.PaymentProof),
+      transferDocumentUrl: transferDocuments.assetTransferDocument || null,
+      paymentProofUrl: transferDocuments.PaymentProof || null,
+      hasDepositReceipt,
+      dealClosed: Boolean(productData.dealClosed),
+      bookingStatus: booking.status,
+      viewAssignedTo: booking.viewAssignedTo || 'myself',
+    })
+  }
+
+  return rows
+}
+
+export const updateTrusteeDepositService = async (
+  bookingId,
+  { transactionDepositDocument, trusteeNote },
+) => {
+  const booking = await Booking.findOne({ uuid: bookingId, isDeleted: false })
+  if (!booking) throw new Error('Booking not found')
+
+  const { asset } = await findAssetForBooking(booking)
+  if (!asset) throw new Error('Asset not found')
+
+  if (transactionDepositDocument) {
+    asset.transactionDepositDocument = transactionDepositDocument
+  }
+  if (trusteeNote !== undefined) {
+    asset.trusteeNote = trusteeNote
+  }
+  await asset.save()
+
+  if (transactionDepositDocument) {
+    booking.productData = booking.productData || {}
+    booking.productData.hasDepositReceipt = true
+    await booking.save()
+  }
+
+  return { booking, asset }
 }

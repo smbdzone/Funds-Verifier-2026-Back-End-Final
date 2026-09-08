@@ -130,13 +130,22 @@ export const emailFormLimiter = rateLimit({
 
 export const signupLimiter = rateLimit({
   windowMs: 24 * 60 * 60 * 1000, // 24 hours
-  max: 5, // 5 signups per IP per day
-  keyGenerator: ipKeyGenerator,
+  max: 5, // 5 public signups per email (or IP if no email) per day
+  keyGenerator: (req) => {
+    const email = req.body?.email?.toLowerCase()?.trim()
+    if (email) return `signup-${email}`
+    return `signup-ip-${ipKeyGenerator(req)}`
+  },
+  skip: (req) => {
+    const role = req.user?.role
+    return role === 'Admin' || role === 'Evaluator'
+  },
   standardHeaders: true,
   legacyHeaders: false,
   message: {
     success: false,
-    message: 'Too many signup attempts from this IP, please try again later.',
+    message:
+      'Too many signup attempts. Only 5 registrations are allowed per day. Please try again later.',
   },
 })
 

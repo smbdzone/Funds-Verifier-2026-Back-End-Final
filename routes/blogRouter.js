@@ -44,11 +44,23 @@ import {
   uploadFile,
   getInsightHubByCategory,
 } from '../controller/blogCtrl.js'
-import { authMiddleware, isAdmin } from '../middlewares/authMiddleware.js'
+import {
+  addBlogComment,
+  getBlogComments,
+  getAdminBlogComments,
+  updateBlogCommentStatus,
+  deleteAdminBlogComment,
+} from '../controller/blogCommentCtrl.js'
+import {
+  authMiddleware,
+  isAdmin,
+  optionalAuthMiddleware,
+} from '../middlewares/authMiddleware.js'
 import { authorizeUserByUUID } from '../middlewares/authorizeUser.js'
 import {
   fileUploadLimiter,
   listingReadLimiter,
+  reviewLimiter,
 } from '../middlewares/rateLimiter.js'
 
 const router = express.Router()
@@ -82,10 +94,39 @@ router.put(
   authorizeUserByUUID,
   updateInsightHub
 )
-router.get('/getAll', listingReadLimiter, getAllInsightHub)
+router.get(
+  '/getAll',
+  listingReadLimiter,
+  optionalAuthMiddleware,
+  getAllInsightHub,
+)
 router.get('/getById/:id', getInsightHubById)
-router.get('/getBySlug/:slug', getInsightHubBySlug)
+router.get('/getBySlug/:slug', optionalAuthMiddleware, getInsightHubBySlug)
 router.get('/getByStatus', authMiddleware, isAdmin, getInsightHubByStatus)
-router.get('/getByCategory/:category', getInsightHubByCategory)
+router.get(
+  '/getByCategory/:category',
+  optionalAuthMiddleware,
+  getInsightHubByCategory,
+)
+router.get(
+  '/comments/admin/all',
+  authMiddleware,
+  isAdmin,
+  getAdminBlogComments,
+)
+router.patch(
+  '/comments/admin/:commentId/status',
+  authMiddleware,
+  isAdmin,
+  updateBlogCommentStatus,
+)
+router.delete(
+  '/comments/admin/:commentId',
+  authMiddleware,
+  isAdmin,
+  deleteAdminBlogComment,
+)
+router.get('/comments/:blogUuid', listingReadLimiter, getBlogComments)
+router.post('/comments', reviewLimiter, addBlogComment)
 
 export default router

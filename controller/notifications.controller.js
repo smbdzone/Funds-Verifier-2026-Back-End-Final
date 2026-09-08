@@ -4,29 +4,26 @@ import { getIO } from '../utils/socket.js'
 // Create a new Notification
 const createNotification = async ({ data }) => {
   try {
-    const { UserRole, title } = data
+    const { UserRole, title } = data || {}
 
-    if (!UserRole)
-      return res
-        .status(400)
-        .json({ error: true, message: 'User role is required!' })
-    if (!title)
-      return res
-        .status(400)
-        .json({ error: true, message: 'Title is required!' })
+    if (!UserRole) {
+      throw new Error('User role is required!')
+    }
+    if (!title) {
+      throw new Error('Title is required!')
+    }
 
     const Notify = new Notifications(data)
     await Notify.save()
 
     // Emit socket event for new notification
     const io = getIO()
-    if (io && Notify.userUUID) {
-      // Prepare notification payload (excluding MongoDB _id and internal fields)
+    if (io) {
       const notificationPayload = {
         type: 'notification:new',
         data: {
           uuid: Notify.uuid,
-          userUUID: Notify.userUUID,
+          userUUID: Notify.userUUID || null,
           userId: Notify.userId || null,
           UserRole: Notify.UserRole,
           title: Notify.title,
@@ -42,9 +39,13 @@ const createNotification = async ({ data }) => {
         },
       }
 
-      // Emit to user's room (named after their UUID)
-      io.to(Notify.userUUID).emit('notification:new', notificationPayload)
-      console.log(`Emitted notification:new to room ${Notify.userUUID}`)
+      if (Notify.userUUID) {
+        io.to(Notify.userUUID).emit('notification:new', notificationPayload)
+        console.log(`Emitted notification:new to room ${Notify.userUUID}`)
+      } else if (Notify.UserRole) {
+        io.to(`role:${Notify.UserRole}`).emit('notification:new', notificationPayload)
+        console.log(`Emitted notification:new to role:${Notify.UserRole}`)
+      }
     }
 
     return { success: true, notification: Notify }
@@ -67,7 +68,7 @@ const GetAllNotificationByUserId = async ({ role, userId, limit, page }) => {
     if (role) findClause.role = role
     findClause.isDeleted = false
     const Notify = await Notifications.find(findClause)
-      .select('-_id -userId -RelatedId -createdAt -updatedAt')
+      .select('-_id -userId -RelatedId')
       .skip(skip)
       .limit(perPage)
       .sort({ createdAt: -1 })
@@ -84,34 +85,87 @@ const GetAllNotificationByUserId = async ({ role, userId, limit, page }) => {
   }
 }
 
+// Roles that receive personal notifications (scoped to one user)
+const PERSONAL_NOTIFICATION_ROLES = new Set([
+  'AssetHolder',
+  'DealHunter',
+  'Evaluator',
+  'SubEvaluator',
+  'Sub-Evaluator',
+  'Trustee',
+  'TechnicalReport',
+  '3dWalkthrough',
+])
+
+const BROADCAST_USER_UUID_CLAUSE = [
+  { userUUID: null },
+  { userUUID: { $exists: false } },
+  { userUUID: '' },
+]
+
+function buildOwnerMatchClause(userUUID, userMongoId) {
+  const ownerMatch = [{ userUUID }, { userId: userUUID }]
+  if (userMongoId) {
+    ownerMatch.push({ userId: String(userMongoId) })
+  }
+  return ownerMatch
+}
+
+function buildUserNotificationFilter({
+  userUUID,
+  userMongoId,
+  UserRole,
+  isAdmin = false,
+}) {
+  if (isAdmin) {
+    return { isDeleted: false, UserRole }
+  }
+
+  if (!userUUID || !PERSONAL_NOTIFICATION_ROLES.has(UserRole)) {
+    return { isDeleted: false, UserRole }
+  }
+
+  const ownerMatch = buildOwnerMatchClause(userUUID, userMongoId)
+  const orClauses = [
+    {
+      UserRole,
+      $or: [...ownerMatch, ...BROADCAST_USER_UUID_CLAUSE],
+    },
+  ]
+
+  if (UserRole === 'SubEvaluator' || UserRole === 'Sub-Evaluator') {
+    orClauses.push({
+      UserRole: 'Evaluator',
+      $or: BROADCAST_USER_UUID_CLAUSE,
+    })
+  }
+
+  return {
+    isDeleted: false,
+    $or: orClauses,
+  }
+}
+
 // Get all Notification by user role
 const GetAllNotificationByUserRole = async ({
-  userId,
+  userUUID,
+  userMongoId,
   UserRole,
   limit,
   page,
+  isAdmin = false,
 }) => {
   try {
     const perPage = parseInt(limit) || 20
     const currentPage = parseInt(page) || 1
     const skip = (currentPage - 1) * perPage
 
-    const findClause = {
-      isDeleted: false,
-    }
-
-    // Non-admin users → filter by role
-    if (UserRole !== 'Admin') {
-      findClause.UserRole = UserRole
-    }
-
-    // Certain roles → filter by userId
-    if (
-      userId &&
-      (UserRole === 'AssetHolder' || UserRole === 'DealHunter')
-    ) {
-      findClause.userId = userId
-    }
+    const findClause = buildUserNotificationFilter({
+      userUUID,
+      userMongoId,
+      UserRole,
+      isAdmin,
+    })
 
     const notifications = await Notifications.find(findClause)
       // .select('-_id') // keep timestamps for UI
@@ -136,7 +190,7 @@ const GetNotificationById = async (id) => {
   try {
     const notification = await Notifications.findById(id, {
       isDeleted: false,
-    }).select('-_id -userId -RelatedId -createdAt -updatedAt')
+    }).select('-_id -userId -RelatedId')
     if (!notification) {
       return res
         .status(404)
@@ -223,65 +277,157 @@ const DeleteNotificationById = async (id) => {
   }
 }
 
-export const GetRoutesForNotifications = (notification) => {
+/** Soft-delete all notifications visible to this user/role. */
+const ClearAllNotificationsForUser = async ({
+  userUUID,
+  userMongoId,
+  UserRole,
+  isAdmin = false,
+}) => {
   try {
-    if (notification?.RelateRoute === 'advertisement') {
-      return `/advertise-with-us`
-    }
-    if (
-      notification?.RelateRoute === 'evaluation' &&
-      notification?.UserRole === 'Evaluator'
-    ) {
-      return `/evaluator-profile`
-    }
-    if (
-      notification?.RelateRoute === 'Trustee' &&
-      notification?.UserRole === 'Trustee'
-    ) {
-      return `/trustee`
-    }
-    if (
-      notification?.RelateRoute === 'TechnicalReport' &&
-      notification?.UserRole === 'TechnicalReport'
-    ) {
-      return `/survey-dashboard`
-    }
-    if (
-      notification?.RelateRoute === 'advertisement' &&
-      notification?.UserRole === 'Admin'
-    ) {
-      if (notification?.RelateId) {
-        return `/dashboard/advertisement-approvals/${notification?.RelateId}`
-      } else {
-        return `/dashboard/advertisement-approvals`
+    const findClause = buildUserNotificationFilter({
+      userUUID,
+      userMongoId,
+      UserRole,
+      isAdmin,
+    })
+
+    const result = await Notifications.updateMany(findClause, {
+      $set: { isDeleted: true, deletedAt: new Date(), isRead: true },
+    })
+
+    const io = getIO()
+    if (io) {
+      const payload = {
+        type: 'notification:cleared',
+        data: { cleared: true, UserRole },
+      }
+      if (userUUID) {
+        io.to(userUUID).emit('notification:cleared', payload)
+      }
+      if (UserRole) {
+        io.to(`role:${UserRole}`).emit('notification:cleared', payload)
       }
     }
-    if (
-      notification?.RelateRoute === '3dWalkthrough' &&
-      notification?.UserRole === '3dWalkthrough'
-    ) {
-      return `/3d-walkthrough`
+
+    return {
+      success: true,
+      message: 'All notifications cleared',
+      cleared: result?.modifiedCount || 0,
+    }
+  } catch (error) {
+    console.error('Error clearing notifications:', error)
+    throw { error: true, message: 'Internal server error!' }
+  }
+}
+
+/** Mark all notifications visible to this user/role as read. */
+const MarkAllNotificationsAsRead = async ({
+  userUUID,
+  userMongoId,
+  UserRole,
+  isAdmin = false,
+}) => {
+  try {
+    const findClause = {
+      ...buildUserNotificationFilter({
+        userUUID,
+        userMongoId,
+        UserRole,
+        isAdmin,
+      }),
+      isRead: false,
+    }
+
+    const result = await Notifications.updateMany(findClause, {
+      $set: { isRead: true },
+    })
+
+    const io = getIO()
+    if (io) {
+      const payload = {
+        type: 'notification:read-all',
+        data: { readAll: true, UserRole },
+      }
+      if (userUUID) {
+        io.to(userUUID).emit('notification:read-all', payload)
+      }
+      if (UserRole) {
+        io.to(`role:${UserRole}`).emit('notification:read-all', payload)
+      }
+    }
+
+    return {
+      success: true,
+      message: 'All notifications marked as read',
+      updated: result?.modifiedCount || 0,
+    }
+  } catch (error) {
+    console.error('Error marking all notifications read:', error)
+    throw { error: true, message: 'Internal server error!' }
+  }
+}
+
+export const GetRoutesForNotifications = (notification) => {
+  try {
+    const role = notification?.UserRole
+    const route = notification?.RelateRoute
+
+    if (route === 'advertisement') {
+      return `/advertise-with-us`
+    }
+    if (route === 'documents-storage' && role === 'AssetHolder') {
+      return '/seller-profile/documents-storage'
+    }
+    if (route === 'pending-evaluation' && role === 'AssetHolder') {
+      if (notification?.RelatedUUID) {
+        return `/seller-profile/pending-evaluation/${notification.RelatedUUID}`
+      }
+      return '/seller-profile/pending-evaluation'
+    }
+    if (route === 'my-listing' && role === 'AssetHolder') {
+      return '/seller-profile/my-listing'
     }
     if (
-      notification?.RelateRoute === 'testimonial' &&
-      notification?.UserRole === 'Admin'
+      (route === 'all-slot' || route === 'create-slot') &&
+      role === 'AssetHolder'
     ) {
+      return '/seller-profile/all-slot'
+    }
+    if (route === 'evaluation' && role === 'Evaluator') {
+      return '/evaluator-profile/property-evaluation'
+    }
+    if (route === 'Trustee' && role === 'Trustee') {
+      return `/trustee`
+    }
+    if (route === 'TechnicalReport' && role === 'TechnicalReport') {
+      return `/survey-dashboard`
+    }
+    if (route === 'advertisement' && role === 'Admin') {
+      if (notification?.RelateId) {
+        return `/dashboard/advertisement-approvals/${notification?.RelateId}`
+      }
+      return `/dashboard/advertisement-approvals`
+    }
+    if (route === '3dWalkthrough' && role === '3dWalkthrough') {
+      return `/3d-walkthrough`
+    }
+    if (route === 'testimonial' && role === 'Admin') {
       return `#`
     }
 
-    if (notification?.RelateRoute === 'profile') {
-      switch (notification?.UserRole) {
+    if (route === 'profile') {
+      switch (role) {
         case 'AssetHolder':
           return `/seller-profile`
         case 'DealHunter':
           return `/profile`
-        case 'AssetHolder':
-          return `/seller-profile`
         case 'Trustee':
           return `/trustee`
         case 'Evaluator':
           return `/evaluator-profile`
         case 'SubEvaluator':
+        case 'Sub-Evaluator':
           return `/sub-evaluator-profile`
         case '3dWalkthrough':
           return `/3d-walkthrough`
@@ -291,17 +437,34 @@ export const GetRoutesForNotifications = (notification) => {
           return `#`
       }
     }
-    if (
-      ['cars', 'boat', 'property', 'jewelry']?.includes(
-        notification?.RelateRoute
-      ) &&
-      notification?.RelatedId &&
-      notification?.UserRole === 'AssetHolder'
-    ) {
-      return `/${notification?.RelateRoute}/${notification?.RelatedId}`
-    } else if (notification?.UserRole == 'Evaluator') {
-      return `/evaluator-profile/${notification?.RelateRoute}-evaluation`
+
+    const evaluatorRoutes = {
+      property: '/evaluator-profile/property-evaluation',
+      cars: '/evaluator-profile/cars-evaluation',
+      car: '/evaluator-profile/cars-evaluation',
+      boat: '/evaluator-profile/boat-evaluation',
+      jewellery: '/evaluator-profile/jewellery-evaluation',
+      jewelry: '/evaluator-profile/jewellery-evaluation',
+      evaluation: '/evaluator-profile/property-evaluation',
     }
+
+    if (role === 'Evaluator' || role === 'SubEvaluator' || role === 'Sub-Evaluator') {
+      if (evaluatorRoutes[route]) {
+        return evaluatorRoutes[route]
+      }
+      if (route) {
+        return `/evaluator-profile/${route}-evaluation`
+      }
+    }
+
+    if (
+      ['cars', 'boat', 'property', 'jewelry', 'jewellery']?.includes(route) &&
+      notification?.RelatedId &&
+      role === 'AssetHolder'
+    ) {
+      return `/${route}/${notification.RelatedId}`
+    }
+
     return '#'
   } catch (error) {
     return '#'
@@ -315,4 +478,6 @@ export {
   UpdateNotificationAsRead,
   DeleteNotificationById,
   GetAllNotificationByUserRole,
+  ClearAllNotificationsForUser,
+  MarkAllNotificationsAsRead,
 }

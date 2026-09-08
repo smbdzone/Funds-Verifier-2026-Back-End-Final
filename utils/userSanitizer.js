@@ -16,7 +16,7 @@ export const sanitizeUserForSelf = async (user) => {
   // Convert to plain object if Mongoose document
   const userObj = user.toObject ? user.toObject() : { ...user }
 
-  // Remove sensitive internal tokens and financial info (never expose these)
+  // Remove sensitive internal tokens (financialInfo is included for self profile editing)
   const {
     password,
     refreshToken,
@@ -25,7 +25,6 @@ export const sanitizeUserForSelf = async (user) => {
     emailVerificationToken,
     emailVerificationExpires,
     pendingEmailChange,
-    financialInfo,
     ...sanitized
   } = userObj
 
@@ -106,11 +105,11 @@ export const sanitizeUserForAdmin = async (user) => {
     ...sanitized
   } = userObj
 
-  // Sanitize documentation array
+  // For admin: include signed URLs so Super Admin can open KYC files
   if (sanitized.documentation) {
     sanitized.documentation = await sanitizeDocumentation(
       sanitized.documentation,
-      false
+      true,
     )
   }
 

@@ -1,7 +1,7 @@
 import mongoose from 'mongoose'
 const Schema = mongoose.Schema
 import { v4 as uuidv4 } from 'uuid'
-import { attachListingMediaRefreshHook } from '../helper/refreshAssetSignedUrls.js'
+import { applyMarketplaceListingIndexes } from '../utils/listingIndexes.js'
 
 // Define jewelry advertisement schema
 const JewelryAdSchema = new Schema(
@@ -14,9 +14,18 @@ const JewelryAdSchema = new Schema(
       unique: true,
       index: true,
     },
+    /** Unique listing number issued by the DLD (Dubai Land Department). */
+    dldNumber: { type: String, default: '', trim: true },
+    /** Public visibility counters: incremented when a visitor opens this listing. */
+    analytics: {
+      impressions: { type: Number, default: 0 },
+      clicks: { type: Number, default: 0 },
+    },
 
     city: { type: String, required: true },
     neighbourhood: { type: String, required: true },
+    /** Optional Google Maps share/embed URL shown on the listing. */
+    mapUrl: { type: String, default: '', trim: true },
     make: { type: String },
     grams: { type: String },
     priceRange: String,
@@ -34,11 +43,19 @@ const JewelryAdSchema = new Schema(
     pictures: { type: mongoose.Schema.Types.ObjectId, ref: 'ImageAsset' },
     video: { type: mongoose.Schema.Types.ObjectId, ref: 'VideoAsset' },
     thumbnailImg: { type: mongoose.Schema.Types.ObjectId, ref: 'ThumbnailImg' },
+    qrScan: { type: mongoose.Schema.Types.ObjectId, ref: 'ImageAsset' },
     transferDocuments: {
       assetTransferDocument: { type: String },
       PaymentProof: { type: String },
+      successFee: { type: Number },
+      paymentUrl: { type: String },
     },
     dealClosed: { type: Boolean },
+    successFeePaymentStatus: {
+      type: String,
+      enum: ['Pending', 'Paid'],
+      default: 'Pending',
+    },
     dealer: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
@@ -47,6 +64,7 @@ const JewelryAdSchema = new Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'EvaluationCertificate',
     },
+    evaluationCertificateDate: { type: Date, required: false },
     invoice: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'EvaluationCertificate',
@@ -72,6 +90,7 @@ const JewelryAdSchema = new Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'ReportTechnical',
     },
+    isRecommendedAsset: { type: Boolean, default: false },
     userId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
@@ -86,7 +105,7 @@ const JewelryAdSchema = new Schema(
     },
     trusteeNote: { type: String },
     evaluationDateTime: { type: Date, required: false },
-    requestDocument: [{ type: String, required: true }],
+    requestDocument: { type: [mongoose.Schema.Types.Mixed], default: [] },
     phoneNumber: { type: Number, required: true },
     uploadDocument: [
       {
@@ -99,6 +118,7 @@ const JewelryAdSchema = new Schema(
       enum: [0, 1],
       default: 0, // Default to "pending"
     },
+    underProcess: { type: Boolean, default: false },
     roi: {
       type: Number,
     },
@@ -170,14 +190,15 @@ JewelryAdSchema.set('toObject', { virtuals: true })
 JewelryAdSchema.set('toJSON', { virtuals: true })
 
 /**
- * Auto-refresh CloudFront signed URLs on every read so that any controller
- * (current or future) that fetches jewelry with populated media returns
- * working URLs instead of stale ~1-hour signatures persisted at upload time.
- * No-op when media refs are not populated.
+ * Media signed URLs: ImageAsset/Video/Thumbnail hooks sign on populate;
+ * controllers refresh for .lean() paths. Listing-level hooks removed to
+ * avoid re-signing the same entries on every list/detail read.
  */
-JewelryAdSchema.post('find', attachListingMediaRefreshHook)
-JewelryAdSchema.post('findOne', attachListingMediaRefreshHook)
-JewelryAdSchema.post('findOneAndUpdate', attachListingMediaRefreshHook)
+
+applyMarketplaceListingIndexes(JewelryAdSchema, {
+  includeSlug: false,
+  includeMake: true,
+})
 
 // Create and export model
 const Jewelry = mongoose.model('Jewelry', JewelryAdSchema)

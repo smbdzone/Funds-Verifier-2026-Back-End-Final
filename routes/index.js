@@ -23,6 +23,7 @@ import prices from './priceRoute.js'
 import userRouter from './userRoutes.js'
 import transactionRouter from './transactionRoute.js'
 import platformFee from './platformFeeRoute.js'
+import successFeeRoute from './successFeeRoute.js'
 import blogRoute from './blogRouter.js'
 import countriesRoute from './countriesRoute.js'
 import advertisementRoute from './advertisementRoute.js'
@@ -34,14 +35,24 @@ import RequestedItemsPriceRoutes from './RequestedItemsPriceRoutes.js'
 import SalesTrackerRoute from './SalesTrackerRoute.js'
 import PurchaseTrackerRoute from './PurchaseTrackerRoute.js'
 import ServicesRoutes from './ServicesRoutes.js'
+import clozerRoutes from './clozerRoutes.js'
 import AssignAssetsRoutes from './AssignAssetsRoutes.js'
 import contactRoutes from './contactRoutes.js'
 import publicRoutes from './publicToken.js'
 import testRoute from './testRoute.js'
+import developerProjectRoute from './developerProjectRoute.js'
 import { createPaymentIntent } from '../controller/createPaymentIntentCtrl.js'
+import { pdfPreviewProxy } from '../controller/pdfPreviewCtrl.js'
+import { listingMediaDownloadProxy } from '../controller/listingMediaDownloadCtrl.js'
+import { issueCsrfToken } from '../middlewares/csrfMiddleware.js'
 
 const router = express.Router()
 
+router.get('/csrf-token', issueCsrfToken)
+
+router.get('/pdf-preview', pdfPreviewProxy)
+router.get('/listing-media-download', listingMediaDownloadProxy)
+router.post('/listing-media-download', listingMediaDownloadProxy)
 router.post('/create-payment-intent', createPaymentIntent)
 
 router.use('/user', userRouter)
@@ -55,6 +66,7 @@ router.use('/boat', boatRoute)
 router.use('/jewelry', jewelryRoute)
 router.use('/', assetRoute)
 router.use('/platform-fee', platformFee)
+router.use('/success-fee', successFeeRoute)
 router.use('/pay', transactionRouter)
 router.use('/blog', blogRoute)
 router.use('/countries', countriesRoute)
@@ -82,6 +94,8 @@ router.use('/payment/revenue', RevenueRoute)
 router.use('/assets/prices', RequestedItemsPriceRoutes)
 router.use('/assets/assign', AssignAssetsRoutes)
 router.use('/services', ServicesRoutes)
+router.use('/clozer', clozerRoutes)
+router.use('/developer-projects', developerProjectRoute)
 router.use('/test', testRoute)
 
 export default router

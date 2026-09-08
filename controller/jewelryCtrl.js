@@ -23,8 +23,34 @@ import {
   sanitizeListingMediaResponse,
   sanitizeListingsMediaResponse,
 } from '../helper/sanitizeListingResponse.js'
+import {
+  recordListingClick,
+} from '../helper/listingAnalytics.js'
+import {
+  getListingSellersByUuid,
+  resolveListingSeller,
+  getSellerRef,
+  attachListingSellerContact,
+} from '../helper/listingSellerInfo.js'
 import { attachDocumentSignedUrls } from '../helper/attachDocumentSignedUrls.js'
-import { stripNullPremiumRefs } from '../utils/listingPremiumSync.js'
+import {
+  REQUEST_DOCUMENT_POPULATE,
+  applyRequestDocumentUpdate,
+  attachRequestDocumentSignedUrls,
+  normalizeRequestDocumentList,
+} from '../helper/requestDocumentHelpers.js'
+import {
+  stripNullPremiumRefs,
+  refreshListingPremiumFieldsForEdit,
+  sanitizeUnpaidPremiumServicesForClient,
+} from '../utils/listingPremiumSync.js'
+import { buildListingIdQuery } from '../utils/listingIdLookup.js'
+import { isListingPrivilegedUser } from '../utils/parentEvaluator.js'
+import {
+  blockPriceChangeIfUnderProcess,
+  stripUnderProcessFromListingPayload,
+} from '../utils/listingUnderProcess.js'
+import { restrictAssetHolderBodyAfterApproval } from '../utils/listingEditLock.js'
 import upload from '../middlewares/Multer.js'
 
 import express from 'express'
@@ -45,9 +71,28 @@ import Boat from '../models/boatModel.js'
 import { verifyToken } from '../middlewares/JwtAuth.js'
 import { AssetsListingsPricing } from '../utils/AssetsListingsPricing.js'
 import { createNotification } from './notifications.controller.js'
+import { notifyEvaluatorsNewListing } from '../helper/notificationHelpers.js'
+import { notifyAssetHolderDocumentRequested } from '../helper/notifyDocumentRequested.js'
+import {
+  listingBecameEvaluatorApproved,
+  notifyAssetHolderListingApproved,
+} from '../helper/notifyAssetHolderListingEvents.js'
 import UserPaymentDetails from '../models/UserPaymentDetails.js'
 import { AddPaymentJob } from '../utils/jobs/index.js'
 import { PUBLIC_JEWELRY_FIELDS } from '../constants/publicFields.js'
+import {
+  applyCardListPopulates,
+  CARD_JEWELRY_FIELDS,
+  computeCardRatingFields,
+  shouldUseCardListProjection,
+} from '../utils/listingCardQuery.js'
+import { findRelatedListings } from '../utils/relatedListings.js'
+import {
+  getSafeTitleRegex,
+  pickScalarFilters,
+  applyListingStatusFilters,
+  applyEvaluatorPendingFilter,
+} from '../utils/listingQuery.js'
 
 // create product
 const createProduct = asyncHandler(async (req, res) => {
@@ -69,63 +114,68 @@ const createProduct = asyncHandler(async (req, res) => {
       price: req.body.price,
     })
 
+    stripNullPremiumRefs(req.body)
+
     const createPdt = await Jewelry.create([req.body], { session })
 
-    // add evaluation payment message queue
-    try {
-      const PaymentDetails = await UserPaymentDetails.create({
-        userId: user?._id,
-        userUUID: user?.uuid,
-        assetId: createPdt?.[0]?._id,
-        assetTitle: createPdt?.[0]?.title,
-        assetType: 'jewelry',
-        customerId: req?.body?.customerId,
-        paymentMethod: req?.body?.paymentMethod,
-      })
-      await AddPaymentJob({
-        jobId: PaymentDetails?._id,
-        assetId: createPdt?.[0]?._id,
-        assetType: 'property',
-        PaymentDetailsId: PaymentDetails?._id,
-        userId: createPdt?.[0]?.userId,
-      })
-    } catch (error) {
-      console.log(`Error adding job to queue: ${error.message}`)
+    const paidViaClozer =
+      req.body?.payment_provider === 'clozer' ||
+      Boolean(req.body?.clozer_transaction_id)
+
+    if (!paidViaClozer) {
+      try {
+        const PaymentDetails = await UserPaymentDetails.create({
+          userId: user?._id,
+          userUUID: user?.uuid,
+          assetId: createPdt?.[0]?._id,
+          assetTitle: createPdt?.[0]?.title,
+          assetType: 'jewelry',
+          customerId: req?.body?.customerId,
+          paymentMethod: req?.body?.paymentMethod,
+        })
+        await AddPaymentJob({
+          jobId: PaymentDetails?._id,
+          assetId: createPdt?.[0]?._id,
+          assetType: 'property',
+          PaymentDetailsId: PaymentDetails?._id,
+          userId: createPdt?.[0]?.userId,
+        })
+      } catch (error) {
+        console.log(`Error adding job to queue: ${error.message}`)
+      }
     }
 
     // Try to find and update the latest pending 3D Request
     const pendingRequest = await Request3D.findOneAndUpdate(
-      { status: 'pending' },
+      { status: 'pending', isDeleted: { $ne: true } },
       {
         productId: createPdt[0]._id,
+        productUUID: createPdt[0].uuid,
         productTitle: createPdt[0].title,
         assetType: createPdt[0].assetType,
-        status: 'successful',
       },
       { new: true, sort: { createdAt: -1 }, session }
     )
     const pendingReport = await Report.findOneAndUpdate(
-      { status: 'pending' },
+      { status: 'pending', isDeleted: { $ne: true } },
       {
         productId: createPdt[0]._id,
+        productUUID: createPdt[0].uuid,
         productTitle: createPdt[0].title,
         assetType: createPdt[0].assetType,
-        status: 'successful',
       },
       { new: true, sort: { createdAt: -1 }, session }
     )
 
     try {
-      const NotificationData = {
-        userId: user._id,
-        userUUID: user.uuid,
-        UserRole: 'Evaluator',
-        title: 'Evaluation',
+      await notifyEvaluatorsNewListing({
         message: `New asset jewelry (${createPdt[0]?.title}) added for evaluation.`,
-        RelateRoute: 'jewellery',
-        RelatedId: createPdt[0]?._id,
-      }
-      await createNotification({ data: NotificationData })
+        assetType: createPdt[0]?.assetType || 'jewelry',
+        relatedId: createPdt[0]?._id,
+        relatedUUID: createPdt[0]?.uuid,
+        listing: createPdt[0],
+        assetHolder: user,
+      })
     } catch (error) {
       console.log({ error: error?.message })
     }
@@ -164,26 +214,32 @@ const pickFields = (obj, fields) => {
   }, {})
 }
 
-// get single product
+// get single product by id or slug
 const getSingleProduct = asyncHandler(async (req, res) => {
   const { id } = req.params
 
+  if (!id) {
+    return res.status(400).json({ message: 'Invalid jewelry ID' })
+  }
+
   const { sanitizeUUID } = await import('../utils/nosqlSanitizer.js')
-  const sanitizedId = sanitizeUUID(id)
-  if (!sanitizedId) {
-    return res.status(400).json({
-      success: false,
-      message: 'Invalid UUID format',
-    })
+  const sanitizedUuid = sanitizeUUID(id)
+  const lookupQuery = { isDeleted: false }
+
+  if (sanitizedUuid) {
+    lookupQuery.$or = [{ uuid: sanitizedUuid }, { slug: id }]
+  } else {
+    lookupQuery.slug = id
   }
 
   try {
-    const jewelry = await Jewelry.findOne({ uuid: sanitizedId, isDeleted: false })
+    const jewelry = await Jewelry.findOne(lookupQuery)
       .populate('pictures')
       .populate('video')
-      .populate('thumbnailImg')
+      .populate('thumbnailImg').populate('qrScan')
       .populate('video3DWalkthrough')
       .populate('uploadDocument')
+      .populate(REQUEST_DOCUMENT_POPULATE)
       .populate('transactionDepositDocument')
       .populate('transactionId')
       .populate('userId')
@@ -200,23 +256,39 @@ const getSingleProduct = asyncHandler(async (req, res) => {
       return res.status(404).json({ message: 'Jewelry not found' })
     }
 
-    await refreshListingMediaSignedUrls(jewelry)
-    sanitizeListingMediaResponse(jewelry)
+    jewelry.requestDocument = normalizeRequestDocumentList(
+      jewelry.requestDocument,
+    )
 
-    const isPrivilegedUser =
-      req.user &&
-      ['Admin', 'AssetHolder', 'Evaluator', 'Sub-Evaluator'].includes(
-        req.user.role,
-      )
+    await refreshListingMediaSignedUrls(jewelry)
+
+    const isPrivilegedUser = isListingPrivilegedUser(req.user)
 
     // 🔒 Public / non-privileged users
     if (!isPrivilegedUser) {
-      return res.json(
-        pickFields(jewelry, PUBLIC_JEWELRY_FIELDS.trim().split(/\s+/))
+      recordListingClick(Jewelry, jewelry)
+      await attachDocumentSignedUrls(jewelry, {
+        fields: ['evaluationCertificate', 'technicalReport'],
+      })
+      const publicJewelry = pickFields(
+        jewelry,
+        PUBLIC_JEWELRY_FIELDS.trim().split(/\s+/),
       )
+      const sellersByUuid = await getListingSellersByUuid([jewelry])
+      const seller = resolveListingSeller(jewelry, sellersByUuid)
+      if (seller) {
+        publicJewelry.sellerRef = getSellerRef(seller)
+      }
+      sanitizeListingMediaResponse(publicJewelry)
+      sanitizeUnpaidPremiumServicesForClient(publicJewelry)
+      return res.json(publicJewelry)
     }
 
-    // 🔓 Privileged users
+    await attachDocumentSignedUrls(jewelry)
+    await attachRequestDocumentSignedUrls(jewelry)
+    sanitizeListingMediaResponse(jewelry)
+    await refreshListingPremiumFieldsForEdit(jewelry)
+    await attachListingSellerContact(jewelry)
     res.json(jewelry)
   } catch (err) {
     console.error('Error fetching jewelry:', err.message)
@@ -226,42 +298,14 @@ const getSingleProduct = asyncHandler(async (req, res) => {
 
 // // get all product
 const getAllProduct = asyncHandler(async (req, res) => {
-  const queryObj = { ...req.query }
+  /* ===================== AUTH — optionalAuthMiddleware (Bearer + cookie) ===================== */
+  const user = req.user || null
+  const isPublicUser = !user || req.query.token === 'false'
 
-  /* ===================== TOKEN HANDLING ===================== */
-  const header = req.headers['authorization']
-  const token = header && header.split(' ')[1]
-  let userId = null
-
-  if (token) {
-    userId = verifyToken(token)
-    if (!userId) {
-      return res.status(401).json({ message: 'Invalid token' })
-    }
+  /* ===================== SAFE FILTER PARAMS ===================== */
+  const parseData = {
+    ...pickScalarFilters(req.query),
   }
-
-  const isPublicUser = !userId || req.query.token === 'false'
-
-  /* ===================== QUERY CLEANUP ===================== */
-  const excludeField = [
-    'page',
-    'sort',
-    'limit',
-    'fields',
-    'date',
-    'minPrice',
-    'maxPrice',
-    'statusFilter',
-    'title',
-    'token',
-    'dashboard',
-  ]
-
-  excludeField.forEach((el) => delete queryObj[el])
-
-  let queryStr = JSON.stringify(queryObj)
-  queryStr = queryStr.replace(/\b(gte|gt|lte|lt)\b/g, (m) => `$${m}`)
-  const parseData = JSON.parse(queryStr)
 
   /* ===================== PRICE FILTER ===================== */
   if (req.query.minPrice || req.query.maxPrice) {
@@ -279,18 +323,17 @@ const getAllProduct = asyncHandler(async (req, res) => {
   }
 
   /* ===================== STATUS FILTER ===================== */
-  if (req.query.statusFilter === '1') {
-    parseData.status = 1
-  }
+  applyListingStatusFilters(parseData, req.query)
+  applyEvaluatorPendingFilter(parseData, req.query)
 
   /* ===================== TITLE SEARCH ===================== */
-  if (req.query.title) {
-    parseData.title = { $regex: req.query.title, $options: 'i' }
+  const titleFilter = getSafeTitleRegex(req.query)
+  if (titleFilter) {
+    parseData.title = titleFilter
   }
 
   /* ===================== ROLE-BASED ACCESS ===================== */
-  if (userId) {
-    const user = await UserModel.findById(userId, { isDeleted: false })
+  if (user) {
     const isSubEvaluator = ['Sub-Evaluator', 'SubEvaluator'].includes(user.role)
 
     if (isSubEvaluator) {
@@ -303,7 +346,7 @@ const getAllProduct = asyncHandler(async (req, res) => {
       .toLowerCase()
       .replace(/[\s_-]/g, '')
     const isElevatedModerator =
-      ['Admin', 'Evaluator'].includes(user.role) || roleNorm === 'superadmin'
+      ['Admin', 'Evaluator', 'Trustee'].includes(user.role) || roleNorm === 'superadmin'
 
     if (!isSubEvaluator && isElevatedModerator) {
       delete parseData.listing
@@ -339,43 +382,57 @@ const getAllProduct = asyncHandler(async (req, res) => {
   parseData.isDeleted = false
 
   /* ===================== BASE QUERY ===================== */
+  const useCardProjection = shouldUseCardListProjection(req, !isPublicUser)
   let query = Jewelry.find(parseData)
-    .populate({ path: 'pictures', select: '-_id' })
-    .populate({ path: 'video', select: '-_id' })
-    .populate({ path: 'thumbnailImg', select: '-_id' })
-    .populate({ path: 'ratings.postedBy', select: '-_id' })
 
-  /* ===================== PRIVATE POPULATES ===================== */
-  if (!isPublicUser) {
+  if (useCardProjection) {
+    query = applyCardListPopulates(query).select(CARD_JEWELRY_FIELDS)
+  } else {
     query = query
+      .populate({ path: 'pictures', select: '-_id' })
+      .populate({ path: 'video', select: '-_id' })
+      .populate({ path: 'thumbnailImg', select: '-_id' })
+      .populate({ path: 'qrScan', select: '-_id' })
+      .populate({ path: 'userId', select: 'profileImage name uuid' })
+      .populate({ path: 'ratings.postedBy', select: '-_id' })
       .populate({ path: 'evaluationCertificate', select: '-_id' })
-      .populate({ path: 'uploadDocument', select: '-_id' })
-      .populate({ path: 'invoice', select: '-_id' })
       .populate({ path: 'video3DWalkthrough', select: '-_id' })
       .populate({
         path: 'technicalReport',
         select: '-_id',
         populate: { path: 'reportFile', select: '-_id' },
       })
-      .populate({
-        path: 'reviews',
-        select: 'ratingNumber review -_id',
-      })
+
+    if (!isPublicUser) {
+      query = query
+        .populate({ path: 'uploadDocument', select: '-_id' })
+        .populate(REQUEST_DOCUMENT_POPULATE)
+        .populate({ path: 'invoice', select: '-_id' })
+        .populate({ path: 'evaluator', select: 'name displayName uuid' })
+        .populate({
+          path: 'reviews',
+          match: {
+            isDeleted: false,
+            $or: [{ status: 'approved' }, { status: { $exists: false } }],
+          },
+          select: 'ratingNumber review -_id',
+        })
+    }
+
+    /* ===================== FIELD SELECTION ===================== */
+    if (isPublicUser) {
+      query = query.select(PUBLIC_JEWELRY_FIELDS)
+    } else if (req.query.fields) {
+      query = query.select(req.query.fields.split(',').join(' '))
+    } else {
+      query = query.select('-__v')
+    }
   }
 
   /* ===================== SORTING ===================== */
   query = req.query.sort
     ? query.sort(req.query.sort.split(',').join(' '))
     : query.sort('-createdAt')
-
-  /* ===================== FIELD SELECTION ===================== */
-  if (isPublicUser) {
-    query = query.select(PUBLIC_JEWELRY_FIELDS)
-  } else if (req.query.fields) {
-    query = query.select(req.query.fields.split(',').join(' '))
-  } else {
-    query = query.select('-__v')
-  }
 
   /* ===================== PAGINATION ===================== */
   const page = Number(req.query.page) || 1
@@ -397,17 +454,45 @@ const getAllProduct = asyncHandler(async (req, res) => {
   // media; re-run as a safety net for non-hooked paths (e.g. legacy lean).
   await refreshListingsMediaSignedUrls(products)
 
+  const sellersByUuid = await getListingSellersByUuid(products)
+
   const modifiedProducts = await Promise.all(
     products.map(async (product) => {
-      const reviewCount = product.reviews?.length || 0
-      const averageRating =
-        reviewCount > 0
-          ? product.reviews.reduce((s, r) => s + r.ratingNumber, 0) / reviewCount
-          : 0
-
       const obj = product.toObject()
-      if (!isPublicUser) {
-        await attachDocumentSignedUrls(obj)
+      const { reviewCount, averageRating } = useCardProjection
+        ? computeCardRatingFields(obj)
+        : (() => {
+            const count = product.reviews?.length || 0
+            const avg =
+              count > 0
+                ? product.reviews.reduce((s, r) => s + r.ratingNumber, 0) /
+                  count
+                : 0
+            return { reviewCount: count, averageRating: avg }
+          })()
+
+      // Seller avatar for cards; strip other user fields for public callers
+      const seller = resolveListingSeller(obj, sellersByUuid)
+      if (seller) {
+        obj.sellerAvatar = seller.profileImage || ''
+        obj.sellerName = seller.name || ''
+        obj.sellerRef = getSellerRef(seller)
+        if (isPublicUser) {
+          obj.userId = {
+            profileImage: seller.profileImage || '',
+            name: seller.name || '',
+          }
+        }
+      }
+
+      if (!useCardProjection) {
+        if (isPublicUser) {
+          await attachDocumentSignedUrls(obj, {
+            fields: ['evaluationCertificate', 'technicalReport'],
+          })
+        } else {
+          await attachDocumentSignedUrls(obj)
+        }
       }
       sanitizeListingMediaResponse(obj)
 
@@ -477,7 +562,7 @@ const getAllProductByFilter = asyncHandler(async (req, res) => {
   let query = Jewelry.find(modifiedQuery)
     .populate('pictures')
     .populate('video')
-    .populate('thumbnailImg')
+    .populate('thumbnailImg').populate('qrScan')
     .populate('evaluationCertificate')
     .populate('uploadDocument')
     .populate('invoice')
@@ -527,6 +612,15 @@ const getAllProductByFilter = asyncHandler(async (req, res) => {
       typeof p.toObject === 'function' ? p.toObject() : p,
     )
     await refreshListingsMediaSignedUrls(allProduct)
+    await Promise.all(
+      allProduct.map((p) =>
+        userId
+          ? attachDocumentSignedUrls(p)
+          : attachDocumentSignedUrls(p, {
+            fields: ['evaluationCertificate', 'technicalReport'],
+          }),
+      ),
+    )
     sanitizeListingsMediaResponse(allProduct)
     return res.status(200).json({
       products: allProduct,
@@ -545,24 +639,16 @@ const getAllProductByFilter = asyncHandler(async (req, res) => {
 // get related product
 
 const getRelatedProduct = asyncHandler(async (req, res) => {
-  const { assetType, country, city, make, price } = req.query
-  // Construct the query object based on provided properties
-  const queryObj = {}
-  if (assetType) queryObj.assetType = assetType
-  if (country) queryObj.country = country
-  if (city) queryObj.city = city
-  if (make) queryObj.make = make
-  if (price) queryObj.price = price
-  // if (condition) queryObj.condition = condition;
-  queryObj.isDeleted = false
   try {
-    // Execute the query with the constructed query object
-    const allProduct = await Jewelry.find(queryObj).select('-_id')
-    sanitizeListingsMediaResponse(allProduct)
-    res.json(allProduct)
+    const result = await findRelatedListings({
+      Model: Jewelry,
+      cardFields: CARD_JEWELRY_FIELDS,
+      query: req.query,
+      softFields: ['assetType', 'country', 'city', 'make', 'brands'],
+    })
+    return res.status(200).json(result)
   } catch (err) {
-    // Handle errors appropriately
-    throw new Error(err)
+    return res.status(500).json({ message: err?.message || 'Server error' })
   }
 })
 
@@ -582,25 +668,42 @@ const updateProduct = asyncHandler(async (req, res) => {
 
     try {
       // Find the existing product
-      const product = await Jewelry.findOne({
-        uuid: moduleId,
-        isDeleted: false,
-      })
+      const product = await Jewelry.findOne(
+        buildListingIdQuery(moduleId),
+      ).populate('uploadDocument')
       if (!product) {
         return res.status(404).json({ message: 'jwellery not found' })
       }
+
+      stripUnderProcessFromListingPayload(req.body)
+      const priceBlock = blockPriceChangeIfUnderProcess(product, req.body)
+      if (priceBlock) {
+        return res.status(403).json({ message: priceBlock })
+      }
+
+      req.body = restrictAssetHolderBodyAfterApproval(
+        product,
+        req.body,
+        req.user,
+      )
 
       // Update slug if title is provided
       if (req.body.title) {
         req.body.slug = slugify(req.body.title)
       }
 
+      const documentFulfilled = Boolean(req.body.fulfillRequestDocument)
+      applyRequestDocumentUpdate(product, req.body)
+
+      const requestedDocumentsUpdated =
+        Boolean(req.body.requestDocument) && !documentFulfilled
+
       // Handle technicalReport upload
       if (req.files && req.files.technicalReport) {
         req.body.technicalReport = req.files.technicalReport[0].path
       }
       // Handle uploadDocument IDs (from frontend)
-      if (req.body.uploadDocument) {
+      if (req.body.uploadDocument && !documentFulfilled) {
         const newDocumentIds = Array.isArray(req.body.uploadDocument)
           ? req.body.uploadDocument // If multiple IDs are passed as an array
           : [req.body.uploadDocument] // If only a single ID is passed as a string
@@ -621,15 +724,42 @@ const updateProduct = asyncHandler(async (req, res) => {
       ).select('-_id')
 
       try {
-        const NotificationData = {
-          userUUID: updatedProduct?.userUUID,
-          UserRole: 'AssetHolder',
-          title: 'Assets Jewelry',
-          message: `Your asset jewelry (${updatedProduct?.title}) has beed updated.`,
-          RelateRoute: 'jewellery',
-          RelatedId: updatedProduct?._id,
+        if (requestedDocumentsUpdated) {
+          await notifyAssetHolderDocumentRequested({
+            listing: updatedProduct,
+            assetType: 'jewelry',
+            requesterRole: req.user?.role,
+            title: 'Document Request',
+          })
+        } else if (
+          listingBecameEvaluatorApproved(product, updatedProduct)
+        ) {
+          await notifyAssetHolderListingApproved({
+            listing: {
+              ...(updatedProduct?.toObject?.() || updatedProduct),
+              _id: product._id,
+              userUUID: updatedProduct?.userUUID || product.userUUID,
+            },
+            assetType: 'jewelry',
+            evaluator: req.user,
+          })
+        } else {
+          const NotificationData = {
+            userUUID: updatedProduct?.userUUID,
+            UserRole: 'AssetHolder',
+            title: 'Assets Jewelry',
+            message: `Your asset jewelry (${updatedProduct?.title}) has beed updated.`,
+            RelateRoute: 'jewellery',
+            RelatedId: updatedProduct?._id,
+          }
+          if (documentFulfilled) {
+            NotificationData.UserRole = 'Evaluator'
+            NotificationData.userUUID = updatedProduct?.evaluatorUUID
+            NotificationData.message = `Seller uploaded a requested document for jewelry (${updatedProduct?.title}).`
+            NotificationData.RelateRoute = 'evaluation'
+          }
+          await createNotification({ data: NotificationData })
         }
-        await createNotification({ data: NotificationData })
       } catch (error) {
         console.log({ error: error?.message })
       }

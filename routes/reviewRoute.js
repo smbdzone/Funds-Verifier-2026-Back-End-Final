@@ -1,17 +1,25 @@
-import express from "express";
+import express from 'express'
 import {
   addReview,
   getReviewsByProductId,
   getReviewsByProductIdFromBody,
   getReviewCounts,
-} from "../controller/reviewCtrl.js";
-import { reviewLimiter } from "../middlewares/rateLimiter.js";
+  getAdminReviews,
+  updateReviewStatus,
+  deleteAdminReview,
+} from '../controller/reviewCtrl.js'
+import { reviewLimiter } from '../middlewares/rateLimiter.js'
+import { authMiddleware, isAdmin } from '../middlewares/authMiddleware.js'
 
-const router = express.Router();
+const router = express.Router()
 
-router.post("/add", reviewLimiter, addReview);
-router.get("/get", getReviewsByProductId);
-router.post("/get-by-id", getReviewsByProductIdFromBody);
-router.post("/count", getReviewCounts);
+router.post('/add', reviewLimiter, addReview)
+router.get('/get', getReviewsByProductId)
+router.post('/get-by-id', getReviewsByProductIdFromBody)
+router.post('/count', getReviewCounts)
 
-export default router;
+router.get('/admin/all', authMiddleware, isAdmin, getAdminReviews)
+router.patch('/admin/:reviewId/status', authMiddleware, isAdmin, updateReviewStatus)
+router.delete('/admin/:reviewId', authMiddleware, isAdmin, deleteAdminReview)
+
+export default router

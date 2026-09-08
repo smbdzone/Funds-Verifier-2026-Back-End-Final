@@ -38,6 +38,14 @@ const slotSchema = new Schema({
   isDeleted: { type: Boolean, default: false },
   deletedAt: { type: Date, default: null },
   times: [timeSlotSchema],
+  /** viewing = trustee arrange-viewing; service = evaluator / 3D / technical report */
+  slotCategory: {
+    type: String,
+    enum: ['viewing', 'service'],
+    default: 'service',
+    index: true,
+  },
+  creatorRole: { type: String },
   createdAt: {
     type: Date,
     default: Date.now,

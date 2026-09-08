@@ -44,6 +44,6 @@ const upload = multer({
     }
     cb(null, true)
   },
-  limits: { fileSize: 100 * 1024 * 1024 }, // 100MB max
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB max (listing video limit)
 })
 export default upload

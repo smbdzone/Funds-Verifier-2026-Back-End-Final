@@ -9,7 +9,17 @@ import { assertListingApprovedForPremium } from '../utils/listingApprovalHelper.
 import {
   linkWalkthroughToListing,
   listingMetaFromApproval,
+  clearUnpaidPremiumOnListing,
+  modelForAssetType,
+  isPremiumServiceRecordPaid,
+  fillListingTitleOnPremiumRecord,
 } from '../utils/listingPremiumSync.js'
+import {
+  notifyAssetHolderWalkthroughCompleted,
+  resolveListingFromPremiumRecord,
+} from '../helper/notifyAssetHolderListingEvents.js'
+import { notifyFvPremiumServiceRequested } from '../utils/fvPortalMail.js'
+import { notifyPremiumProviderRequest } from '../utils/premiumProviderMail.js'
 
 export const createRequest = async (req, res) => {
   try {
@@ -42,6 +52,12 @@ export const createRequest = async (req, res) => {
         return res.status(approval.status).json({ message: approval.message })
       }
       listingMeta = listingMetaFromApproval(approval)
+      const AssetModel = modelForAssetType(assetType)
+      if (AssetModel && approval.listing) {
+        await clearUnpaidPremiumOnListing(approval.listing, AssetModel, [
+          'video3DWalkthrough',
+        ])
+      }
     }
 
     // Validate that required fields are provided
@@ -96,6 +112,40 @@ export const createRequest = async (req, res) => {
       console.log({ error: error?.message })
     }
 
+    try {
+      await notifyFvPremiumServiceRequested({
+        serviceType: '3d_walkthrough',
+        request: newRequest,
+        listing: listingMeta?.productTitle
+          ? {
+            title: listingMeta.productTitle,
+            assetType,
+            uuid: listingMeta.productUUID,
+            _id: listingMeta.productId,
+          }
+          : null,
+      })
+    } catch (error) {
+      console.log({ fvPortal3dRequestEmailError: error?.message || error })
+    }
+
+    try {
+      await notifyPremiumProviderRequest({
+        serviceType: '3d_walkthrough',
+        request: newRequest,
+        listing: listingMeta?.productTitle
+          ? {
+            title: listingMeta.productTitle,
+            assetType,
+            uuid: listingMeta.productUUID,
+            _id: listingMeta.productId,
+          }
+          : null,
+      })
+    } catch (error) {
+      console.log({ premium3dRequestEmailError: error?.message || error })
+    }
+
     res
       .status(201)
       .json({ message: 'Request submitted successfully', request: newRequest })
@@ -106,10 +156,22 @@ export const createRequest = async (req, res) => {
 
 export const getRequests = async (req, res) => {
   try {
-    const requests = await Request3D.find({ isDeleted: false }).select(
-      '-_id -productId -userId -createdAt -updatedAt '
+    const requests = await Request3D.find({ isDeleted: false })
+      .sort({ createdAt: -1 })
+      .lean()
+
+    const paidRequests = []
+    for (const request of requests) {
+      if (!isPremiumServiceRecordPaid(request)) continue
+      await fillListingTitleOnPremiumRecord(request)
+      paidRequests.push(request)
+    }
+
+    const payload = paidRequests.map(
+      ({ _id, productId, userId, createdAt, updatedAt, ...rest }) => rest,
     )
-    res.status(200).json(requests)
+
+    res.status(200).json(payload)
   } catch (error) {
     res.status(500).json({ message: 'Error fetching requests', error })
   }
@@ -141,6 +203,7 @@ export const getRequestById = async (req, res) => {
           sizeSQFT: 1,
           bedrooms: 1,
           bathrooms: 1,
+          projectName: 1,
           developer: 1,
           isFurnished: 1,
           occupancyStatus: 1,
@@ -206,6 +269,14 @@ export const updateRequest = async (req, res) => {
     const { request } = req.params
     const data = { ...req.body }
 
+    const existingRequest = await Request3D.findOne({
+      uuid: request,
+      isDeleted: false,
+    })
+    if (!existingRequest) {
+      return res.status(404).json({ message: 'Request not found' })
+    }
+
     const link =
       typeof data.link === 'string' ? data.link.trim() : ''
     if (
@@ -228,17 +299,38 @@ export const updateRequest = async (req, res) => {
 
     await linkWalkthroughToListing(updatedRequest)
 
+    const becameSuccessful =
+      existingRequest.status !== 'successful' &&
+      updatedRequest.status === 'successful'
+
     try {
-      const NotificationData = {
-        userId: updatedRequest?.userId,
-        userUUID: updatedRequest?.userUUID,
-        UserRole: 'AssetHolder',
-        title: '3D Walkthrough',
-        message: `your request for 3d walkthrough is updated.`,
-        RelateRoute: '3dWalkthrough',
-        RelatedId: updatedRequest?.productId,
+      if (becameSuccessful) {
+        const listing =
+          (await resolveListingFromPremiumRecord(updatedRequest)) || null
+        await notifyAssetHolderWalkthroughCompleted({
+          listing: listing || {
+            userUUID: updatedRequest?.userUUID || existingRequest.userUUID,
+            title:
+              updatedRequest?.productTitle || existingRequest.productTitle,
+            uuid: updatedRequest?.productUUID || existingRequest.productUUID,
+            _id: updatedRequest?.productId || existingRequest.productId,
+            assetType: updatedRequest?.assetType || existingRequest.assetType,
+          },
+          assetType: updatedRequest?.assetType || existingRequest.assetType,
+          provider: req.user || { name: updatedRequest?.name },
+        })
+      } else {
+        const NotificationData = {
+          userId: updatedRequest?.userId,
+          userUUID: updatedRequest?.userUUID,
+          UserRole: 'AssetHolder',
+          title: '3D Walkthrough',
+          message: `your request for 3d walkthrough is updated.`,
+          RelateRoute: '3dWalkthrough',
+          RelatedId: updatedRequest?.productId,
+        }
+        await createNotification({ data: NotificationData })
       }
-      await createNotification({ data: NotificationData })
     } catch (error) {
       console.log({ error: error?.message })
     }

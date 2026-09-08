@@ -17,11 +17,17 @@ const sendMail = asyncHandler(async (req, res) => {
   try {
     const { email, subject, text } = req.body
 
-    sendEmail({
+    const result = await sendEmail({
       to: email,
       subject: clean(subject),
       text: text,
     })
+
+    if (!result.success) {
+      return res
+        .status(503)
+        .json({ success: false, message: 'Failed to send email' })
+    }
 
     res.status(200).json({ success: true, message: 'Email sent successfully' })
   } catch (error) {

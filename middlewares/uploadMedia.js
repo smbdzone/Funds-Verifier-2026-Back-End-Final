@@ -204,6 +204,11 @@ import EvaluationCertificate from '../models/evaluationCertificateModel.js'
 import DealHunterDoc from '../models/dealHunterDocModel.js'
 import { generateCloudFrontSignedUrl } from '../services/cloudFrontSignedUrlService.js'
 import { checkExecutableFile } from '../utils/executableFileBlocklist.js'
+import {
+  IMAGE_MAX_BYTES,
+  VIDEO_MAX_BYTES,
+  PDF_MAX_BYTES,
+} from '../utils/uploadLimits.js'
 
 // ------------------- Multer Memory Storage -------------------
 const storage = multer.memoryStorage()
@@ -216,11 +221,11 @@ const uploadPhoto = multer({
     if (executableCheck.isBlocked) {
       return cb(new Error(`Security: ${executableCheck.reason}`), false)
     }
-    
+
     if (file.mimetype.startsWith('image')) cb(null, true)
     else cb(new Error('Unsupported image format'), false)
   },
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+  limits: { fileSize: IMAGE_MAX_BYTES },
 })
 
 const uploadVideo = multer({
@@ -231,11 +236,11 @@ const uploadVideo = multer({
     if (executableCheck.isBlocked) {
       return cb(new Error(`Security: ${executableCheck.reason}`), false)
     }
-    
+
     if (file.mimetype.startsWith('video')) cb(null, true)
     else cb(new Error('Unsupported video format'), false)
   },
-  limits: { fileSize: 20 * 1024 * 1024 }, // 20MB
+  limits: { fileSize: VIDEO_MAX_BYTES },
 })
 
 const uploadPDF = multer({
@@ -246,11 +251,11 @@ const uploadPDF = multer({
     if (executableCheck.isBlocked) {
       return cb(new Error(`Security: ${executableCheck.reason}`), false)
     }
-    
+
     if (file.mimetype === 'application/pdf') cb(null, true)
     else cb(new Error('Unsupported PDF format'), false)
   },
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
+  limits: { fileSize: PDF_MAX_BYTES },
 })
 
 // ------------------- Antivirus Scanner -------------------
@@ -265,78 +270,118 @@ const scanBuffer = async (buffer) => {
 // ------------------- Image Resizing -------------------
 const resizeImages =
   (width = 580, height = 580) =>
-  async (req, res, next) => {
-    try {
-      if (!req.files) return next()
+    async (req, res, next) => {
+      try {
+        if (!req.files) return next()
 
-      req.files = await Promise.all(
-        req.files.map(async (file) => {
-          const resizedBuffer = await sharp(file.buffer)
-            .resize(width, height)
-            .toFormat('jpeg')
-            .jpeg({ quality: 90 })
-            .toBuffer()
+        req.files = await Promise.all(
+          req.files.map(async (file) => {
+            // Watermark is burned client-side (centered light "FUNDS VERIFIER" text)
+            // before upload so downloads keep branding without double-stamping here.
+            const resizedBuffer = await sharp(file.buffer)
+              .resize(width, height)
+              .toFormat('jpeg')
+              .jpeg({ quality: 90 })
+              .toBuffer()
 
-          return {
-            ...file,
-            buffer: resizedBuffer,
-            mimetype: 'image/jpeg',
-            size: resizedBuffer.length,
-          }
-        })
-      )
+            return {
+              ...file,
+              buffer: resizedBuffer,
+              mimetype: 'image/jpeg',
+              size: resizedBuffer.length,
+            }
+          }),
+        )
 
-      next()
-    } catch (err) {
-      console.error('Image resizing error:', err)
-      res
-        .status(500)
-        .json({ message: 'Image resizing failed', error: err.message })
+        next()
+      } catch (err) {
+        console.error('Image resizing error:', err)
+        res
+          .status(500)
+          .json({ message: 'Image resizing failed', error: err.message })
+      }
     }
-  }
 
 // ------------------- Video Conversion -------------------
+function isMp4Container(buffer) {
+  if (!buffer || buffer.length < 12) return false
+  return buffer.slice(4, 8).toString('ascii') === 'ftyp'
+}
+
+function skipVideoConversion(file) {
+  const name = String(file.originalname || '').toLowerCase()
+  if (name.endsWith('.mp4')) return true
+  if (file.mimetype === 'video/mp4') return true
+  return isMp4Container(file.buffer)
+}
+
+function reencodeVideoToMp4(file) {
+  return new Promise((resolve, reject) => {
+    const inputStream = new Readable()
+    inputStream.push(file.buffer)
+    inputStream.push(null)
+
+    const outputStream = new PassThrough()
+    const chunks = []
+
+    outputStream.on('data', (chunk) => chunks.push(chunk))
+    outputStream.on('end', () => {
+      const finalBuffer = Buffer.concat(chunks)
+      resolve({
+        ...file,
+        buffer: finalBuffer,
+        mimetype: 'video/mp4',
+        size: finalBuffer.length,
+      })
+    })
+    outputStream.on('error', reject)
+
+    ffmpeg(inputStream)
+      .outputOptions('-c:v libx264', '-crf 20', '-preset fast')
+      .format('mp4')
+      .on('error', (ffmpegErr) => {
+        if (skipVideoConversion(file)) {
+          console.warn(
+            '[upload] FFmpeg unavailable; uploading original MP4 without re-encode',
+            ffmpegErr.message,
+          )
+          resolve({
+            ...file,
+            mimetype: 'video/mp4',
+          })
+          return
+        }
+        reject(ffmpegErr)
+      })
+      .pipe(outputStream, { end: true })
+  })
+}
+
 const convertVideos = async (req, res, next) => {
   try {
     if (!req.files) return next()
 
     req.files = await Promise.all(
-      req.files.map((file) => {
-        return new Promise((resolve, reject) => {
-          const inputStream = new Readable()
-          inputStream.push(file.buffer)
-          inputStream.push(null)
-
-          const outputStream = new PassThrough()
-          const chunks = []
-
-          outputStream.on('data', (chunk) => chunks.push(chunk))
-          outputStream.on('end', () => {
-            const finalBuffer = Buffer.concat(chunks)
-            resolve({
-              ...file,
-              buffer: finalBuffer,
-              mimetype: 'video/mp4',
-              size: finalBuffer.length,
-            })
-          })
-          outputStream.on('error', reject)
-
-          ffmpeg(inputStream)
-            .outputOptions('-c:v libx264', '-crf 20', '-preset fast')
-            .format('mp4')
-            .on('error', reject)
-            .pipe(outputStream, { end: true })
-        })
-      })
+      req.files.map(async (file) => {
+        if (skipVideoConversion(file)) {
+          return {
+            ...file,
+            mimetype: 'video/mp4',
+          }
+        }
+        return reencodeVideoToMp4(file)
+      }),
     )
 
     next()
   } catch (err) {
     console.error('Video conversion error:', err)
-    res
-      .status(500)
-      .json({ message: 'Video conversion failed', error: err.message })
+    res.status(500).json({
+      message: 'Video conversion failed',
+      error: err.message,
+      hint:
+        'Upload an MP4 file under 5MB, or install full FFmpeg on the server (apt install ffmpeg).',
+    })
   }
 }
 
@@ -357,7 +402,7 @@ const secureUploadMiddleware = async (req, res, next) => {
       if (executableCheck.isBlocked) {
         throw new Error(`Security violation: ${executableCheck.reason}`)
       }
-      
+
       const isValid = await validateMagicBytes(file.buffer)
       if (!isValid)
         throw new Error(`Invalid file type detected: ${file.originalname}`)

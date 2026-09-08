@@ -2,42 +2,83 @@ export const PUBLIC_PROPERTY_FIELDS = `
   slug
   title
   uuid
+  dldNumber
   images
   thumbnailImg
   video
   video3DWalkthrough
   price
+  priceFrom
+  priceTo
   evaluationPrices
   roi
   sizeSQFT
+  sizeSQM
+  sizeSQFTFrom
+  sizeSQFTTo
+  sizeSQMFrom
+  sizeSQMTo
+  sizeUnit
+  sizeType
+  qrScan
+  userId
   propertyDescription
   description
   additionalDescription
   bedrooms
   evaluationCompanies
   developer
+  projectName
   bathrooms
   isFurnished
+  occupancyStatus
   isfeatured
   facilities
   ratings
   totalrating
   status
+  underProcess
+  createdAt
   assetType
+  propertyType
+  propertyForSale
+  propertyForLease
+  listing
+  neighbourhood
+  mapUrl
   country
   city
+  phoneNumber
   userUUID
-    video
+  video
   pictures
   thumbnailImg
+  deliveryQuarter
+  deliveryYear
+  paymentPlanType
+  layout
+  numberOfFloors
+  availableApartment
+  paymentPlan
+  unitLayout
+  floorPlan
+  titleDeed
+  advertisementId
+  analytics
+  evaluationCertificate
+  technicalReport
+  leaseNumberofCheques
 `
 
 export const PUBLIC_CAR_FIELDS = `
   uuid
+  dldNumber
+  userId
   assetType
   country
   city
   neighbourhood
+  mapUrl
   make
   category
   model
@@ -66,17 +107,26 @@ export const PUBLIC_CAR_FIELDS = `
   extras
   evaluationPrices
   status
+  underProcess
   userUUID
   video
   pictures
   thumbnailImg
+  qrScan
+  evaluationCertificate
+  technicalReport
+  video3DWalkthrough
+  analytics
 `
 export const PUBLIC_BOAT_FIELDS = `
 uuid 
+dldNumber
+userId
 assetType 
 country 
 city 
 neighbourhood 
+mapUrl
 category 
 model
 title 
@@ -86,6 +136,7 @@ evaluationPrices
 pictures
  video 
  thumbnailImg 
+ qrScan
  video3DWalkthrough
 description 
 ratings
@@ -103,18 +154,25 @@ age
 usage
 locateBoat
 seats
+extras
 userUUID
   video
   pictures
   thumbnailImg
+  evaluationCertificate
+  technicalReport
+  analytics
 `
 
 export const PUBLIC_JEWELRY_FIELDS = `
   uuid
+  dldNumber
+  userId
   assetType
   country
   city 
   neighbourhood
+  mapUrl
   category
   model
   title
@@ -133,13 +191,18 @@ export const PUBLIC_JEWELRY_FIELDS = `
   pictures
   video
   thumbnailImg
+  qrScan
   video3DWalkthrough
   ratings
   status
+  underProcess
   grams
   materials
   userUUID
   video
   pictures
   thumbnailImg
+  evaluationCertificate
+  technicalReport
+  analytics
 `

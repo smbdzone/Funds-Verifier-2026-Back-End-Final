@@ -23,8 +23,34 @@ import {
   sanitizeListingMediaResponse,
   sanitizeListingsMediaResponse,
 } from '../helper/sanitizeListingResponse.js'
+import {
+  recordListingClick,
+} from '../helper/listingAnalytics.js'
+import {
+  getListingSellersByUuid,
+  resolveListingSeller,
+  getSellerRef,
+  attachListingSellerContact,
+} from '../helper/listingSellerInfo.js'
 import { attachDocumentSignedUrls } from '../helper/attachDocumentSignedUrls.js'
-import { stripNullPremiumRefs } from '../utils/listingPremiumSync.js'
+import {
+  REQUEST_DOCUMENT_POPULATE,
+  applyRequestDocumentUpdate,
+  attachRequestDocumentSignedUrls,
+  normalizeRequestDocumentList,
+} from '../helper/requestDocumentHelpers.js'
+import {
+  stripNullPremiumRefs,
+  refreshListingPremiumFieldsForEdit,
+  sanitizeUnpaidPremiumServicesForClient,
+} from '../utils/listingPremiumSync.js'
+import { buildListingIdQuery } from '../utils/listingIdLookup.js'
+import { isListingPrivilegedUser } from '../utils/parentEvaluator.js'
+import {
+  blockPriceChangeIfUnderProcess,
+  stripUnderProcessFromListingPayload,
+} from '../utils/listingUnderProcess.js'
+import { restrictAssetHolderBodyAfterApproval } from '../utils/listingEditLock.js'
 import express from 'express'
 import upload from '../middlewares/Multer.js'
 
@@ -36,9 +62,29 @@ import { verifyToken } from '../middlewares/JwtAuth.js'
 import UserModel from '../models/userModel.js'
 import { AssetsListingsPricing } from '../utils/AssetsListingsPricing.js'
 import { createNotification } from './notifications.controller.js'
+import { notifyEvaluatorsNewListing } from '../helper/notificationHelpers.js'
+import { notifyAssetHolderDocumentRequested } from '../helper/notifyDocumentRequested.js'
+import {
+  listingBecameEvaluatorApproved,
+  notifyAssetHolderListingApproved,
+} from '../helper/notifyAssetHolderListingEvents.js'
 import UserPaymentDetails from '../models/UserPaymentDetails.js'
 import { AddPaymentJob } from '../utils/jobs/index.js'
 import { PUBLIC_BOAT_FIELDS } from '../constants/publicFields.js'
+import {
+  applyCardListPopulates,
+  CARD_BOAT_FIELDS,
+  computeCardRatingFields,
+  shouldUseCardListProjection,
+} from '../utils/listingCardQuery.js'
+import { findRelatedListings } from '../utils/relatedListings.js'
+import {
+  getSafeStringParam,
+  getSafeTitleRegex,
+  pickScalarFilters,
+  applyListingStatusFilters,
+  applyEvaluatorPendingFilter,
+} from '../utils/listingQuery.js'
 const app = express()
 
 const __filename = fileURLToPath(import.meta.url)
@@ -67,64 +113,68 @@ const createProduct = asyncHandler(async (req, res) => {
       price: req.body.price,
     })
 
+    stripNullPremiumRefs(req.body)
+
     const createPdt = await Boat.create([req.body], { session })
 
-    // add evaluation payment message queue
-    try {
-      const PaymentDetails = await UserPaymentDetails.create({
-        userId: user?._id,
-        userUUID: user?.uuid,
-        assetId: createPdt?.[0]?._id,
-        assetTitle: createPdt?.[0]?.title,
-        assetType: 'property',
-        customerId: req?.body?.customerId,
-        paymentMethod: req?.body?.paymentMethod,
-      })
-      await AddPaymentJob({
-        jobId: PaymentDetails?._id,
-        assetId: createPdt?.[0]?._id,
-        assetType: 'boat',
-        PaymentDetailsId: PaymentDetails?._id,
-        userId: createPdt?.[0]?.userId,
-      })
-    } catch (error) {
-      // Keep error logging for queue failures
-      console.log(`Error adding job to queue: ${error.message}`)
+    const paidViaClozer =
+      req.body?.payment_provider === 'clozer' ||
+      Boolean(req.body?.clozer_transaction_id)
+
+    if (!paidViaClozer) {
+      try {
+        const PaymentDetails = await UserPaymentDetails.create({
+          userId: user?._id,
+          userUUID: user?.uuid,
+          assetId: createPdt?.[0]?._id,
+          assetTitle: createPdt?.[0]?.title,
+          assetType: 'property',
+          customerId: req?.body?.customerId,
+          paymentMethod: req?.body?.paymentMethod,
+        })
+        await AddPaymentJob({
+          jobId: PaymentDetails?._id,
+          assetId: createPdt?.[0]?._id,
+          assetType: 'boat',
+          PaymentDetailsId: PaymentDetails?._id,
+          userId: createPdt?.[0]?.userId,
+        })
+      } catch (error) {
+        console.log(`Error adding job to queue: ${error.message}`)
+      }
     }
 
     // Try to find and update the latest pending 3D Request
     const pendingRequest = await Request3D.findOneAndUpdate(
-      { status: 'pending' },
+      { status: 'pending', isDeleted: { $ne: true } },
       {
         productId: createPdt[0]._id,
+        productUUID: createPdt[0].uuid,
         productTitle: createPdt[0].title,
         assetType: createPdt[0].assetType,
-        status: 'successful',
       },
       { new: true, sort: { createdAt: -1 }, session }
     )
     const pendingReport = await Report.findOneAndUpdate(
-      { status: 'pending' },
+      { status: 'pending', isDeleted: { $ne: true } },
       {
         productId: createPdt[0]._id,
+        productUUID: createPdt[0].uuid,
         productTitle: createPdt[0].title,
         assetType: createPdt[0].assetType,
-        status: 'successful',
       },
       { new: true, sort: { createdAt: -1 }, session }
     )
 
     try {
-      const NotificationData = {
-        userId: user._id,
-        userUUID: user.uuid,
-        UserRole: 'Evaluator',
-        title: 'Evaluation',
+      await notifyEvaluatorsNewListing({
         message: `New asset boat (${createPdt[0]?.title}) added for evaluation.`,
-        RelateRoute: 'boat',
-        RelatedId: createPdt[0]?._id,
-      }
-      await createNotification({ data: NotificationData })
+        assetType: createPdt[0]?.assetType || 'boat',
+        relatedId: createPdt[0]?._id,
+        relatedUUID: createPdt[0]?.uuid,
+        listing: createPdt[0],
+        assetHolder: user,
+      })
     } catch (error) {
       console.log({ error: error?.message })
     }
@@ -176,25 +226,31 @@ const pickFields = (obj, fields) => {
 //   console.log("create product in working");
 // });
 
-// get single product by id
+// get single product by id or slug
 const getSingleProduct = asyncHandler(async (req, res) => {
   const { id } = req.params
 
+  if (!id) {
+    return res.status(400).json({ message: 'Invalid boat ID' })
+  }
+
   const { sanitizeUUID } = await import('../utils/nosqlSanitizer.js')
-  const sanitizedId = sanitizeUUID(id)
-  if (!sanitizedId) {
-    return res.status(400).json({
-      success: false,
-      message: 'Invalid UUID format',
-    })
+  const sanitizedUuid = sanitizeUUID(id)
+  const lookupQuery = { isDeleted: false }
+
+  if (sanitizedUuid) {
+    lookupQuery.$or = [{ uuid: sanitizedUuid }, { slug: id }]
+  } else {
+    lookupQuery.slug = id
   }
 
   try {
-    const boat = await Boat.findOne({ uuid: sanitizedId, isDeleted: false })
+    const boat = await Boat.findOne(lookupQuery)
       .populate('pictures')
       .populate('video')
       .populate('uploadDocument')
-      .populate('thumbnailImg')
+      .populate(REQUEST_DOCUMENT_POPULATE)
+      .populate('thumbnailImg').populate('qrScan')
       .populate('video3DWalkthrough')
       .populate('transactionDepositDocument')
       .populate('transactionId')
@@ -212,21 +268,34 @@ const getSingleProduct = asyncHandler(async (req, res) => {
       return res.status(404).json({ message: 'Boat not found' })
     }
 
-    await refreshListingMediaSignedUrls(boat)
-    sanitizeListingMediaResponse(boat)
+    boat.requestDocument = normalizeRequestDocumentList(boat.requestDocument)
 
-    const isPrivilegedUser =
-      req.user &&
-      ['Admin', 'AssetHolder', 'Evaluator', 'Sub-Evaluator'].includes(
-        req.user.role,
-      )
+    await refreshListingMediaSignedUrls(boat)
+
+    const isPrivilegedUser = isListingPrivilegedUser(req.user)
 
     // Public user → return limited fields
     if (!isPrivilegedUser) {
-      return res.json(pickFields(boat, PUBLIC_BOAT_FIELDS.trim().split(/\s+/)))
+      recordListingClick(Boat, boat)
+      await attachDocumentSignedUrls(boat, {
+        fields: ['evaluationCertificate', 'technicalReport'],
+      })
+      const publicBoat = pickFields(boat, PUBLIC_BOAT_FIELDS.trim().split(/\s+/))
+      const sellersByUuid = await getListingSellersByUuid([boat])
+      const seller = resolveListingSeller(boat, sellersByUuid)
+      if (seller) {
+        publicBoat.sellerRef = getSellerRef(seller)
+      }
+      sanitizeListingMediaResponse(publicBoat)
+      sanitizeUnpaidPremiumServicesForClient(publicBoat)
+      return res.json(publicBoat)
     }
 
-    // Privileged user → return full object
+    await attachDocumentSignedUrls(boat)
+    await attachRequestDocumentSignedUrls(boat)
+    sanitizeListingMediaResponse(boat)
+    await refreshListingPremiumFieldsForEdit(boat)
+    await attachListingSellerContact(boat)
     res.json(boat)
   } catch (err) {
     console.error('Error fetching boat:', err.message)
@@ -239,18 +308,14 @@ const getSingleProductBySlug = asyncHandler(async (req, res) => {
   const { slug } = req.params
 
   // Check privileged roles
-  const isPrivilegedUser =
-    req.user &&
-    ['AssetHolder', 'Admin', 'Evaluator', 'Sub-Evaluator'].includes(
-      req.user.role,
-    )
+  const isPrivilegedUser = isListingPrivilegedUser(req.user)
 
   try {
     const boat = await Boat.findOne({ slug, isDeleted: false })
       .select(isPrivilegedUser ? '' : PUBLIC_BOAT_FIELDS)
       .populate('pictures')
       .populate('video')
-      .populate('thumbnailImg')
+      .populate('thumbnailImg').populate('qrScan')
       .populate('video3DWalkthrough')
 
     if (!boat) {
@@ -258,6 +323,11 @@ const getSingleProductBySlug = asyncHandler(async (req, res) => {
     }
 
     const boatObj = typeof boat.toObject === 'function' ? boat.toObject() : boat
+    const sellersByUuid = await getListingSellersByUuid([boatObj])
+    const seller = resolveListingSeller(boatObj, sellersByUuid)
+    if (seller) {
+      boatObj.sellerRef = getSellerRef(seller)
+    }
     await refreshListingMediaSignedUrls(boatObj)
     sanitizeListingMediaResponse(boatObj)
 
@@ -272,48 +342,16 @@ const getSingleProductBySlug = asyncHandler(async (req, res) => {
 const getAllProduct = asyncHandler(async (req, res) => {
   try {
     /* ----------------------------------------------------
-       1️⃣ OPTIONAL AUTH (NO 401 FOR PUBLIC)
+       1️⃣ AUTH — use optionalAuthMiddleware (Bearer + accessToken cookie)
     ---------------------------------------------------- */
-    const header = req.headers.authorization
-    const token =
-      header && header.startsWith('Bearer ') ? header.split(' ')[1] : null
-
-    let user = null
-
-    if (token) {
-      try {
-        const userId = verifyToken(token)
-        user = await UserModel.findOne({
-          _id: userId,
-          isDeleted: false,
-        })
-      } catch {
-        user = null
-      }
-    }
+    const user = req.user || null
 
     /* ----------------------------------------------------
-       2️⃣ CLEAN QUERY PARAMS
+       2️⃣ SAFE FILTER PARAMS (no raw req.query spread)
     ---------------------------------------------------- */
-    const queryObj = { ...req.query }
-
-    const excludeFields = [
-      'page',
-      'sort',
-      'limit',
-      'fields',
-      'date',
-      'minPrice',
-      'maxPrice',
-      'statusFilter',
-      'title',
-      'dashboard',
-    ]
-    excludeFields.forEach((f) => delete queryObj[f])
-
-    let queryStr = JSON.stringify(queryObj)
-    queryStr = queryStr.replace(/\b(gte|gt|lte|lt)\b/g, (m) => `$${m}`)
-    const parseData = JSON.parse(queryStr)
+    const parseData = {
+      ...pickScalarFilters(req.query),
+    }
 
     /* ----------------------------------------------------
        3️⃣ COMMON FILTERS
@@ -335,13 +373,13 @@ const getAllProduct = asyncHandler(async (req, res) => {
     }
 
     // Status
-    if (req.query.statusFilter === '1') {
-      parseData.status = 1
-    }
+    applyListingStatusFilters(parseData, req.query)
+    applyEvaluatorPendingFilter(parseData, req.query)
 
     // Title search
-    if (req.query.title) {
-      parseData.title = { $regex: req.query.title, $options: 'i' }
+    const titleFilter = getSafeTitleRegex(req.query)
+    if (titleFilter) {
+      parseData.title = titleFilter
     }
 
     /* ----------------------------------------------------
@@ -349,7 +387,7 @@ const getAllProduct = asyncHandler(async (req, res) => {
     ---------------------------------------------------- */
     if (!user) {
       // PUBLIC USER
-      parseData.listing = { $regex: /^public$/i }
+      parseData.listing = 'Public'
     } else {
       const isSubEvaluator = ['Sub-Evaluator', 'SubEvaluator'].includes(
         user.role
@@ -379,7 +417,7 @@ const getAllProduct = asyncHandler(async (req, res) => {
           .toLowerCase()
           .replace(/[\s_-]/g, '')
         const isElevatedModerator =
-          ['Admin', 'Evaluator'].includes(user.role) ||
+          ['Admin', 'Evaluator', 'Trustee'].includes(user.role) ||
           roleNorm === 'superadmin'
         if (isElevatedModerator) {
           delete parseData.listing
@@ -388,15 +426,15 @@ const getAllProduct = asyncHandler(async (req, res) => {
           user.financialInfo?.status === 'Approved'
         ) {
           parseData.$or = [
-            { listing: { $regex: /^public$/i } },
+            { listing: 'Public' },
             {
-              listing: { $regex: /^private$/i },
+              listing: 'Private',
               price: { $lte: Number(user.financialInfo.fundsVerification) },
             },
           ]
           delete parseData.listing
         } else {
-          parseData.listing = { $regex: /^public$/i }
+          parseData.listing = 'Public'
         }
       }
     }
@@ -412,27 +450,40 @@ const getAllProduct = asyncHandler(async (req, res) => {
     /* ----------------------------------------------------
        6️⃣ QUERY
     ---------------------------------------------------- */
+    const useCardProjection = shouldUseCardListProjection(req, Boolean(user))
     let query = Boat.find(parseData)
-      .populate({ path: 'pictures', select: '-_id' })
-      .populate({ path: 'video', select: '-_id' })
-      .populate({ path: 'thumbnailImg', select: '-_id' })
-      .populate({ path: 'video3DWalkthrough', select: '-_id' })
-      .populate({
-        path: 'ratings.postedBy',
-        select: '-_id',
-      })
 
-    if (user) {
+    if (useCardProjection) {
+      query = applyCardListPopulates(query).select(CARD_BOAT_FIELDS)
+    } else {
       query = query
+        .populate({ path: 'pictures', select: '-_id' })
+        .populate({ path: 'video', select: '-_id' })
+        .populate({ path: 'thumbnailImg', select: '-_id' })
+        .populate({ path: 'qrScan', select: '-_id' })
+        .populate({ path: 'video3DWalkthrough', select: '-_id' })
+        .populate({ path: 'userId', select: 'profileImage name uuid' })
         .populate({ path: 'evaluationCertificate', select: '-_id' })
         .populate({
           path: 'technicalReport',
           select: '-_id',
           populate: { path: 'reportFile', select: '-_id' },
         })
-    }
+        .populate({
+          path: 'ratings.postedBy',
+          select: '-_id',
+        })
 
-    query = user ? query.select('-__v') : query.select(PUBLIC_BOAT_FIELDS)
+      if (user) {
+        query = query
+          .populate({ path: 'uploadDocument', select: '-_id' })
+          .populate(REQUEST_DOCUMENT_POPULATE)
+          .populate({ path: 'invoice', select: '-_id' })
+          .populate({ path: 'evaluator', select: 'name displayName uuid' })
+      }
+
+      query = user ? query.select('-__v') : query.select(PUBLIC_BOAT_FIELDS)
+    }
 
     /* ----------------------------------------------------
        7️⃣ SORTING
@@ -454,12 +505,38 @@ const getAllProduct = asyncHandler(async (req, res) => {
     query = query.skip(skip).limit(limit)
 
     const productsRaw = await query
-    const products = productsRaw.map((p) =>
-      typeof p.toObject === 'function' ? p.toObject() : p,
-    )
+    const sellersByUuid = await getListingSellersByUuid(productsRaw)
+    const products = productsRaw.map((p) => {
+      const obj = typeof p.toObject === 'function' ? p.toObject() : p
+      // Seller avatar for cards; strip other user fields for public callers
+      const seller = resolveListingSeller(obj, sellersByUuid)
+      if (seller) {
+        obj.sellerAvatar = seller.profileImage || ''
+        obj.sellerName = seller.name || ''
+        obj.sellerRef = getSellerRef(seller)
+        if (!user) {
+          obj.userId = {
+            profileImage: seller.profileImage || '',
+            name: seller.name || '',
+          }
+        }
+      }
+      const { reviewCount, averageRating } = computeCardRatingFields(obj)
+      obj.reviewCount = reviewCount
+      obj.averageRating = averageRating
+      return obj
+    })
     await refreshListingsMediaSignedUrls(products)
-    if (user) {
-      await Promise.all(products.map((p) => attachDocumentSignedUrls(p)))
+    if (!useCardProjection) {
+      await Promise.all(
+        products.map((p) =>
+          user
+            ? attachDocumentSignedUrls(p)
+            : attachDocumentSignedUrls(p, {
+              fields: ['evaluationCertificate', 'technicalReport'],
+            }),
+        ),
+      )
     }
     sanitizeListingsMediaResponse(products)
 
@@ -513,7 +590,10 @@ const getAllProductByFilter = asyncHandler(async (req, res) => {
   }
   // Title filtering
   if (req.query.brands) {
-    modifiedQuery.brands = { $regex: req.query.brands, $options: 'i' } // Case-insensitive search
+    const brands = getSafeStringParam(req.query, 'brands')
+    if (brands) {
+      modifiedQuery.brands = { $regex: brands, $options: 'i' }
+    }
   }
 
   // Facility filtering (assuming "facilities" is a field in the Property model)
@@ -549,7 +629,7 @@ const getAllProductByFilter = asyncHandler(async (req, res) => {
   let query = Boat.find(modifiedQuery)
     .populate('pictures')
     .populate('video')
-    .populate('thumbnailImg')
+    .populate('thumbnailImg').populate('qrScan')
     .populate('evaluationCertificate')
     .populate('invoice')
     .populate('uploadDocument')
@@ -597,6 +677,15 @@ const getAllProductByFilter = asyncHandler(async (req, res) => {
       typeof p.toObject === 'function' ? p.toObject() : p,
     )
     await refreshListingsMediaSignedUrls(allProduct)
+    await Promise.all(
+      allProduct.map((p) =>
+        userId
+          ? attachDocumentSignedUrls(p)
+          : attachDocumentSignedUrls(p, {
+            fields: ['evaluationCertificate', 'technicalReport'],
+          }),
+      ),
+    )
     sanitizeListingsMediaResponse(allProduct)
     return res.status(200).json({
       products: allProduct,
@@ -615,24 +704,16 @@ const getAllProductByFilter = asyncHandler(async (req, res) => {
 // get related product
 
 const getRelatedProduct = asyncHandler(async (req, res) => {
-  const { assetType, country, city, make, price } = req.body
-
-  // Construct the query object based on provided properties
-  const queryObj = {}
-  if (assetType) queryObj.assetType = assetType
-  if (country) queryObj.country = country
-  if (city) queryObj.city = city
-  if (make) queryObj.make = make
-  if (price) queryObj.price = price
-  queryObj.isDeleted = false
   try {
-    // Execute the query with the constructed query object
-    const allProduct = await Boat.find(queryObj).select('-_id')
-    sanitizeListingsMediaResponse(allProduct)
-    res.json(allProduct)
+    const result = await findRelatedListings({
+      Model: Boat,
+      cardFields: CARD_BOAT_FIELDS,
+      query: req.query,
+      softFields: ['assetType', 'country', 'city', 'brands'],
+    })
+    return res.status(200).json(result)
   } catch (err) {
-    // Handle errors appropriately
-    throw new Error(err)
+    return res.status(500).json({ message: err?.message || 'Server error' })
   }
 })
 
@@ -653,15 +734,35 @@ const updateProduct = asyncHandler(async (req, res) => {
     try {
       // validateMongoId(id)
       // Find the existing product
-      const product = await Boat.findOne({ uuid: moduleId, isDeleted: false })
+      const product = await Boat.findOne(buildListingIdQuery(moduleId)).populate(
+        'uploadDocument',
+      )
       if (!product) {
         return res.status(404).json({ message: 'boat not found' })
       }
+
+      stripUnderProcessFromListingPayload(req.body)
+      const priceBlock = blockPriceChangeIfUnderProcess(product, req.body)
+      if (priceBlock) {
+        return res.status(403).json({ message: priceBlock })
+      }
+
+      req.body = restrictAssetHolderBodyAfterApproval(
+        product,
+        req.body,
+        req.user,
+      )
 
       // Update slug if title is provided
       if (req.body.title) {
         req.body.slug = slugify(req.body.title)
       }
+
+      const documentFulfilled = Boolean(req.body.fulfillRequestDocument)
+      applyRequestDocumentUpdate(product, req.body)
+
+      const requestedDocumentsUpdated =
+        Boolean(req.body.requestDocument) && !documentFulfilled
 
       // Handle technicalReport upload
       if (req.files && req.files.technicalReport) {
@@ -674,7 +775,7 @@ const updateProduct = asyncHandler(async (req, res) => {
       // }
 
       // Handle uploadDocument IDs (from frontend)
-      if (req.body.uploadDocument) {
+      if (req.body.uploadDocument && !documentFulfilled) {
         const newDocumentIds = Array.isArray(req.body.uploadDocument)
           ? req.body.uploadDocument // If multiple IDs are passed as an array
           : [req.body.uploadDocument] // If only a single ID is passed as a string
@@ -695,15 +796,42 @@ const updateProduct = asyncHandler(async (req, res) => {
       ).select('-_id')
 
       try {
-        const NotificationData = {
-          userUUID: updatedProduct?.userUUID,
-          UserRole: 'AssetHolder',
-          title: 'Assets Boat',
-          message: `Your boat (${updatedProduct?.title}) has been updated.`,
-          RelateRoute: 'boat',
-          RelatedId: updatedProduct?._id,
+        if (requestedDocumentsUpdated) {
+          await notifyAssetHolderDocumentRequested({
+            listing: updatedProduct,
+            assetType: 'boat',
+            requesterRole: req.user?.role,
+            title: 'Document Request',
+          })
+        } else if (
+          listingBecameEvaluatorApproved(product, updatedProduct)
+        ) {
+          await notifyAssetHolderListingApproved({
+            listing: {
+              ...(updatedProduct?.toObject?.() || updatedProduct),
+              _id: product._id,
+              userUUID: updatedProduct?.userUUID || product.userUUID,
+            },
+            assetType: 'boat',
+            evaluator: req.user,
+          })
+        } else {
+          const NotificationData = {
+            userUUID: updatedProduct?.userUUID,
+            UserRole: 'AssetHolder',
+            title: 'Assets Boat',
+            message: `Your boat (${updatedProduct?.title}) has been updated.`,
+            RelateRoute: 'boat',
+            RelatedId: updatedProduct?._id,
+          }
+          if (documentFulfilled) {
+            NotificationData.UserRole = 'Evaluator'
+            NotificationData.userUUID = updatedProduct?.evaluatorUUID
+            NotificationData.message = `Seller uploaded a requested document for boat (${updatedProduct?.title}).`
+            NotificationData.RelateRoute = 'evaluation'
+          }
+          await createNotification({ data: NotificationData })
         }
-        await createNotification({ data: NotificationData })
       } catch (error) {
         console.log({ error: error?.message })
       }

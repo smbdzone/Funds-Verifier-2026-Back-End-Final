@@ -1,5 +1,9 @@
 import express from "express";
-import { authMiddleware, isAdmin } from "../middlewares/authMiddleware.js";
+import {
+  authMiddleware,
+  isAdmin,
+  requireBearerAuth,
+} from "../middlewares/authMiddleware.js";
 const router = express.Router();
 
 import {
@@ -10,10 +14,13 @@ import {
   updateContact,
 } from "../controller/contactCtrl.js";
 
-router.get("/:id", getSingleContact);
-router.get("/", getAllContact);
-router.post("/", createContact);
-router.put("/:id", authMiddleware, isAdmin, updateContact);
-router.delete("/:id", authMiddleware, isAdmin, DeleteContact);
+/** Legacy contact model at /api/country — same Super Admin rules as /contact-us */
+const superAdminOnly = [requireBearerAuth, authMiddleware, isAdmin];
+
+router.get("/", ...superAdminOnly, getAllContact);
+router.get("/:id", ...superAdminOnly, getSingleContact);
+router.post("/", ...superAdminOnly, createContact);
+router.put("/:id", ...superAdminOnly, updateContact);
+router.delete("/:id", ...superAdminOnly, DeleteContact);
 
 export default router;

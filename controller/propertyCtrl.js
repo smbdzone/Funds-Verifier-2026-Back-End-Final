@@ -15,11 +15,38 @@ import { verifyToken } from '../middlewares/JwtAuth.js'
 import UserModel from '../models/userModel.js'
 import { AssetsListingsPricing } from '../utils/AssetsListingsPricing.js'
 import { createNotification } from './notifications.controller.js'
+import { notifyEvaluatorsNewListing, notifyAssetHolderListingSubmitted } from '../helper/notificationHelpers.js'
+import { notifyAssetHolderDocumentRequested } from '../helper/notifyDocumentRequested.js'
+import {
+  listingBecameEvaluatorApproved,
+  notifyAssetHolderListingApproved,
+  notifyAssetHolderOffPlanApproved,
+  notifyAssetHolderOffPlanFeeRequested,
+} from '../helper/notifyAssetHolderListingEvents.js'
+import { notifyFvListingPosted } from '../utils/fvPortalMail.js'
+import { stripe } from '../libs/stripe.js'
 import { AddPaymentJob } from '../utils/jobs/index.js'
 import UserPaymentDetails from '../models/UserPaymentDetails.js'
 import { PUBLIC_PROPERTY_FIELDS } from '../constants/publicFields.js'
+import {
+  applyCardListPopulates,
+  CARD_PROPERTY_FIELDS,
+  computeCardRatingFields,
+  shouldUseCardListProjection,
+} from '../utils/listingCardQuery.js'
+import { findRelatedListings } from '../utils/relatedListings.js'
 import { attachDocumentSignedUrls } from '../helper/attachDocumentSignedUrls.js'
-import { stripNullPremiumRefs } from '../utils/listingPremiumSync.js'
+import {
+  REQUEST_DOCUMENT_POPULATE,
+  applyRequestDocumentUpdate,
+  attachRequestDocumentSignedUrls,
+  normalizeRequestDocumentList,
+} from '../helper/requestDocumentHelpers.js'
+import {
+  stripNullPremiumRefs,
+  refreshListingPremiumFieldsForEdit,
+  sanitizeUnpaidPremiumServicesForClient,
+} from '../utils/listingPremiumSync.js'
 import {
   refreshListingMediaSignedUrls,
   refreshListingsMediaSignedUrls,
@@ -28,6 +55,35 @@ import {
   sanitizeListingMediaResponse,
   sanitizeListingsMediaResponse,
 } from '../helper/sanitizeListingResponse.js'
+import {
+  recordListingClick,
+} from '../helper/listingAnalytics.js'
+import {
+  getListingSellersByUuid,
+  resolveListingSeller,
+  getSellerRef,
+  attachListingSellerContact,
+} from '../helper/listingSellerInfo.js'
+import {
+  getSafeStringParam,
+  getSafeTitleRegex,
+  getSafeProjectNameRegex,
+  pickScalarFilters,
+  applyListingStatusFilters,
+  applyEvaluatorPendingFilter,
+  applyRoiRangeFilter,
+} from '../utils/listingQuery.js'
+import { buildListingIdQuery } from '../utils/listingIdLookup.js'
+import { isListingPrivilegedUser } from '../utils/parentEvaluator.js'
+import {
+  blockPriceChangeIfUnderProcess,
+  stripUnderProcessFromListingPayload,
+} from '../utils/listingUnderProcess.js'
+import { restrictAssetHolderBodyAfterApproval } from '../utils/listingEditLock.js'
+import {
+  applyOffPlanAutoApproval,
+  isOffPlanAssetType,
+} from '../utils/offPlanAsset.js'
 
 const app = express()
 
@@ -43,6 +99,21 @@ const filterPublicFields = (doc, allowedFields) => {
   return result
 }
 
+/** Ensure title-based slugs stay unique so detail pages don't load the wrong listing. */
+async function ensureUniquePropertySlug(title, excludeId = null) {
+  const base = slugify(title || '') || 'property'
+  let slug = base
+  let suffix = 0
+  while (true) {
+    const query = { slug, isDeleted: false }
+    if (excludeId) query._id = { $ne: excludeId }
+    const exists = await Property.exists(query)
+    if (!exists) return slug
+    suffix += 1
+    slug = `${base}-${suffix}`
+  }
+}
+
 // create product
 const createProduct = asyncHandler(async (req, res) => {
   const session = await mongoose.startSession()
@@ -52,7 +123,7 @@ const createProduct = asyncHandler(async (req, res) => {
   try {
     // Create the new Property
     if (req.body.title) {
-      req.body.slug = slugify(req.body.title)
+      req.body.slug = await ensureUniquePropertySlug(req.body.title)
     }
     if (!req.body.price) {
       return res.status(400).json({ message: 'Price of an asset is required.' })
@@ -63,50 +134,59 @@ const createProduct = asyncHandler(async (req, res) => {
       price: req.body.price,
     })
 
+    stripNullPremiumRefs(req.body)
+
+    const isOffPlan = isOffPlanAssetType(req.body.assetType)
+    applyOffPlanAutoApproval(req.body)
+
     const createPdt = await Property.create([req.body], { session })
 
-    // add evaluation payment message queue
-    try {
-      const PaymentDetails = await UserPaymentDetails.create({
-        userId: user?._id,
-        userUUID: user?.uuid,
-        assetId: createPdt?.[0]?._id,
-        assetTitle: createPdt?.[0]?.title,
-        assetType: 'property',
-        customerId: req?.body?.customerId,
-        paymentMethod: req?.body?.paymentMethod,
-      })
-      await AddPaymentJob({
-        jobId: PaymentDetails?._id,
-        assetId: createPdt?.[0]?.uuid,
-        assetType: 'property',
-        PaymentDetailsId: PaymentDetails?.uuid,
-        userId: createPdt?.[0]?.userId,
-      })
-    } catch (error) {
-      console.log(`Error adding job to queue: ${error.message}`)
+    // Deferred Stripe evaluation fee — skip for off-plan and Clozer installments
+    const paidViaClozer =
+      req.body?.payment_provider === 'clozer' ||
+      Boolean(req.body?.clozer_transaction_id)
+
+    if (!paidViaClozer && !isOffPlan) {
+      try {
+        const PaymentDetails = await UserPaymentDetails.create({
+          userId: user?._id,
+          userUUID: user?.uuid,
+          assetId: createPdt?.[0]?._id,
+          assetTitle: createPdt?.[0]?.title,
+          assetType: 'property',
+          customerId: req?.body?.customerId,
+          paymentMethod: req?.body?.paymentMethod,
+        })
+        await AddPaymentJob({
+          jobId: PaymentDetails?._id,
+          assetId: createPdt?.[0]?.uuid,
+          assetType: 'property',
+          PaymentDetailsId: PaymentDetails?.uuid,
+          userId: createPdt?.[0]?.userId,
+        })
+      } catch (error) {
+        console.log(`Error adding job to queue: ${error.message}`)
+      }
     }
 
     // Find the latest pending 3D Request
     const pendingRequest = await Request3D.findOneAndUpdate(
-      { status: 'pending' },
+      { status: 'pending', isDeleted: { $ne: true } },
       {
         productId: createPdt[0]._id,
         productUUID: createPdt[0].uuid,
         productTitle: createPdt[0].title,
         assetType: createPdt[0].assetType,
-        status: 'successful',
       },
       { new: true, sort: { createdAt: -1 }, session },
     )
     const pendingReport = await Report.findOneAndUpdate(
-      { status: 'pending' },
+      { status: 'pending', isDeleted: { $ne: true } },
       {
         productId: createPdt[0]._id,
         productUUID: createPdt[0].uuid,
         productTitle: createPdt[0].title,
         assetType: createPdt[0].assetType,
-        status: 'successful',
       },
       { new: true, sort: { createdAt: -1 }, session },
     )
@@ -130,17 +210,37 @@ const createProduct = asyncHandler(async (req, res) => {
     }
 
     try {
-      const NotificationData = {
-        userId: user._id,
-        userUUID: user.uuid,
-        UserRole: 'Evaluator',
-        title: 'Evaluation',
-        message: `New property (${createPdt[0]?.title}) added for evaluation.`,
-        RelateRoute: `evaluation`,
-        RelatedId: createPdt[0]._id,
+      if (!isOffPlan) {
+        await notifyEvaluatorsNewListing({
+          message: `New property (${createPdt[0]?.title}) added for evaluation.`,
+          assetType: createPdt[0]?.assetType || 'property',
+          relatedId: createPdt[0]._id,
+          relatedUUID: createPdt[0]?.uuid,
+          listing: createPdt[0],
+          assetHolder: user,
+        })
+      } else {
+        await createNotification({
+          data: {
+            UserRole: 'Admin',
+            title: 'Off-Plan Request',
+            message: `New off-plan listing (${createPdt[0]?.title}) is pending Super Admin approval.`,
+            RelateRoute: 'offplan-requests',
+            RelatedId: createPdt[0]._id,
+            RelatedUUID: createPdt[0]?.uuid,
+          },
+        })
+        await notifyFvListingPosted({
+          listing: createPdt[0],
+          assetHolder: user,
+          assetType: createPdt[0]?.assetType || 'off plan',
+        })
+        await notifyAssetHolderListingSubmitted({
+          listing: createPdt[0],
+          assetHolder: user,
+          assetType: createPdt[0]?.assetType || 'off plan',
+        })
       }
-
-      await createNotification({ data: NotificationData })
     } catch (error) {
       console.log({ error: error?.message })
     }
@@ -163,22 +263,33 @@ const getSingleProperty = asyncHandler(async (req, res) => {
   }
 
   const { sanitizeUUID } = await import('../utils/nosqlSanitizer.js')
-  const sanitizedId = sanitizeUUID(id)
-  if (!sanitizedId) {
-    return res.status(400).json({
-      success: false,
-      message: 'Invalid UUID format',
-    })
+  const sanitizedUuid = sanitizeUUID(id)
+  const isRealUuid =
+    typeof sanitizedUuid === 'string' &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+      sanitizedUuid,
+    )
+  const lookupQuery = { isDeleted: false }
+
+  // Exact uuid when the param is a real UUID; otherwise look up by slug.
+  // Slug lookups sort newest-first so duplicate historical slugs don't hide
+  // layout/floor-plan media on an older duplicate listing.
+  if (isRealUuid) {
+    lookupQuery.uuid = sanitizedUuid
+  } else {
+    lookupQuery.slug = id
   }
 
   try {
-    const property = await Property.findOne({
-      uuid: sanitizedId,
-      isDeleted: false,
-    })
+    let propertyQuery = Property.findOne(lookupQuery)
+    if (!isRealUuid) {
+      propertyQuery = propertyQuery.sort({ updatedAt: -1 })
+    }
+    const property = await propertyQuery
       .populate('pictures')
       .populate('video')
       .populate('uploadDocument')
+      .populate(REQUEST_DOCUMENT_POPULATE)
       .populate('thumbnailImg')
       .populate('video3DWalkthrough')
       .populate('transactionDepositDocument')
@@ -190,24 +301,48 @@ const getSingleProperty = asyncHandler(async (req, res) => {
         populate: { path: 'reportFile' },
       })
       .populate('evaluationCertificate')
+      .populate('agencyAgreement')
+      .populate('unitLayout')
+      .populate('floorPlan')
+      .populate('titleDeed')
+      .populate('qrScan')
       .lean()
 
     if (!property) {
       return res.status(404).json({ message: 'Property not found' })
     }
 
+    property.requestDocument = normalizeRequestDocumentList(
+      property.requestDocument,
+    )
+
     await refreshListingMediaSignedUrls(property)
 
-    const isPrivilegedUser =
-      req.user &&
-      ['AssetHolder', 'Admin', 'Evaluator', 'Sub-Evaluator'].includes(
-        req.user.role,
-      )
+    const isPrivilegedUser = isListingPrivilegedUser(req.user)
 
     if (!isPrivilegedUser) {
+      recordListingClick(Property, property)
+      await attachDocumentSignedUrls(property, {
+        fields: ['evaluationCertificate', 'technicalReport'],
+      })
       const publicFields = PUBLIC_PROPERTY_FIELDS.trim().split(/\s+/)
       const publicProperty = filterPublicFields(property, publicFields)
+      const sellersByUuid = await getListingSellersByUuid([property])
+      const seller = resolveListingSeller(property, sellersByUuid)
+      if (seller) {
+        publicProperty.sellerAvatar = seller.profileImage || ''
+        publicProperty.sellerName = seller.name || ''
+        publicProperty.sellerEmail = seller.email || ''
+        publicProperty.sellerRef = getSellerRef(seller)
+        publicProperty.userId = {
+          profileImage: seller.profileImage || '',
+          name: seller.name || '',
+          email: seller.email || '',
+          phoneNumber: seller.phoneNumber || seller.phone || '',
+        }
+      }
       sanitizeListingMediaResponse(publicProperty)
+      sanitizeUnpaidPremiumServicesForClient(publicProperty)
       return res.json(publicProperty)
     }
 
@@ -215,10 +350,16 @@ const getSingleProperty = asyncHandler(async (req, res) => {
     // etc. — attach fresh `signedUrl` so the frontend can render the docs
     // without the URL having expired since they were stored.
     await attachDocumentSignedUrls(property)
+    await attachRequestDocumentSignedUrls(property)
 
     // Strip server-internal S3 metadata (s3Bucket / s3Key / etc.) before
     // responding. The signed URL is everything the client needs.
     sanitizeListingMediaResponse(property)
+    await refreshListingPremiumFieldsForEdit(property)
+
+    // Many listings only store userUUID (userId ObjectId unset) — fill contact
+    // for evaluator evaluate forms the same way public cards resolve the seller.
+    await attachListingSellerContact(property)
 
     res.json(property)
   } catch (err) {
@@ -236,19 +377,70 @@ const getAllProduct = asyncHandler(async (req, res) => {
     // ------------------ BASE FILTER ------------------
     const parseData = {
       isDeleted: false,
-      listing: /Public/i, // 🔐 default: PUBLIC ONLY
+      listing: 'Public', // 🔐 default: PUBLIC ONLY
     }
 
     // ------------------ SEARCH & FILTERS (SAFE) ------------------
-    if (req.query.title) {
-      const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-      parseData.title = { $regex: escapeRegex(req.query.title), $options: 'i' }
+    const titleFilter = getSafeTitleRegex(req.query)
+    if (titleFilter) {
+      parseData.title = titleFilter
     }
+
+    const projectNameFilter = getSafeProjectNameRegex(req.query)
+    if (projectNameFilter) {
+      parseData.projectName = projectNameFilter
+    }
+
+    Object.assign(parseData, pickScalarFilters(req.query))
 
     if (req.query.minPrice || req.query.maxPrice) {
       parseData.price = {}
       if (req.query.minPrice) parseData.price.$gte = +req.query.minPrice
       if (req.query.maxPrice) parseData.price.$lte = +req.query.maxPrice
+    }
+
+    applyRoiRangeFilter(parseData, req.query)
+
+    applyListingStatusFilters(parseData, req.query)
+    applyEvaluatorPendingFilter(parseData, req.query)
+
+    if (req.query.propertyForSale) {
+      const saleVal = String(req.query.propertyForSale).trim()
+      if (/^yes$/i.test(saleVal)) {
+        parseData.$and = [
+          ...(parseData.$and || []),
+          {
+            $or: [
+              { propertyForSale: { $regex: /^yes$/i } },
+              {
+                assetType: { $regex: /for sale|off plan/i },
+                $or: [
+                  { propertyForLease: { $exists: false } },
+                  { propertyForLease: null },
+                  { propertyForLease: '' },
+                  { propertyForLease: { $not: /^yes$/i } },
+                ],
+              },
+            ],
+          },
+        ]
+      } else {
+        parseData.propertyForSale = {
+          $regex: new RegExp(`^${saleVal}$`, 'i'),
+        }
+      }
+    }
+
+    if (req.query.propertyForLease) {
+      parseData.propertyForLease = {
+        $regex: new RegExp(`^${String(req.query.propertyForLease).trim()}$`, 'i'),
+      }
+    }
+
+    if (req.query.propertyType) {
+      parseData.propertyType = {
+        $regex: new RegExp(`^${String(req.query.propertyType).trim()}$`, 'i'),
+      }
     }
 
     // ------------------ AUTHENTICATED LOGIC ------------------
@@ -272,7 +464,7 @@ const getAllProduct = asyncHandler(async (req, res) => {
         .toLowerCase()
         .replace(/[\s_-]/g, '')
       const isElevatedModerator =
-        ['Admin', 'Evaluator'].includes(user.role) ||
+        ['Admin', 'Evaluator', 'Trustee'].includes(user.role) ||
         roleNorm === 'superadmin'
 
       // Evaluator / Admin / Super Admin: moderation (all listing visibilities)
@@ -287,9 +479,9 @@ const getAllProduct = asyncHandler(async (req, res) => {
         user.financialInfo?.status === 'Approved'
       ) {
         parseData.$or = [
-          { listing: /Public/i },
+          { listing: 'Public' },
           {
-            listing: /Private/i,
+            listing: 'Private',
             price: { $lte: Number(user.financialInfo.fundsVerification) },
           },
         ]
@@ -309,21 +501,28 @@ const getAllProduct = asyncHandler(async (req, res) => {
 
     // ------------------ QUERY BUILD ------------------
     let query = Property.find(parseData)
+    const useCardProjection = shouldUseCardListProjection(req, isAuthenticated)
 
     // 🔐 PUBLIC VS AUTH FIELD SELECTION
-    if (!isAuthenticated) {
-      query = query.select(PUBLIC_PROPERTY_FIELDS)
+    if (useCardProjection) {
+      query = query.select(CARD_PROPERTY_FIELDS)
+      query = applyCardListPopulates(query)
     } else {
-      query = query.select('-__v')
-    }
+      if (!isAuthenticated) {
+        query = query.select(PUBLIC_PROPERTY_FIELDS)
+      } else {
+        query = query.select('-__v')
+      }
 
-    query = query
-      .populate({ path: 'pictures', select: '-_id' })
-      .populate({ path: 'video', select: '-_id' })
-      .populate({ path: 'thumbnailImg', select: '-_id' })
-
-    if (isAuthenticated) {
       query = query
+        .populate({ path: 'pictures', select: '-_id' })
+        .populate({ path: 'video', select: '-_id' })
+        .populate({ path: 'thumbnailImg', select: '-_id' })
+        .populate({ path: 'unitLayout', select: '-_id' })
+        .populate({ path: 'floorPlan', select: '-_id' })
+        .populate({ path: 'titleDeed', select: '-_id' })
+        .populate({ path: 'qrScan', select: '-_id' })
+        .populate({ path: 'userId', select: 'profileImage name uuid' })
         .populate({ path: 'evaluationCertificate', select: '-_id' })
         .populate({ path: 'video3DWalkthrough', select: '-_id' })
         .populate({
@@ -331,14 +530,34 @@ const getAllProduct = asyncHandler(async (req, res) => {
           select: '-_id',
           populate: { path: 'reportFile', select: '-_id' },
         })
+
+      if (isAuthenticated) {
+        query = query
+          .populate({ path: 'agencyAgreement', select: '-_id' })
+          .populate({ path: 'uploadDocument', select: '-_id' })
+          .populate(REQUEST_DOCUMENT_POPULATE)
+          .populate({ path: 'invoice', select: '-_id' })
+          .populate({ path: 'evaluator', select: 'name displayName uuid' })
+      }
+
+      query = query.populate({
+        path: 'reviews',
+        match: {
+          isDeleted: false,
+          $or: [{ status: 'approved' }, { status: { $exists: false } }],
+        },
+        select: isAuthenticated
+          ? 'ratingNumber review -_id'
+          : 'ratingNumber -_id',
+      })
     }
 
-    query = query.populate({
-      path: 'reviews',
-      select: isAuthenticated
-        ? 'ratingNumber review -_id'
-        : 'ratingNumber -_id',
-    })
+    if (req.query.sort) {
+      const sortBy = req.query.sort.split(',').join(' ')
+      query = query.sort(sortBy)
+    } else {
+      query = query.sort('-createdAt')
+    }
 
     // ------------------ PAGINATION ------------------
     const page = +req.query.page || 1
@@ -348,9 +567,12 @@ const getAllProduct = asyncHandler(async (req, res) => {
     const total = await Property.countDocuments(parseData)
     const products = await query.skip(skip).limit(limit)
 
-    // Post-find hook on Property model already refreshed signed URLs on
-    // populated media; re-run as a safety net for non-hooked paths.
+    // Asset-doc hooks already signed populated media on non-lean finds.
+    // This call is required for .lean() paths and is a cheap no-op when
+    // entries were already signed earlier in the same request.
     await refreshListingsMediaSignedUrls(products)
+
+    const sellersByUuid = await getListingSellersByUuid(products)
 
     // ------------------ RESPONSE SANITIZATION ------------------
     // Doc-signing is async (it may hit S3 presign for non-image buckets), so
@@ -360,19 +582,37 @@ const getAllProduct = asyncHandler(async (req, res) => {
       products.map(async (product) => {
         const obj = product.toObject()
 
-        const reviewCount = obj.reviews?.length || 0
-        const averageRating =
-          reviewCount > 0
-            ? obj.reviews.reduce((a, c) => a + c.ratingNumber, 0) / reviewCount
-            : 0
+        const { reviewCount, averageRating } = useCardProjection
+          ? computeCardRatingFields(obj)
+          : (() => {
+            const count = obj.reviews?.length || 0
+            const avg =
+              count > 0
+                ? obj.reviews.reduce((a, c) => a + c.ratingNumber, 0) / count
+                : 0
+            return { reviewCount: count, averageRating: avg }
+          })()
 
-        // 🔥 REMOVE SENSITIVE FIELDS FOR PUBLIC
+        // Seller avatar for cards (populated userId or userUUID fallback)
+        const seller = resolveListingSeller(obj, sellersByUuid)
+        if (seller) {
+          obj.sellerAvatar = seller.profileImage || ''
+          obj.sellerName = seller.name || ''
+          obj.sellerRef = getSellerRef(seller)
+        }
+
+        // 🔥 REMOVE SENSITIVE FIELDS FOR PUBLIC (keep card certs / reports)
         if (!isAuthenticated) {
-          delete obj.evaluationCertificate
           delete obj.uploadDocument
           delete obj.invoice
-          delete obj.technicalReport
+          delete obj.agencyAgreement
           delete obj.userUUID
+
+          // Keep seller avatar for cards; strip other user fields
+          obj.userId = {
+            profileImage: seller?.profileImage || '',
+            name: seller?.name || '',
+          }
 
           // ratings → stars only
           if (Array.isArray(obj.ratings)) {
@@ -380,9 +620,19 @@ const getAllProduct = asyncHandler(async (req, res) => {
           }
         }
 
-        // 🔐 SIGNED URLS ONLY FOR AUTH USERS (S3/CloudFront; legacy docs use stored url)
-        if (isAuthenticated) {
-          await attachDocumentSignedUrls(obj)
+        // Card lists only need premium refs for badges — skip PDF URL signing.
+        if (!useCardProjection) {
+          if (isAuthenticated) {
+            await attachDocumentSignedUrls(obj)
+            obj.requestDocument = normalizeRequestDocumentList(
+              obj.requestDocument,
+            )
+            await attachRequestDocumentSignedUrls(obj)
+          } else {
+            await attachDocumentSignedUrls(obj, {
+              fields: ['evaluationCertificate', 'technicalReport'],
+            })
+          }
         }
 
         // Drop internal S3 fields before serializing (signedUrl is enough).
@@ -456,17 +706,30 @@ const getAllProductByFilter = asyncHandler(async (req, res) => {
   }
   modifiedQuery.isDeleted = false
   modifiedQuery.status = 1
-  let query = Property.find(modifiedQuery)
-    .populate('pictures')
-    .populate('video')
-    .populate('thumbnailImg')
-    .populate('evaluationCertificate')
-    .populate('video3DWalkthrough')
-    .populate({
-      path: 'technicalReport',
-      populate: { path: 'reportFile' },
-    })
-    .select('-_id')
+  const useCardProjection = shouldUseCardListProjection(req, Boolean(userId))
+  let query = Property.find(modifiedQuery).select(
+    useCardProjection ? CARD_PROPERTY_FIELDS : '-_id',
+  )
+
+  if (useCardProjection) {
+    query = applyCardListPopulates(query)
+  } else {
+    query = query
+      .populate('pictures')
+      .populate('video')
+      .populate('thumbnailImg')
+      .populate('evaluationCertificate')
+      .populate('video3DWalkthrough')
+      .populate('unitLayout')
+      .populate('floorPlan')
+      .populate('titleDeed')
+      .populate('qrScan')
+      .populate({ path: 'userId', select: 'profileImage name uuid' })
+      .populate({
+        path: 'technicalReport',
+        populate: { path: 'reportFile' },
+      })
+  }
   // sorting
   if (req.query.sort) {
     const sortBy = req.query.sort.split(',').join(' ')
@@ -476,11 +739,13 @@ const getAllProductByFilter = asyncHandler(async (req, res) => {
   }
 
   // limiting the fields
-  if (req.query.fields) {
-    const fields = req.query.fields.split(',').join(' ')
-    query = query.select(fields)
-  } else {
-    query = query.select('')
+  if (!useCardProjection) {
+    if (req.query.fields) {
+      const fields = req.query.fields.split(',').join(' ')
+      query = query.select(fields)
+    } else {
+      query = query.select('')
+    }
   }
 
   // pagination
@@ -499,21 +764,35 @@ const getAllProductByFilter = asyncHandler(async (req, res) => {
 
   try {
     const allProductRaw = await query
-    const allProduct = allProductRaw.map((p) =>
-      typeof p.toObject === 'function' ? p.toObject() : p,
-    )
+    const sellersByUuid = await getListingSellersByUuid(allProductRaw)
+    const allProduct = allProductRaw.map((p) => {
+      const obj = typeof p.toObject === 'function' ? p.toObject() : p
+      const seller = resolveListingSeller(obj, sellersByUuid)
+      if (seller) {
+        obj.sellerAvatar = seller.profileImage || ''
+        obj.sellerName = seller.name || ''
+        obj.sellerRef = getSellerRef(seller)
+      }
+      if (useCardProjection) {
+        const { reviewCount, averageRating } = computeCardRatingFields(obj)
+        obj.reviewCount = reviewCount
+        obj.averageRating = averageRating
+      }
+      return obj
+    })
     await refreshListingsMediaSignedUrls(allProduct)
-    // Listing cards need fresh `signedUrl` on evaluation certificate / technical
-    // report. Authenticated users also get uploadDocument + invoice when present.
-    await Promise.all(
-      allProduct.map((p) =>
-        userId
-          ? attachDocumentSignedUrls(p)
-          : attachDocumentSignedUrls(p, {
-            fields: ['evaluationCertificate', 'technicalReport'],
-          }),
-      ),
-    )
+    // Card lists only need premium refs for badges — skip PDF URL signing.
+    if (!useCardProjection) {
+      await Promise.all(
+        allProduct.map((p) =>
+          userId
+            ? attachDocumentSignedUrls(p)
+            : attachDocumentSignedUrls(p, {
+              fields: ['evaluationCertificate', 'technicalReport'],
+            }),
+        ),
+      )
+    }
     // Strip server-internal S3 metadata before responding.
     sanitizeListingsMediaResponse(allProduct)
     const totalFilteredProducts =
@@ -536,32 +815,16 @@ const getAllProductByFilter = asyncHandler(async (req, res) => {
 })
 
 const getRelatedProduct = asyncHandler(async (req, res) => {
-  const { assetType, country, city, propertyType, price, evaluationPrices } =
-    req.query
-
-  // Construct the query object based on provided properties
-  const queryObj = {}
-  if (assetType) queryObj.assetType = assetType
-  if (country) queryObj.country = country
-  if (city) queryObj.city = city
-  if (propertyType) queryObj.propertyType = propertyType
-  if (price) queryObj.price = price
-  queryObj.isDeleted = false
   try {
-    const allProductRaw = await Property.find(queryObj)
-      .select('-_id')
-      .populate({ path: 'pictures', select: '-_id' })
-      .populate({ path: 'thumbnailImg', select: '-_id' })
-      .populate({ path: 'video', select: '-_id' })
-
-    const allProduct = allProductRaw.map((p) =>
-      typeof p.toObject === 'function' ? p.toObject() : p,
-    )
-    await refreshListingsMediaSignedUrls(allProduct)
-    sanitizeListingsMediaResponse(allProduct)
-    return res.status(200).json(allProduct)
+    const result = await findRelatedListings({
+      Model: Property,
+      cardFields: CARD_PROPERTY_FIELDS,
+      query: req.query,
+      softFields: ['assetType', 'country', 'city', 'propertyType'],
+    })
+    return res.status(200).json(result)
   } catch (err) {
-    return res.status(200).json({ message: err?.message })
+    return res.status(500).json({ message: err?.message || 'Server error' })
   }
 })
 
@@ -580,22 +843,44 @@ const updateProduct = asyncHandler(async (req, res) => {
     try {
       // validateMongoId(id)
       // Find the existing product
-      const product = await Property.findOne({
-        uuid: moduleId,
-        isDeleted: false,
-      }).populate('uploadDocument')
+      const product = await Property.findOne(
+        buildListingIdQuery(moduleId),
+      ).populate('uploadDocument')
       // Populate existing documents
       if (!product) {
         return res.status(404).json({ message: 'Property not found' })
       }
 
-      // Update slug if title is provided
-      if (req.body.title) {
-        req.body.slug = slugify(req.body.title)
+      stripUnderProcessFromListingPayload(req.body)
+      const priceBlock = blockPriceChangeIfUnderProcess(product, req.body)
+      if (priceBlock) {
+        return res.status(403).json({ message: priceBlock })
       }
 
+      // After evaluator approval, keep finalized details — asset holders may
+      // only update price, Public/Private, and premium-service requests.
+      req.body = restrictAssetHolderBodyAfterApproval(
+        product,
+        req.body,
+        req.user,
+      )
+
+      // Update slug if title is provided (keep unique across listings)
+      if (req.body.title) {
+        req.body.slug = await ensureUniquePropertySlug(
+          req.body.title,
+          product._id,
+        )
+      }
+
+      const documentFulfilled = Boolean(req.body.fulfillRequestDocument)
+      applyRequestDocumentUpdate(product, req.body)
+
+      const requestedDocumentsUpdated =
+        Boolean(req.body.requestDocument) && !documentFulfilled
+
       // Handle uploadDocument IDs (from frontend)
-      if (req.body.uploadDocument) {
+      if (req.body.uploadDocument && !documentFulfilled) {
         const newDocumentIds = Array.isArray(req.body.uploadDocument)
           ? req.body.uploadDocument // If multiple IDs are passed as an array
           : [req.body.uploadDocument] // If only a single ID is passed as a string
@@ -626,15 +911,42 @@ const updateProduct = asyncHandler(async (req, res) => {
       // }
 
       try {
-        const NotificationData = {
-          UserRole: 'AssetHolder',
-          userUUID: updatedProduct?.userUUID,
-          title: 'Assets Property',
-          message: `Property (${updatedProduct?.title}) has been updated.`,
-          RelateRoute: `property`,
-          RelatedId: updatedProduct?._id,
+        if (requestedDocumentsUpdated) {
+          await notifyAssetHolderDocumentRequested({
+            listing: updatedProduct,
+            assetType: 'property',
+            requesterRole: req.user?.role,
+            title: 'Document Request',
+          })
+        } else if (
+          listingBecameEvaluatorApproved(product, updatedProduct)
+        ) {
+          await notifyAssetHolderListingApproved({
+            listing: {
+              ...(updatedProduct?.toObject?.() || updatedProduct),
+              _id: product._id,
+              userUUID: updatedProduct?.userUUID || product.userUUID,
+            },
+            assetType: 'property',
+            evaluator: req.user,
+          })
+        } else {
+          const NotificationData = {
+            UserRole: 'AssetHolder',
+            userUUID: updatedProduct?.userUUID,
+            title: 'Assets Property',
+            message: `Property (${updatedProduct?.title}) has been updated.`,
+            RelateRoute: `property`,
+            RelatedId: updatedProduct?._id,
+          }
+          if (documentFulfilled) {
+            NotificationData.UserRole = 'Evaluator'
+            NotificationData.userUUID = updatedProduct?.evaluatorUUID
+            NotificationData.message = `Seller uploaded a requested document for property (${updatedProduct?.title}).`
+            NotificationData.RelateRoute = 'evaluation'
+          }
+          await createNotification({ data: NotificationData })
         }
-        await createNotification({ data: NotificationData })
       } catch (error) {
         console.log({ error: error?.message })
       }
@@ -882,6 +1194,342 @@ const getApprovedListingsMetrics = async (req, res) => {
   }
 }
 
+/** Super Admin: list off-plan listings awaiting / past approval. */
+const getOffPlanRequests = asyncHandler(async (req, res) => {
+  try {
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1)
+    const limit = Math.min(50, Math.max(1, parseInt(req.query.limit, 10) || 10))
+    const skip = (page - 1) * limit
+    const statusParam = String(req.query.status || 'pending').toLowerCase()
+
+    const query = {
+      isDeleted: false,
+      assetType: { $regex: /off\s*plan/i },
+    }
+
+    if (statusParam === 'pending' || statusParam === '0') {
+      query.status = 0
+    } else if (statusParam === 'approved' || statusParam === '1') {
+      query.status = 1
+    }
+
+    const [products, total] = await Promise.all([
+      Property.find(query)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .populate({ path: 'pictures', select: '-_id' })
+        .populate({ path: 'thumbnailImg', select: '-_id' })
+        .populate({ path: 'agencyAgreement', select: '-_id' })
+        .populate(REQUEST_DOCUMENT_POPULATE)
+        .select('-__v')
+        .lean(),
+      Property.countDocuments(query),
+    ])
+
+    await refreshListingsMediaSignedUrls(products)
+
+    for (const product of products) {
+      product.requestDocument = normalizeRequestDocumentList(
+        product.requestDocument,
+      )
+      await attachRequestDocumentSignedUrls(product)
+      await attachDocumentSignedUrls(product, { fields: ['agencyAgreement'] })
+      sanitizeListingMediaResponse(product)
+    }
+
+    res.json({
+      products,
+      currentPage: page,
+      totalPages: Math.max(1, Math.ceil(total / limit)),
+      total,
+    })
+  } catch (error) {
+    res.status(500).json({
+      message: 'Could not load off-plan requests',
+      error: error.message,
+    })
+  }
+})
+
+/** Super Admin only: approve or set pending an off-plan listing. */
+const updateOffPlanRequestStatus = asyncHandler(async (req, res) => {
+  try {
+    const { moduleId } = req.params
+    const nextStatus = Number(req.body?.status)
+
+    if (![0, 1].includes(nextStatus)) {
+      return res
+        .status(400)
+        .json({ message: 'status must be 0 (pending) or 1 (approved)' })
+    }
+
+    const product = await Property.findOne(buildListingIdQuery(moduleId))
+    if (!product) {
+      return res.status(404).json({ message: 'Off-plan listing not found' })
+    }
+
+    if (!isOffPlanAssetType(product.assetType)) {
+      return res
+        .status(400)
+        .json({ message: 'Only off-plan listings can be updated here' })
+    }
+
+    product.status = nextStatus
+    product.evaluationStatus = nextStatus === 1 ? 'approved' : 'pending'
+    await product.save()
+
+    try {
+      if (product.userUUID && nextStatus === 1) {
+        await notifyAssetHolderOffPlanApproved({ listing: product })
+      } else if (product.userUUID) {
+        await createNotification({
+          data: {
+            UserRole: 'AssetHolder',
+            userUUID: product.userUUID,
+            title: 'Off-Plan Listing',
+            message: `Your off-plan listing (${product.title}) was set back to pending.`,
+            RelateRoute: 'property',
+            RelatedId: product._id,
+            RelatedUUID: product.uuid,
+          },
+        })
+      }
+    } catch (notifyErr) {
+      console.log({ error: notifyErr?.message })
+    }
+
+    res.json(product)
+  } catch (error) {
+    res.status(500).json({
+      message: 'Could not update off-plan status',
+      error: error.message,
+    })
+  }
+})
+
+/** Super Admin: request documents on an off-plan listing (optional before approve). */
+const requestOffPlanDocuments = asyncHandler(async (req, res) => {
+  try {
+    const { moduleId } = req.params
+    const product = await Property.findOne(buildListingIdQuery(moduleId))
+
+    if (!product) {
+      return res.status(404).json({ message: 'Off-plan listing not found' })
+    }
+
+    if (!isOffPlanAssetType(product.assetType)) {
+      return res
+        .status(400)
+        .json({ message: 'Only off-plan listings can be updated here' })
+    }
+
+    if (!Object.prototype.hasOwnProperty.call(req.body || {}, 'requestDocument')) {
+      return res.status(400).json({ message: 'requestDocument is required' })
+    }
+
+    const body = { requestDocument: req.body.requestDocument }
+    applyRequestDocumentUpdate(product, body)
+
+    const nextDocs = normalizeRequestDocumentList(body.requestDocument)
+    if (!nextDocs.length) {
+      return res.status(400).json({
+        message: 'Add at least one document name before requesting.',
+      })
+    }
+
+    const missingDate = nextDocs.some((doc) => !doc.date)
+    if (missingDate) {
+      return res.status(400).json({
+        message: 'Each requested document must have a date.',
+      })
+    }
+
+    product.requestDocument = nextDocs
+    await product.save()
+
+    const updated = await Property.findById(product._id)
+      .populate(REQUEST_DOCUMENT_POPULATE)
+      .lean()
+
+    if (updated) {
+      updated.requestDocument = normalizeRequestDocumentList(
+        updated.requestDocument,
+      )
+      await attachRequestDocumentSignedUrls(updated)
+    }
+
+    try {
+      await notifyAssetHolderDocumentRequested({
+        listing: updated || product,
+        assetType: 'off-plan',
+        requesterRole: req.user?.role || 'Admin',
+        title: 'Document Request',
+      })
+    } catch (notifyErr) {
+      console.log({ error: notifyErr?.message })
+    }
+
+    res.json(updated || product)
+  } catch (error) {
+    res.status(500).json({
+      message: 'Could not request documents for off-plan listing',
+      error: error.message,
+    })
+  }
+})
+
+/** Super Admin: optional off-plan approval fee payment request (Stripe + notify/email). */
+const requestOffPlanApprovalFee = asyncHandler(async (req, res) => {
+  try {
+    const { moduleId } = req.params
+    const amount = Number(req.body?.amount)
+
+    if (!Number.isFinite(amount) || amount <= 0) {
+      return res.status(400).json({
+        message: 'Enter a valid approval fee amount greater than 0.',
+      })
+    }
+
+    const product = await Property.findOne(buildListingIdQuery(moduleId))
+    if (!product) {
+      return res.status(404).json({ message: 'Off-plan listing not found' })
+    }
+
+    if (!isOffPlanAssetType(product.assetType)) {
+      return res
+        .status(400)
+        .json({ message: 'Only off-plan listings can be updated here' })
+    }
+
+    if (product.offPlanApprovalFeeStatus === 'paid') {
+      return res.status(400).json({
+        message: 'Approval fee is already paid for this listing.',
+      })
+    }
+
+    const holder = await UserModel.findOne(
+      { uuid: product.userUUID, isDeleted: false },
+      { email: 1, name: 1, uuid: 1 },
+    )
+
+    if (!holder?.email) {
+      return res.status(400).json({
+        message: 'Asset holder email was not found for this listing.',
+      })
+    }
+
+    const frontendBase = String(
+      process.env.FRONTEND_URL || 'https://fundsverifier.com',
+    ).replace(/\/$/, '')
+    const successUrl = `${frontendBase}/service-payment-success`
+
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ['card'],
+      line_items: [
+        {
+          price_data: {
+            currency: 'aed',
+            product_data: {
+              name: `Off-plan approval fee — ${product.title || 'Listing'}`,
+              description: 'Optional Super Admin off-plan approval fee',
+            },
+            unit_amount: Math.round(amount * 100),
+          },
+          quantity: 1,
+        },
+      ],
+      mode: 'payment',
+      customer_email: holder.email,
+      success_url: `${successUrl}?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${frontendBase}/seller-profile/invoices`,
+      metadata: {
+        paymentType: 'off_plan_approval_fee',
+        listingId: String(product._id),
+        listingUuid: String(product.uuid || ''),
+        userUUID: String(product.userUUID || ''),
+      },
+    })
+
+    product.offPlanApprovalFee = amount
+    product.offPlanApprovalFeeStatus = 'requested'
+    product.offPlanApprovalFeePaymentUrl = session.url
+    product.offPlanApprovalFeeSessionId = session.id
+    product.offPlanApprovalFeePaidAt = null
+    await product.save()
+
+    try {
+      await notifyAssetHolderOffPlanFeeRequested({
+        listing: product,
+        amount,
+        paymentUrl: session.url,
+      })
+    } catch (notifyErr) {
+      console.log({ error: notifyErr?.message })
+    }
+
+    res.json({
+      message: 'Approval fee payment request sent to asset holder.',
+      paymentUrl: session.url,
+      product,
+    })
+  } catch (error) {
+    res.status(500).json({
+      message: 'Could not request off-plan approval fee',
+      error: error.message,
+    })
+  }
+})
+
+/** Super Admin: attach or clear optional agency agreement PDF on an off-plan listing. */
+const updateOffPlanAgencyAgreement = asyncHandler(async (req, res) => {
+  try {
+    const { moduleId } = req.params
+    const product = await Property.findOne(buildListingIdQuery(moduleId))
+
+    if (!product) {
+      return res.status(404).json({ message: 'Off-plan listing not found' })
+    }
+
+    if (!isOffPlanAssetType(product.assetType)) {
+      return res
+        .status(400)
+        .json({ message: 'Only off-plan listings can be updated here' })
+    }
+
+    if (!Object.prototype.hasOwnProperty.call(req.body || {}, 'agencyAgreement')) {
+      return res.status(400).json({ message: 'agencyAgreement is required' })
+    }
+
+    const nextValue = req.body.agencyAgreement
+    product.agencyAgreement =
+      nextValue === null || nextValue === '' || nextValue === undefined
+        ? null
+        : nextValue
+
+    await product.save()
+
+    const updated = await Property.findById(product._id)
+      .populate({ path: 'agencyAgreement', select: '-_id' })
+      .lean()
+
+    await attachDocumentSignedUrls(updated, { fields: ['agencyAgreement'] })
+    sanitizeListingMediaResponse(updated)
+
+    res.json({
+      message: product.agencyAgreement
+        ? 'Agency agreement saved.'
+        : 'Agency agreement removed.',
+      product: updated,
+    })
+  } catch (error) {
+    res.status(500).json({
+      message: 'Could not update agency agreement',
+      error: error.message,
+    })
+  }
+})
+
 export {
   createProduct,
   //  getSingleProduct,
@@ -895,4 +1543,9 @@ export {
   getPrice,
   getAllProductByFilter,
   getApprovedListingsMetrics,
+  getOffPlanRequests,
+  updateOffPlanRequestStatus,
+  requestOffPlanDocuments,
+  requestOffPlanApprovalFee,
+  updateOffPlanAgencyAgreement,
 }

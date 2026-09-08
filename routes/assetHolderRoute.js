@@ -14,8 +14,8 @@ import { authMiddleware, isAdmin } from "../middlewares/authMiddleware.js";
 
 // Admin-only management of AssetHolder records
 router.post("/", authMiddleware, isAdmin, createUser);
-router.get("/:id", authMiddleware, getSingleUser);
-router.get("/", authMiddleware, getAllUser);
+router.get("/:id", authMiddleware, isAdmin, getSingleUser);
+router.get("/", authMiddleware, isAdmin, getAllUser);
 router.put("/update-user/:id", authMiddleware, isAdmin, updateUser);
 router.put("/block-user/:id", authMiddleware, isAdmin, blockUser);
 router.put("/unblock-user/:id", authMiddleware, isAdmin, unblockUser);

@@ -73,6 +73,7 @@ const userSchema = new Schema(
         'TechnicalReport',
         '3dWalkthrough',
         'Advertiser',
+        'Developer',
       ],
       required: true,
     },
@@ -105,11 +106,43 @@ const userSchema = new Schema(
         enum: ['Pending', 'Approved'],
       },
     },
+    // Corporate KYC for Developer / Corporate accounts
+    developerKyc: {
+      companyName: { type: String },
+      username: { type: String },
+      jurisdiction: { type: String },
+      tradeLicenseNumber: { type: String },
+      status: {
+        type: String,
+        enum: ['NotStarted', 'Submitted', 'Pending', 'Approved', 'Rejected'],
+        default: 'NotStarted',
+      },
+      submittedAt: { type: Date },
+      reviewedAt: { type: Date },
+      reviewNote: { type: String },
+      requestedDocuments: [
+        {
+          name: { type: String, required: true },
+          note: { type: String, default: '' },
+          requestedAt: { type: Date, default: Date.now },
+          status: {
+            type: String,
+            enum: ['Pending', 'Fulfilled'],
+            default: 'Pending',
+          },
+        },
+      ],
+    },
     personalDetails: {
       residenceStatus: String,
       citizenship: String,
       industry: String,
       employerName: String,
+    },
+    emiratesId: {
+      fullName: String,
+      number: String,
+      expiryDate: Date,
     },
     isEmailVerified: { type: Boolean, default: false },
     emailVerificationToken: String,
@@ -132,6 +165,11 @@ const userSchema = new Schema(
     passwordChangedAt: Date,
     passwordResetToken: String,
     passwordResetTokenExpiresAt: Date,
+    // Two-step email OTP login (staff roles: evaluator, sub-evaluator, etc.)
+    loginOtpHash: { type: String, select: false },
+    loginOtpExpiresAt: { type: Date, select: false },
+    loginOtpAttempts: { type: Number, default: 0, select: false },
+    loginOtpSentAt: { type: Date, select: false },
     // Soft delete fields
     isDeleted: { type: Boolean, default: false },
     deletedAt: { type: Date, default: null },

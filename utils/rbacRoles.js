@@ -38,6 +38,16 @@ export const RolePermissions = {
     editOwnProfile: true,
   },
 
+  Developer: {
+    ...Permissions,
+    editOwnProfile: true,
+  },
+
+  Advertiser: {
+    ...Permissions,
+    editOwnProfile: true,
+  },
+
   Trustee: {
     ...Permissions,
   },

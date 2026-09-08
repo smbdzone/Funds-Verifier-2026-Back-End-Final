@@ -6,6 +6,7 @@ import Car from '../models/carModel.js'
 import Boat from '../models/boatModel.js'
 import Jewelry from '../models/jewelryModel.js'
 import { logSuspiciousActivity } from './logSuspicious.js'
+import { buildListingIdQuery } from '../utils/listingIdLookup.js'
 
 const assetModels = {
   Property,
@@ -39,7 +40,7 @@ export const assetHolderUpdate = async (req, res, next) => {
 
     for (const key in assetModels) {
       const Model = assetModels[key]
-      const record = await Model.findOne({ uuid: moduleId, isDeleted: false })
+      const record = await Model.findOne(buildListingIdQuery(moduleId))
 
       if (record) {
         assetFound = { record, model: key }
@@ -67,8 +68,29 @@ export const assetHolderUpdate = async (req, res, next) => {
       return next()
     }
 
+    // Trustees may request documents on any listing.
+    if (user.role === 'Trustee') {
+      req.user = user
+      req.asset = asset
+      return next()
+    }
+
     const isEvaluator = user.role === 'Evaluator'
     const isSubEvaluator = ['Sub-Evaluator', 'SubEvaluator'].includes(user.role)
+
+    // Evaluators may update assets in the evaluation workflow (pending or evaluated).
+    if (isEvaluator || isSubEvaluator) {
+      const evaluationStatus = asset.status
+      if (
+        evaluationStatus === 0 ||
+        evaluationStatus === 1 ||
+        evaluationStatus == null
+      ) {
+        req.user = user
+        req.asset = asset
+        return next()
+      }
+    }
 
     const userIdString = String(user._id)
     const isDirectAssignee =

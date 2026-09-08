@@ -33,6 +33,14 @@ function sanitizeMediaArray(arr) {
   for (const entry of arr) stripFields(entry, RISKY_MEDIA_FIELDS)
 }
 
+/** Keep unsigned `url` as fallback for QR thumbs if signing fails. */
+function sanitizeQrMediaArray(arr) {
+  if (!Array.isArray(arr)) return
+  for (const entry of arr) {
+    stripFields(entry, ['s3Bucket', 's3Key', 's3VersionId', 's3ETag'])
+  }
+}
+
 function sanitizeDocumentWrapper(doc) {
   if (!doc || typeof doc !== 'object') return
   // Document docs (EvaluationCertificate, DealHunterDoc) wrap their S3 fields
@@ -47,14 +55,32 @@ function sanitizeDocumentWrapper(doc) {
  * Safe on partial/lean docs and on populated subdocs that haven't yet been
  * filled in (the helper just walks what's there).
  */
+const OFF_PLAN_LAYOUT_MEDIA_KEYS = [
+  'unitLayout',
+  'floorPlan',
+  'studioLayout',
+  'oneBhkLayout',
+  'twoBhkLayout',
+  'twoBhkDuplexLayout',
+  'threeBhkDuplexLayout',
+  'penthouseLayout',
+]
+
 export function sanitizeListingMediaResponse(doc) {
   if (!doc || typeof doc !== 'object') return doc
 
   sanitizeMediaArray(doc?.pictures?.images)
   sanitizeMediaArray(doc?.thumbnailImg?.images)
   sanitizeMediaArray(doc?.video?.videos)
+  sanitizeQrMediaArray(doc?.qrScan?.images)
+
+  for (const key of OFF_PLAN_LAYOUT_MEDIA_KEYS) {
+    sanitizeMediaArray(doc?.[key]?.images)
+  }
 
   sanitizeDocumentWrapper(doc.evaluationCertificate)
+  sanitizeDocumentWrapper(doc.agencyAgreement)
+  sanitizeDocumentWrapper(doc.titleDeed)
   sanitizeDocumentWrapper(doc.technicalReport)
   sanitizeDocumentWrapper(doc.invoice)
 

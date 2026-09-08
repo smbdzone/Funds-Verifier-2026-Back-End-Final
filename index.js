@@ -18,41 +18,80 @@ import { errorHandler, notFound } from './middlewares/errorHandler.js'
 import { apiLimiter, contactFormLimiter, emailFormLimiter } from './middlewares/rateLimiter.js'
 import { initSocket } from './utils/socket.js'
 import initNotificationSocket from './sockets/notificationSocket.js'
+import { csrfProtection } from './middlewares/csrfMiddleware.js'
 
+dotenv.config()
 
 const localOrigin = [
   'http://localhost:5002',
   'http://localhost:3011',
+  'http://localhost:3012',
+  'http://127.0.0.1:5002',
+  'http://127.0.0.1:3011',
+  'http://127.0.0.1:3012',
 ]
-// Configure CORS
-const corsOptions = {
-  origin: [
+
+function buildCorsOrigins() {
+  const defaults = [
     'https://fv.admin.fundsverifier.com',
     'https://fundsverifier.com',
-    ...(process.env.NODE_ENV === 'development' ? localOrigin : [])
-  ],
-  credentials: true, // Allow credentials (cookies)
+  ]
+  const extra = String(process.env.CORS_ORIGINS || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean)
+  const origins = [...new Set([...defaults, ...extra])]
+  if (process.env.NODE_ENV !== 'production') {
+    origins.push(...localOrigin)
+  }
+  return origins
 }
 
-dotenv.config()
+const corsOptions = {
+  origin: buildCorsOrigins(),
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: [
+    'Content-Type',
+    'Authorization',
+    'x-csrf-token',
+    'X-CSRF-Token',
+    'x-public-token',
+    'x-api-key',
+    'X-API-Key',
+    'Cache-Control',
+    'Pragma',
+  ],
+}
 const app = express()
 
 // Configure Helmet for security headers
+const isProduction = process.env.NODE_ENV === 'production'
 app.use(
   helmet({
     contentSecurityPolicy: {
       directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'"],
         styleSrc: ["'self'", "'unsafe-inline'"],
         imgSrc: ["'self'", 'data:', 'https:', 'http:', 'res.cloudinary.com'],
         connectSrc: ["'self'", 'https:', 'http:', 'res.cloudinary.com'],
         frameSrc: ["'none'"],
+        objectSrc: ["'none'"],
+        baseUri: ["'self'"],
+        formAction: ["'self'"],
+        frameAncestors: ["'none'"],
       },
     },
     xssFilter: true,
-    referrerPolicy: {
-      policy: 'strict-origin-when-cross-origin',
-    },
-  })
+    xContentTypeOptions: true,
+    frameguard: { action: 'deny' },
+    referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+    hsts: isProduction
+      ? { maxAge: 31536000, includeSubDomains: true, preload: true }
+      : false,
+    permittedCrossDomainPolicies: { permittedPolicies: 'none' },
+  }),
 )
 
 
@@ -60,7 +99,16 @@ app.use(morgan('tiny'))
 app.disable('x-powered-by')
 
 // Use JSON parser and CORS middleware
-app.use(express.json({ limit: '20mb' }))
+app.use(
+  express.json({
+    limit: '50mb',
+    verify: (req, _res, buf) => {
+      if (req.originalUrl?.includes('/clozer/installment-updates')) {
+        req.rawBody = buf.toString('utf8')
+      }
+    },
+  }),
+)
 app.use(cors(corsOptions))
 app.use(cookieParser())
 
@@ -83,6 +131,7 @@ app.get('/', (req, res) => {
 })
 // Apply to all requests
 app.use('/api', apiLimiter)
+app.use('/api', csrfProtection)
 //routes
 app.use('/api/', routes)
 

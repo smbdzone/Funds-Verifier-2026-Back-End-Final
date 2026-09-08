@@ -2,7 +2,6 @@ import express from 'express'
 import {
   authMiddleware,
   isAdmin,
-  optionalAuthMiddleware,
 } from '../middlewares/authMiddleware.js'
 const router = express.Router()
 
@@ -18,9 +17,9 @@ import {
   getRelatedProduct,
   getPrice,
   getAllProductByFilter,
-  getSingleProductBySlug,
   getApprovedListingsMetrics,
 } from '../controller/boatCtrl.js'
+import { getBoatLocations } from '../controller/listingLocationsCtrl.js'
 // import { getSingleProductBySlug } from "../controller/carCtrl.js";
 // import { uploadPhoto, productImgResize } from '../middlewares/uploadImgs.js';
 import { assetHolderCreate } from '../middlewares/assetHolderCreate.js'
@@ -30,30 +29,29 @@ import {
   formLimiter,
   listingReadLimiter,
 } from '../middlewares/rateLimiter.js'
-import { publicTokenMiddleware } from '../middlewares/publicTokenMiddleware.js'
+import { listingReadAccess } from '../middlewares/listingReadAccess.js'
 
 router.post('/', assetHolderCreate, formLimiter, createProduct)
 router.get(
   '/',
   listingReadLimiter,
-  optionalAuthMiddleware,
-  publicTokenMiddleware,
+  ...listingReadAccess,
   getAllProduct
 )
-router.get('/filter', publicTokenMiddleware, getAllProductByFilter)
+router.get('/filter', ...listingReadAccess, getAllProductByFilter)
 
-router.get('/price', publicTokenMiddleware, getPrice)
-router.get('/related-boat', publicTokenMiddleware, getRelatedProduct)
+router.get('/price', ...listingReadAccess, getPrice)
 router.get(
-  '/:id',
-  optionalAuthMiddleware,
-  publicTokenMiddleware,
-  getSingleProduct
+  '/locations',
+  listingReadLimiter,
+  ...listingReadAccess,
+  getBoatLocations,
 )
-router.get('/', publicTokenMiddleware, getSingleProductBySlug)
+router.get('/related-boat', ...listingReadAccess, getRelatedProduct)
+router.get('/:id', ...listingReadAccess, getSingleProduct)
 
 // router.put('/wishlist',assetHolderCreate, authorizeUserByUUID,isAdmin, addToWishList)
-router.put('/rating', publicTokenMiddleware, addRating)
+router.put('/rating', ...listingReadAccess, addRating)
 
 router.put('/:moduleId', authMiddleware, assetHolderUpdate, updateProduct)
 // router.delete('/:id',assetHolderCreate, authorizeUserByUUID,isAdmin, deleteProduct)

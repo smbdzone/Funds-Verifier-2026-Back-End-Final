@@ -1,7 +1,7 @@
 import mongoose from 'mongoose'
 const Schema = mongoose.Schema
 import { v4 as uuidv4 } from 'uuid'
-import { attachListingMediaRefreshHook } from '../helper/refreshAssetSignedUrls.js'
+import { applyMarketplaceListingIndexes } from '../utils/listingIndexes.js'
 
 // Define boats advertisement schema
 const BoatAdSchema = new Schema(
@@ -12,11 +12,20 @@ const BoatAdSchema = new Schema(
       unique: true,
       index: true,
     },
+    /** Unique listing number issued by the DLD (Dubai Land Department). */
+    dldNumber: { type: String, default: '', trim: true },
+    /** Public visibility counters: incremented when a visitor opens this listing. */
+    analytics: {
+      impressions: { type: Number, default: 0 },
+      clicks: { type: Number, default: 0 },
+    },
 
     assetType: { type: String, required: true },
     country: { type: String, required: true },
     city: { type: String, required: true },
     neighbourhood: { type: String, required: true },
+    /** Optional Google Maps share/embed URL shown on the listing. */
+    mapUrl: { type: String, default: '', trim: true },
     priceRange: String,
     title: { type: String, maxlength: 50 },
     phoneNumber: { type: String, required: true },
@@ -37,11 +46,19 @@ const BoatAdSchema = new Schema(
     pictures: { type: mongoose.Schema.Types.ObjectId, ref: 'ImageAsset' },
     video: { type: mongoose.Schema.Types.ObjectId, ref: 'VideoAsset' },
     thumbnailImg: { type: mongoose.Schema.Types.ObjectId, ref: 'ThumbnailImg' },
+    qrScan: { type: mongoose.Schema.Types.ObjectId, ref: 'ImageAsset' },
     transferDocuments: {
       assetTransferDocument: { type: String },
       PaymentProof: { type: String },
+      successFee: { type: Number },
+      paymentUrl: { type: String },
     },
     dealClosed: { type: Boolean },
+    successFeePaymentStatus: {
+      type: String,
+      enum: ['Pending', 'Paid'],
+      default: 'Pending',
+    },
     dealer: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
@@ -50,6 +67,7 @@ const BoatAdSchema = new Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'EvaluationCertificate',
     },
+    evaluationCertificateDate: { type: Date, required: false },
     invoice: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'EvaluationCertificate',
@@ -77,7 +95,8 @@ const BoatAdSchema = new Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'ReportTechnical',
     },
-    requestDocument: [{ type: String, required: true }],
+    isRecommendedAsset: { type: Boolean, default: false },
+    requestDocument: { type: [mongoose.Schema.Types.Mixed], default: [] },
     uploadDocument: [
       {
         type: mongoose.Schema.Types.ObjectId,
@@ -111,6 +130,7 @@ const BoatAdSchema = new Schema(
       enum: [0, 1],
       default: 0, // Default to "pending"
     },
+    underProcess: { type: Boolean, default: false },
     roi: {
       type: Number,
     },
@@ -160,14 +180,14 @@ BoatAdSchema.set('toObject', { virtuals: true })
 BoatAdSchema.set('toJSON', { virtuals: true })
 
 /**
- * Auto-refresh CloudFront signed URLs on every read so that any controller
- * (current or future) that fetches a boat with populated media returns working
- * URLs instead of stale ~1-hour signatures persisted at upload time. No-op
- * when media refs are not populated.
+ * Media signed URLs: ImageAsset/Video/Thumbnail hooks sign on populate;
+ * controllers refresh for .lean() paths. Listing-level hooks removed to
+ * avoid re-signing the same entries on every list/detail read.
  */
-BoatAdSchema.post('find', attachListingMediaRefreshHook)
-BoatAdSchema.post('findOne', attachListingMediaRefreshHook)
-BoatAdSchema.post('findOneAndUpdate', attachListingMediaRefreshHook)
+
+applyMarketplaceListingIndexes(BoatAdSchema, {
+  includeSlug: true,
+})
 
 // Create and export model
 const Boat = mongoose.model('Boat', BoatAdSchema)

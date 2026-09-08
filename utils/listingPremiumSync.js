@@ -28,15 +28,20 @@ function listingQueryFromPremiumRecord(record) {
   return null
 }
 
-/** Do not let PUT /property wipe premium refs when body sends null (legacy frontend). */
+/** Do not let create/update wipe or cast empty ObjectId refs (legacy frontend sends ""). */
 export function stripNullPremiumRefs(body) {
   if (!body || typeof body !== 'object') return body
   for (const key of [
     'technicalReport',
     'video3DWalkthrough',
     'evaluationCertificate',
+    'video',
+    'qrScan',
+    'pictures',
+    'thumbnailImg',
+    'agencyAgreement',
   ]) {
-    if (body[key] === null || body[key] === '') {
+    if (body[key] === null || body[key] === '' || body[key] === undefined) {
       delete body[key]
     }
   }
@@ -59,7 +64,13 @@ export async function linkTechnicalReportToListing(report) {
   const Model = modelForAssetType(report.assetType)
   const query = listingQueryFromPremiumRecord(report)
   if (!Model || !query) return
-  await Model.updateOne(query, { $set: { technicalReport: report._id } })
+
+  const update = { technicalReport: report._id }
+  if (typeof report.IsRecommended === 'boolean') {
+    update.isRecommendedAsset = report.IsRecommended
+  }
+
+  await Model.updateOne(query, { $set: update })
 }
 
 /** Keep listing → video3DWalkthrough ObjectId in sync. */
@@ -69,6 +80,22 @@ export async function linkWalkthroughToListing(request) {
   const query = listingQueryFromPremiumRecord(request)
   if (!Model || !query) return
   await Model.updateOne(query, { $set: { video3DWalkthrough: request._id } })
+}
+
+/** Ensure dashboard rows show the linked listing title when productTitle was not stored. */
+export async function fillListingTitleOnPremiumRecord(record) {
+  if (!record) return record
+  if (String(record.productTitle || '').trim()) return record
+
+  const Model = modelForAssetType(record.assetType)
+  const query = listingQueryFromPremiumRecord(record)
+  if (!Model || !query) return record
+
+  const listing = await Model.findOne(query).select('title').lean()
+  if (listing?.title) {
+    record.productTitle = listing.title
+  }
+  return record
 }
 
 export async function markReportDelivered(reportUuid, extra = {}) {
@@ -95,4 +122,81 @@ export async function markWalkthroughDelivered(requestUuid, extra = {}) {
     },
     { new: true },
   )
+}
+
+const PAID_PAYMENT_STATUSES = new Set(['paid', 'succeeded', 'active', 'approved'])
+const PAID_RECORD_STATUSES = new Set(['successful'])
+
+export function isPremiumServiceRecordPaid(record) {
+  if (!record) return false
+  const paymentStatus = String(record.payment_method_status || '').toLowerCase()
+  const recordStatus = String(record.status || '').toLowerCase()
+  return (
+    PAID_PAYMENT_STATUSES.has(paymentStatus) ||
+    PAID_RECORD_STATUSES.has(recordStatus)
+  )
+}
+
+/**
+ * Remove unpaid premium service refs so the user can pick another slot or payment method.
+ */
+export async function clearUnpaidPremiumOnListing(product, AssetModel, fields) {
+  if (!product?._id || !AssetModel || !Array.isArray(fields) || !fields.length) {
+    return product
+  }
+
+  const unset = {}
+  for (const field of fields) {
+    const refId = product[field]
+    if (!refId) continue
+
+    const RecordModel = field === 'technicalReport' ? Report : Request3D
+    const record = await RecordModel.findOne({
+      _id: refId,
+      isDeleted: { $ne: true },
+    })
+    if (!record || isPremiumServiceRecordPaid(record)) continue
+
+    // Checkout may still be in progress — do not remove the request yet.
+    const createdAt = record.createdAt ? new Date(record.createdAt).getTime() : 0
+    const checkoutGraceMs = 45 * 60 * 1000
+    if (createdAt && Date.now() - createdAt < checkoutGraceMs) continue
+
+    await RecordModel.findByIdAndUpdate(refId, {
+      $set: { isDeleted: true, deletedAt: new Date() },
+    })
+    unset[field] = 1
+    product[field] = undefined
+  }
+
+  if (Object.keys(unset).length) {
+    await AssetModel.findByIdAndUpdate(product._id, { $unset: unset })
+  }
+
+  return product
+}
+
+/** Hide unpaid premium services in API responses (abandoned Clozer/Stripe attempts). */
+export function sanitizeUnpaidPremiumServicesForClient(listing) {
+  if (!listing || typeof listing !== 'object') return listing
+  for (const field of ['technicalReport', 'video3DWalkthrough']) {
+    const ref = listing[field]
+    if (ref && typeof ref === 'object' && !isPremiumServiceRecordPaid(ref)) {
+      delete listing[field]
+    }
+  }
+  return listing
+}
+
+/** Clear unpaid DB refs and strip them from the listing payload for edit forms. */
+export async function refreshListingPremiumFieldsForEdit(listing) {
+  if (!listing) return listing
+  const Model = modelForAssetType(listing.assetType)
+  if (Model && listing._id) {
+    await clearUnpaidPremiumOnListing(listing, Model, [
+      'technicalReport',
+      'video3DWalkthrough',
+    ])
+  }
+  return sanitizeUnpaidPremiumServicesForClient(listing)
 }

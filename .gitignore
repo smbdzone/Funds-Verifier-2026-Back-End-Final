@@ -1,7 +1,15 @@
 node_modules/
 public/
 .env
+.env.local
+.env.production
 .vercel
 private_key.pem
 public_key.pem
 keys/*.pem
+*.pem
+*.key
+
+# Local-only admin/campaign account seeder — contains hardcoded credentials.
+# Must never be committed or deployed (commercial project). Keep local only.
+scripts/seed-admin-and-campaign.js

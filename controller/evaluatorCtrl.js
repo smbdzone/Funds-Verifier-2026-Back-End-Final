@@ -6,6 +6,72 @@ import Jewelry from '../models/jewelryModel.js'
 import Car from '../models/carModel.js'
 import Property from '../models/propertyModel.js'
 import User from '../models/userModel.js'
+import { sanitizeUUID, sanitizeMongoId } from '../utils/nosqlSanitizer.js'
+import {
+  canAccessParentScope,
+  getRequesterIdentityKeys,
+  isParentEvaluatorOf,
+  isSubEvaluatorRole,
+} from '../utils/parentEvaluator.js'
+
+const findSubEvaluatorByRouteId = async (id, { includeDeleted = false } = {}) => {
+  const sanitizedUuid = sanitizeUUID(id)
+  if (sanitizedUuid) {
+    const query = { uuid: sanitizedUuid }
+    if (!includeDeleted) {
+      query.isDeleted = false
+    }
+    const byUuid = await User.findOne(query)
+    if (byUuid) return byUuid
+  }
+
+  const mongoId = sanitizeMongoId(id)
+  if (mongoId) {
+    const query = { _id: mongoId }
+    if (!includeDeleted) {
+      query.isDeleted = false
+    }
+    return User.findOne(query)
+  }
+
+  return null
+}
+
+const assertParentCanManageSubEvaluator = (requester, subEvaluator) => {
+  if (!requester) {
+    return { ok: false, status: 401, message: 'Unauthorized' }
+  }
+
+  if (String(requester.role || '').trim() === 'Admin') {
+    return { ok: true }
+  }
+
+  if (String(requester.role || '').trim() !== 'Evaluator') {
+    return {
+      ok: false,
+      status: 403,
+      message: 'Forbidden: Only evaluators can manage sub-evaluators',
+    }
+  }
+
+  if (!subEvaluator || !isSubEvaluatorRole(subEvaluator.role)) {
+    return {
+      ok: false,
+      status: 403,
+      message: 'Forbidden: Can only manage sub-evaluators',
+    }
+  }
+
+  if (!isParentEvaluatorOf(requester, subEvaluator)) {
+    return {
+      ok: false,
+      status: 403,
+      message: 'Forbidden: Not allowed to manage this sub-evaluator',
+    }
+  }
+
+  return { ok: true }
+}
 
 // function for creating user
 
@@ -34,19 +100,86 @@ const createUser = asyncHandler(async (req, res) => {
 const getAllEvaluatorsByParentId = asyncHandler(async (req, res) => {
   try {
     const parentid = req.params.parentid
-    console.log(parentid)
+    const requester = req.user
 
-    // validateMongoId(parentid)
-    const createPdt = await User.find({
-      parentEvaluator: parentid,
+    if (!canAccessParentScope(requester, parentid)) {
+      return res.status(403).json({
+        message: 'Forbidden: Not allowed to view these sub-evaluators',
+      })
+    }
+
+    const parentKeys = getRequesterIdentityKeys(requester)
+    const subEvaluators = await User.find({
+      parentEvaluator: { $in: parentKeys },
+      role: { $in: ['Sub-Evaluator', 'SubEvaluator'] },
       isDeleted: false,
     })
-    return res.status(200).json(createPdt)
+      .select('-password -refreshToken -passwordResetToken -passwordResetTokenExpiresAt')
+      .sort({ createdAt: -1 })
+
+    return res.status(200).json(subEvaluators)
   } catch (err) {
     return res
       .status(500)
       .json({ message: err?.message || 'Something went wrong!' })
   }
+})
+
+const updateSubEvaluatorStatus = asyncHandler(async (req, res) => {
+  const { id } = req.params
+  const { userState } = req.body
+  const requester = req.user
+
+  if (!['active', 'inactive'].includes(String(userState || '').trim())) {
+    return res.status(400).json({
+      message: 'userState must be either active or inactive',
+    })
+  }
+
+  const subEvaluator = await findSubEvaluatorByRouteId(id)
+  if (!subEvaluator) {
+    return res.status(404).json({ message: 'Sub-evaluator not found' })
+  }
+
+  const access = assertParentCanManageSubEvaluator(requester, subEvaluator)
+  if (!access.ok) {
+    return res.status(access.status).json({ message: access.message })
+  }
+
+  const updatedUser = await User.findByIdAndUpdate(
+    subEvaluator._id,
+    { userState },
+    { new: true },
+  ).select('-password')
+
+  return res.status(200).json({
+    message: 'User status updated successfully',
+    user: updatedUser,
+  })
+})
+
+const deleteSubEvaluatorByParent = asyncHandler(async (req, res) => {
+  const { id } = req.params
+  const requester = req.user
+  const isAdmin = String(requester?.role || '').trim() === 'Admin'
+
+  const subEvaluator = await findSubEvaluatorByRouteId(id, {
+    includeDeleted: isAdmin,
+  })
+  if (!subEvaluator) {
+    return res.status(404).json({ message: 'Sub-evaluator not found' })
+  }
+
+  const access = assertParentCanManageSubEvaluator(requester, subEvaluator)
+  if (!access.ok) {
+    return res.status(access.status).json({ message: access.message })
+  }
+
+  await User.deleteOne({ _id: subEvaluator._id })
+
+  return res.status(200).json({
+    message: 'Sub-evaluator permanently deleted',
+  })
 })
 // AllAssignedAssetstoEvaluator
 const AllAssignedAssetstoEvaluator = asyncHandler(async (req, res) => {
@@ -301,4 +434,6 @@ export {
   unblockUser,
   getAllEvaluatorsByParentId,
   AllAssignedAssetstoEvaluator,
+  updateSubEvaluatorStatus,
+  deleteSubEvaluatorByParent,
 }

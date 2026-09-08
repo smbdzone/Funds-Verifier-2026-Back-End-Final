@@ -28,6 +28,22 @@ function isDocumentVisible(docType) {
   )
 }
 
+/** Decrypt-and-stream URL for encrypted-at-rest PDFs (DealHunterDoc / EvaluationCertificate). */
+function buildDocumentStreamUrl(uuid) {
+  if (!uuid) return null
+  const fromEnv = String(
+    process.env.API_PUBLIC_URL || process.env.BASE_URL || '',
+  )
+    .trim()
+    .replace(/\/+$/, '')
+  if (fromEnv) {
+    const base = fromEnv.endsWith('/api') ? fromEnv : `${fromEnv}/api`
+    return `${base}/evaluation-certificate/${encodeURIComponent(uuid)}/pdf`
+  }
+  // Relative path — clients prefix NEXT_PUBLIC_BASE_URL
+  return `/evaluation-certificate/${encodeURIComponent(uuid)}/pdf`
+}
+
 /**
  * Generate signed URL for a document
  * @param {Object} documentDoc - Document document from database
@@ -39,6 +55,17 @@ async function getDocumentSignedUrl(documentDoc) {
   }
 
   const { s3Bucket, s3Key, encrypted } = documentDoc.Certificate
+  const uuid = documentDoc.uuid
+
+  // Encrypted objects are ciphertext on S3 — browsers fail to open them as PDF.
+  // Use the decrypt stream endpoint instead (same as listing certificates).
+  if (encrypted === true && uuid) {
+    return {
+      url: buildDocumentStreamUrl(uuid),
+      encrypted: true,
+      name: documentDoc.Certificate.name || 'document.pdf',
+    }
+  }
 
   // If document has S3 key, generate signed URL (bucket-aware: CloudFront for
   // images bucket, S3-presigned for everything else — see
@@ -55,6 +82,14 @@ async function getDocumentSignedUrl(documentDoc) {
       }
     } catch (error) {
       console.error('Error generating signed URL:', error)
+      // Fallback to decrypt stream if we have a uuid
+      if (uuid) {
+        return {
+          url: buildDocumentStreamUrl(uuid),
+          encrypted: Boolean(encrypted),
+          name: documentDoc.Certificate.name || 'document.pdf',
+        }
+      }
       return null
     }
   }
@@ -64,6 +99,14 @@ async function getDocumentSignedUrl(documentDoc) {
     return {
       url: documentDoc.Certificate.url,
       encrypted: false,
+      name: documentDoc.Certificate.name || 'document.pdf',
+    }
+  }
+
+  if (uuid) {
+    return {
+      url: buildDocumentStreamUrl(uuid),
+      encrypted: Boolean(encrypted),
       name: documentDoc.Certificate.name || 'document.pdf',
     }
   }
@@ -85,10 +128,9 @@ async function sanitizeDocumentationEntry(docEntry, isSelf = false) {
   const docType = docEntry.type
   const isVisible = isDocumentVisible(docType)
 
-  // For visible document types, return full details with signed URL (if document exists)
-  if (isVisible && docEntry.document) {
+  // Owner (and visible types) get a signed URL so they can open/view the file
+  if ((isSelf || isVisible) && docEntry.document) {
     const urlData = await getDocumentSignedUrl(docEntry.document)
-    // If we got URL data, return full document info
     if (urlData) {
       return {
         type: docType,
@@ -103,10 +145,9 @@ async function sanitizeDocumentationEntry(docEntry, isSelf = false) {
         },
       }
     }
-    // If visible but no URL data, still return type only
   }
 
-  // For hidden document types or visible types without document/URL, return only type (to show tick mark)
+  // Type-only entry (shows uploaded tick without exposing file URL)
   return {
     type: docType,
   }
