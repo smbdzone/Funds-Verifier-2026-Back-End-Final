@@ -4,9 +4,10 @@ import { v4 as uuidv4 } from 'uuid'
 const schema = new Schema({
   creatives: [
     {
-      img: { type: Object, required: true },
+      // Stored as the permanent (unsigned) CloudFront URL string.
+      img: { type: String, required: true },
       adLink: { type: String, required: true },
-      format: { type: String, default: 'footer-banner' },
+      format: { type: String, default: 'Footer Banner' },
       impressions: [
         {
           country: String,
@@ -28,7 +29,7 @@ const schema = new Schema({
     },
   ],
   totalBudgetUsed: { type: Number, default: 0 },
-  budget: { type: String, required: true },
+  budget: { type: Number, required: true },
   uuid: {
     type: String,
     default: uuidv4,
@@ -56,6 +57,11 @@ const schema = new Schema({
     enum: ['Pending', 'Approved', 'Rejected'],
     default: 'Pending',
   },
+  // Stripe payment + refund tracking (per-ad prepaid budget; refund to card on
+  // delete, no wallet).
+  stripePaymentIntentId: { type: String },
+  refundId: { type: String },
+  refundedAt: { type: Date },
   // Soft delete fields
   isDeleted: { type: Boolean, default: false },
   deletedAt: { type: Date, default: null },

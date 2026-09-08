@@ -5,8 +5,8 @@ import { createNotification } from '../controller/notifications.controller.js'
 import { GetUserLocalization } from '../utils/localization/GetUserLocalization.js'
 import { Types } from 'mongoose'
 import validateMongoId from '../utils/validateMongodbId.js'
-import AdsWallet from '../models/AdsWalletModel.js'
 import { generateCloudFrontSignedUrl } from '../services/cloudFrontSignedUrlService.js'
+import { stripe } from '../libs/stripe.js'
 
 const AD_IMG_SIGNED_URL_EXPIRES_IN_SECONDS = 60 * 60 // 1 hour
 
@@ -71,8 +71,17 @@ const getAll = async (req, res) => {
   const userId = verifyToken(bearerToken)
 
   try {
+    // Only expose approved + paid + non-deleted ads that aren't the viewer's
+    // own — never unapproved/unpaid/soft-deleted rows.
     const result = await Advertisement.aggregate([
-      { $match: { userId: { $ne: userId } } },
+      {
+        $match: {
+          userId: { $ne: userId },
+          isDeleted: { $ne: true },
+          Approval: 'Approved',
+          paymentStatus: 1,
+        },
+      },
       { $sample: { size: 2 } },
     ])
     return res
@@ -107,9 +116,10 @@ const GetAllAdvertisements = async (req, res) => {
   const skip = (page - 1) * limit
 
   try {
-    const user = await User.findById(userId, { isDeleted: false }).select(
-      'role',
-    )
+    const user = await User.findOne({
+      _id: userId,
+      isDeleted: { $ne: true },
+    }).select('role')
     if (!user || user?.role !== 'Admin') {
       return res.status(403).json({
         success: false,
@@ -186,9 +196,10 @@ const GetOneAdvertisements = async (req, res) => {
 
   try {
     // validateMongoId(id)
-    const user = await User.findById(userId, { isDeleted: false }).select(
-      'role',
-    )
+    const user = await User.findOne({
+      _id: userId,
+      isDeleted: { $ne: true },
+    }).select('role')
 
     if (!user || user?.role !== 'Admin') {
       return res.status(403).json({
@@ -228,62 +239,6 @@ const GetOneAdvertisements = async (req, res) => {
       success: true,
       advertisement: withSignedCreatives(result?.[0]),
     })
-  } catch (error) {
-    console.error(error)
-    return res
-      .status(500)
-      .json({ success: false, message: 'Error retrieving data' })
-  }
-}
-
-// --------------------------------
-const getAllSideBanners = async (req, res) => {
-  const authorizationHeader = req.headers['authorization']
-  if (!authorizationHeader || !authorizationHeader.startsWith('Bearer ')) {
-    return res.status(401).json({
-      success: false,
-      message: 'Bearer token not found in Authorization header',
-    })
-  }
-  const bearerToken = authorizationHeader.split(' ')[1]
-  const userId = verifyToken(bearerToken)
-
-  try {
-    const result = await Advertisement.aggregate([
-      {
-        $match: { userId: { $ne: userId } },
-      },
-      {
-        $unwind: '$creatives',
-      },
-      {
-        $match: { Approval: 'Approved', 'creatives.format': 'Side Banner' },
-      },
-      {
-        $group: {
-          _id: '$_id',
-          creatives: { $push: '$creatives' },
-          totalBudgetUsed: { $first: '$totalBudgetUsed' },
-          budget: { $first: '$budget' },
-          targetedAudience: { $first: '$targetedAudience' },
-          Approval: { $first: '$Approval' },
-          userId: { $first: '$userId' },
-          status: { $first: '$status' },
-          paymentStatus: { $first: '$paymentStatus' },
-          createdAt: { $first: '$createdAt' },
-        },
-      },
-      {
-        $sample: { size: 1 },
-      },
-    ])
-    return res
-      .status(200)
-      .json({
-        success: true,
-        message: 'Data retrieved',
-        data: withSignedCreativesArray(result),
-      })
   } catch (error) {
     console.error(error)
     return res
@@ -393,7 +348,10 @@ const getById = async (req, res) => {
         .json({ success: false, message: 'Invalid or expired token' })
     }
 
-    const result = await Advertisement.findById(id, { isDeleted: false })
+    const result = await Advertisement.findOne({
+      _id: id,
+      isDeleted: { $ne: true },
+    })
 
     if (!result) {
       return res
@@ -464,51 +422,6 @@ const getUserAdvertisements = async (req, res) => {
   }
 }
 
-const getByDateAndTime = async (req, res) => {
-  try {
-    const currentDate = new Date()
-    const currentDayOfWeek = currentDate.toLocaleDateString('en-US', {
-      weekday: 'short',
-    })
-    const currentTime = currentDate.toLocaleTimeString('en-US', {
-      hour12: false,
-    })
-
-    const slots = ['08:00–14:00', '14:00–20:00', '20:00–02:00', '02:00–08:00']
-
-    let selectedSlot = null
-
-    // Check if the current time falls within any of the slots
-    for (const slot of slots) {
-      const [start, end] = slot.split('–')
-      if (currentTime >= start && currentTime < end) {
-        selectedSlot = slot
-        break
-      }
-    }
-
-    const advertisements = await Advertisement.find({
-      $nor: [
-        { 'targetedAudience.unwantedDays': { $in: [currentDayOfWeek] } },
-        { 'targetedAudience.unwantedTimeSlots': { $in: [selectedSlot] } },
-      ],
-      isDeleted: false,
-    })
-
-    return res
-      .status(200)
-      .json({
-        success: true,
-        message: 'Data retrieved',
-        data: withSignedCreativesArray(advertisements),
-      })
-  } catch (error) {
-    console.error(error)
-    return res
-      .status(500)
-      .json({ success: false, message: 'Error retrieving data' })
-  }
-}
 const create = async (req, res) => {
   const { body, headers } = req
   // console.log(body, headers, 'headers')
@@ -608,7 +521,10 @@ const updatedClicks = async (req, res) => {
   const userIdFromToken = verifyToken(bearerToken)
 
   try {
-    const user = await User.findById({ _id: userIdFromToken, isDeleted: false })
+    const user = await User.findOne({
+      _id: userIdFromToken,
+      isDeleted: { $ne: true },
+    })
 
     if (user) {
       const currentDate = new Date()
@@ -627,10 +543,10 @@ const updatedClicks = async (req, res) => {
         date: currentDate,
       }
 
-      const advertisementFound = await Advertisement.findById(
-        body.advertisementId,
-        { isDeleted: false },
-      )
+      const advertisementFound = await Advertisement.findOne({
+        _id: body.advertisementId,
+        isDeleted: { $ne: true },
+      })
 
       if (!advertisementFound) {
         return res
@@ -673,26 +589,14 @@ const updatedClicks = async (req, res) => {
       const budget = Number(advertisementFound?.budget)
       const used = Number(advertisementFound?.totalBudgetUsed) || 0
 
-      // Once the prepaid budget is spent, the overage is charged to the
-      // advertiser's wallet. Do it as one conditional atomic decrement so
-      // concurrent clicks can't drive the wallet negative or race each other.
+      // Budget is a hard cap: prepaid per ad, no wallet/overage. Serving already
+      // stops exhausted ads; this guards the boundary click (and any race) so we
+      // never bill past the budget the advertiser paid for.
       if (Number.isFinite(budget) && used >= budget) {
-        const debited = await AdsWallet.findOneAndUpdate(
-          {
-            userId: advertisementFound.userId,
-            isDeleted: false,
-            total: { $gte: currentPrice },
-          },
-          { $inc: { total: -currentPrice } },
-          { new: true },
-        )
-        if (!debited) {
-          return res.status(403).json({
-            success: false,
-            message:
-              'Advertisement budget exhausted and no balance left in wallet.',
-          })
-        }
+        return res.status(200).json({
+          success: true,
+          message: 'Advertisement budget exhausted',
+        })
       }
 
       // Atomic spend increment + click record — no read-then-write race, so
@@ -752,7 +656,10 @@ const updatedImpressions = async (req, res) => {
     })
   }
   try {
-    const user = await User.findById({ _id: userIdFromToken, isDeleted: false })
+    const user = await User.findOne({
+      _id: userIdFromToken,
+      isDeleted: { $ne: true },
+    })
 
     if (user) {
       const currentDate = new Date()
@@ -772,10 +679,10 @@ const updatedImpressions = async (req, res) => {
         date: currentDate,
       }
 
-      const advertisementFound = await Advertisement.findById(
-        body?.advertisementId,
-        { isDeleted: false },
-      )
+      const advertisementFound = await Advertisement.findOne({
+        _id: body?.advertisementId,
+        isDeleted: { $ne: true },
+      })
 
       if (!advertisementFound) {
         return res
@@ -792,13 +699,15 @@ const updatedImpressions = async (req, res) => {
       }
 
       // Check if userId is already present in the advertisement's impressions within the last 24 hours
-      const isUserIdPresent = advertisementFound.creatives.some((creative) =>
-        creative.impressions.some(
-          (impression) =>
-            impression.userId.toString() === userIdFromToken.toString() &&
-            new Date(impression.date).getTime() >
-            currentDate.getTime() - 24 * 60 * 60 * 1000,
-        ),
+      const isUserIdPresent = (advertisementFound.creatives || []).some(
+        (creative) =>
+          (creative.impressions || []).some(
+            (impression) =>
+              impression?.userId &&
+              impression.userId.toString() === userIdFromToken.toString() &&
+              new Date(impression.date).getTime() >
+                currentDate.getTime() - 24 * 60 * 60 * 1000,
+          ),
       )
 
       if (isUserIdPresent) {
@@ -865,13 +774,17 @@ const update = async (req, res) => {
     }
 
     const userIdFromToken = tokenVerification
-    const user = await User.findById(userIdFromToken, {
-      isDeleted: false,
+    const user = await User.findOne({
+      _id: userIdFromToken,
+      isDeleted: { $ne: true },
     }).select('role')
 
     if (!user) return res.status(401).json({ message: 'User not found' })
 
-    const advertisement = await Advertisement.findById(id, { isDeleted: false })
+    const advertisement = await Advertisement.findOne({
+      _id: id,
+      isDeleted: { $ne: true },
+    })
     if (!advertisement)
       return res.status(404).json({ message: 'Advertisement not found' })
 
@@ -959,10 +872,18 @@ const markAdvertisementPaid = async (req, res) => {
   }
 
   const { id } = req.params
+  // Stripe payment_intent captured at confirm time so the ad can be refunded to
+  // the original card on deletion (no wallet).
+  const paymentIntentId =
+    typeof req.body?.paymentIntentId === 'string'
+      ? req.body.paymentIntentId
+      : undefined
   try {
+    const update = { paymentStatus: 1, status: 'completed' }
+    if (paymentIntentId) update.stripePaymentIntentId = paymentIntentId
     const ad = await Advertisement.findOneAndUpdate(
       { _id: id, isDeleted: { $ne: true } },
-      { $set: { paymentStatus: 1, status: 'completed' } },
+      { $set: update },
       { new: true },
     )
     if (!ad) {
@@ -1044,23 +965,37 @@ const deleteAdvertisement = async (req, res) => {
     findAdvertisement.deletedAt = new Date()
     await findAdvertisement.save()
 
-    // Refund to wallet if paymentStatus == 1
-    if (findAdvertisement.paymentStatus === 1) {
-      const wallet = await AdsWallet.findOne({
-        userId: findAdvertisement.userId,
-        isDeleted: false,
-      })
+    // Refund unspent budget to the original card via Stripe (no wallet). Refund
+    // = budget - spend, capped at >= 0. Skipped when there's no captured payment
+    // (e.g. a 100%-off promo checkout completes with no payment_intent).
+    if (
+      findAdvertisement.paymentStatus === 1 &&
+      findAdvertisement.stripePaymentIntentId &&
+      !findAdvertisement.refundId
+    ) {
       const refundAmount =
-        Number(findAdvertisement.budget) - findAdvertisement.totalBudgetUsed
+        Number(findAdvertisement.budget) -
+        Number(findAdvertisement.totalBudgetUsed || 0)
+      const refundFils = Math.round(refundAmount * 100)
 
-      if (!wallet) {
-        await AdsWallet.create({
-          userId: userIdFromToken,
-          total: refundAmount,
-        })
-      } else {
-        wallet.total += refundAmount
-        await wallet.save()
+      if (refundFils > 0) {
+        try {
+          const refund = await stripe.refunds.create({
+            payment_intent: findAdvertisement.stripePaymentIntentId,
+            amount: refundFils,
+          })
+          findAdvertisement.refundId = refund.id
+          findAdvertisement.refundedAt = new Date()
+          await findAdvertisement.save()
+        } catch (refundErr) {
+          // Don't fail the delete on a refund error — the ad is already
+          // soft-deleted. Log so it can be reconciled/refunded manually.
+          console.error(
+            'Advertisement refund failed for',
+            findAdvertisement._id?.toString(),
+            refundErr?.message,
+          )
+        }
       }
     }
 
@@ -1161,11 +1096,9 @@ const getByUserId = async (req, res) => {
 
 export {
   getAll,
-  getAllSideBanners,
   getAllFooterBanners,
   getById,
   getUserAdvertisements,
-  getByDateAndTime,
   create,
   updatedClicks,
   updatedImpressions,
