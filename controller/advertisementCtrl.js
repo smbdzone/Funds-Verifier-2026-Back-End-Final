@@ -10,23 +10,6 @@ import { generateCloudFrontSignedUrl } from '../services/cloudFrontSignedUrlServ
 
 const AD_IMG_SIGNED_URL_EXPIRES_IN_SECONDS = 60 * 60 // 1 hour
 
-// Map a date of birth to one of the targeting age buckets (derived live, so it
-// stays correct as the person ages). Returns '' when unknown / under 21.
-function ageGroupFromDob(dob) {
-  if (!dob) return ''
-  const birth = new Date(dob)
-  if (isNaN(birth.getTime())) return ''
-  const now = new Date()
-  let age = now.getFullYear() - birth.getFullYear()
-  const m = now.getMonth() - birth.getMonth()
-  if (m < 0 || (m === 0 && now.getDate() < birth.getDate())) age--
-  if (age >= 21 && age <= 30) return '21-30'
-  if (age >= 31 && age <= 40) return '31-40'
-  if (age >= 41 && age <= 50) return '41-50'
-  if (age >= 51 && age <= 60) return '51-60'
-  if (age > 60) return '60+'
-  return ''
-}
 
 function extractS3KeyFromCloudFrontUrl(url) {
   if (!url || typeof url !== 'string') return null
@@ -309,136 +292,6 @@ const getAllSideBanners = async (req, res) => {
   }
 }
 
-// Public endpoint: the banner renders for logged-out visitors too. A valid token
-// unlocks targeted ads (matched on the viewer's city / age-group / gender);
-// without one we can't match any dimension, so anonymous visitors only ever see
-// ads that constrain none of them. Impressions/clicks stay auth-gated, so
-// anonymous views are shown but never billed.
-const getAllLargeBanners = async (req, res) => {
-  const authorizationHeader = req.headers['authorization']
-  const bearerToken = authorizationHeader?.startsWith('Bearer ')
-    ? authorizationHeader.split(' ')[1]
-    : null
-  const decoded = bearerToken ? verifyToken(bearerToken) : null
-  // verifyToken falls back to the whole payload when there's no `id` claim, so
-  // only treat a plain string id as a signed-in viewer.
-  const userId = typeof decoded === 'string' ? decoded : null
-  const isAnonymous = !userId
-
-  try {
-    // Viewer attributes for strict targeting (from UAE Pass / onboarding).
-    // Age-group is derived live from date of birth so it never goes stale.
-    let viewerCity = ''
-    let viewerGender = ''
-    let viewerAge = ''
-
-    if (!isAnonymous) {
-      const viewer = await User.findById(userId).select(
-        'city gender dateOfBirth',
-      )
-      viewerCity = (viewer?.city || '').toString().trim()
-      viewerGender = (viewer?.gender || '').toString().trim().toLowerCase()
-      viewerAge = ageGroupFromDob(viewer?.dateOfBirth)
-    }
-
-    // Candidate approved Quarter-Page ads. A signed-in viewer never sees their
-    // own ads; an anonymous visitor has no "own" ads to exclude.
-    const baseMatch = { isDeleted: { $ne: true } }
-    if (!isAnonymous) baseMatch.userId = { $ne: userId }
-
-    const candidates = await Advertisement.aggregate([
-      { $match: baseMatch },
-      { $unwind: '$creatives' },
-      {
-        $match: {
-          Approval: 'Approved',
-          'creatives.format': 'Quarter-Page Banner',
-        },
-      },
-      {
-        $group: {
-          _id: '$_id',
-          creatives: { $push: '$creatives' },
-          totalBudgetUsed: { $first: '$totalBudgetUsed' },
-          budget: { $first: '$budget' },
-          targetedAudience: { $first: '$targetedAudience' },
-          Approval: { $first: '$Approval' },
-          userId: { $first: '$userId' },
-          status: { $first: '$status' },
-          paymentStatus: { $first: '$paymentStatus' },
-          createdAt: { $first: '$createdAt' },
-        },
-      },
-    ])
-
-    // Strict targeting: the viewer must match every dimension an ad constrains.
-    // An unconstrained dimension (empty / 'all') is open; unknown viewer attribute = no match.
-    const matches = candidates.filter((ad) => {
-      const ta = ad.targetedAudience || {}
-
-      const cities = (Array.isArray(ta.city) ? ta.city : [])
-        .flat(Infinity)
-        .filter(Boolean)
-        .map((c) => c.toString().trim())
-
-      const adGender = (ta.gender || '').toString().trim().toLowerCase()
-      const adAge = (ta.ageGroup || '').toString().trim()
-
-      // Anonymous visitors can't be matched on any dimension, so they only see
-      // ads that target nobody in particular. This keeps the targeting an
-      // advertiser paid for honest rather than spraying their budget.
-      if (isAnonymous) {
-        const isTargeted =
-          cities.length > 0 || (!!adGender && adGender !== 'all') || !!adAge
-        return !isTargeted
-      }
-
-      if (cities.length > 0) {
-        if (!viewerCity || !cities.includes(viewerCity)) return false
-      }
-
-      if (adGender && adGender !== 'all') {
-        if (!viewerGender || viewerGender !== adGender) return false
-      }
-
-      if (adAge) {
-        if (!viewerAge || viewerAge !== adAge) return false
-      }
-
-      return true
-    })
-
-    const chosen = matches.length
-      ? [matches[Math.floor(Math.random() * matches.length)]]
-      : []
-
-    // This endpoint is public, so return only what the banner needs to render
-    // and to report an impression/click — never the advertiser's id, budget,
-    // spend or payment status.
-    const data = withSignedCreativesArray(chosen).map((ad) => ({
-      _id: ad._id,
-      creatives: (ad.creatives || []).map((c) => ({
-        _id: c._id,
-        img: c.img,
-        signedImg: c.signedImg,
-        adLink: c.adLink,
-        format: c.format,
-      })),
-    }))
-
-    return res.status(200).json({
-      success: true,
-      message: 'Data retrieved',
-      data,
-    })
-  } catch (error) {
-    console.error(error)
-    return res
-      .status(500)
-      .json({ success: false, message: 'Error retrieving data' })
-  }
-}
-
 const getAllFooterBanners = async (req, res) => {
   const authorizationHeader = req.get('authorization')
   if (!authorizationHeader || !authorizationHeader.startsWith('Bearer ')) {
@@ -452,9 +305,20 @@ const getAllFooterBanners = async (req, res) => {
   const userId = verifyToken(bearerToken)
 
   try {
-    const result = await Advertisement.aggregate([
+    // Candidate ads must be approved, paid, not soft-deleted, and not the
+    // viewer's own. (Payment/approval are the serving gates; without the paid
+    // check an approved-but-unpaid ad would serve for free.)
+    const candidates = await Advertisement.aggregate([
+      {
+        $match: {
+          isDeleted: { $ne: true },
+          Approval: 'Approved',
+          paymentStatus: 1,
+          userId: { $ne: userId },
+        },
+      },
       { $unwind: '$creatives' },
-      { $match: { Approval: 'Approved', 'creatives.format': 'Footer Banner' } },
+      { $match: { 'creatives.format': 'Footer Banner' } },
       {
         $group: {
           _id: '$_id',
@@ -469,14 +333,37 @@ const getAllFooterBanners = async (req, res) => {
           createdAt: { $first: '$createdAt' },
         },
       },
-      { $sample: { size: 1 } },
     ])
+
+    // Only serve ads inside their flight window and with budget remaining.
+    // (Budget is click-only spend now; wallet top-ups don't exist yet, so
+    // budget exhaustion is a hard stop — revisit if a top-up path is added.)
+    const now = Date.now()
+    const servable = candidates.filter((ad) => {
+      const ta = ad.targetedAudience || {}
+      const start = ta.startAt?.[0] ? new Date(ta.startAt[0]) : null
+      const end = ta.endAt?.[0] ? new Date(ta.endAt[0]) : null
+      if (start && !isNaN(start.getTime()) && now < start.getTime()) return false
+      if (end && !isNaN(end.getTime())) {
+        // endAt is inclusive of the whole end day.
+        if (now >= end.getTime() + 24 * 60 * 60 * 1000) return false
+      }
+      const budget = Number(ad.budget)
+      const used = Number(ad.totalBudgetUsed) || 0
+      if (Number.isFinite(budget) && used >= budget) return false
+      return true
+    })
+
+    const chosen = servable.length
+      ? [servable[Math.floor(Math.random() * servable.length)]]
+      : []
+
     return res
       .status(200)
       .json({
         success: true,
         message: 'Data retrieved',
-        data: withSignedCreativesArray(result),
+        data: withSignedCreativesArray(chosen),
       })
   } catch (error) {
     console.error(error)
@@ -647,9 +534,21 @@ const create = async (req, res) => {
 
       const userIdFromToken = tokenVerification
 
+      // Whitelist: only advertiser-supplied fields are accepted. Approval,
+      // paymentStatus, totalBudgetUsed and status are set by the server (and by
+      // the payment/approval flows) — never by the client — so a crafted body
+      // can't self-approve, mark itself paid, or pre-spend budget.
       const response = await Advertisement.create({
-        ...body,
+        creatives: Array.isArray(body?.creatives) ? body.creatives : [],
+        targetedAudience: body?.targetedAudience,
+        budget: body?.budget,
+        email: body?.email,
         userId: userIdFromToken,
+        // Server-forced safe defaults (also the schema defaults, set explicitly):
+        Approval: 'Pending',
+        paymentStatus: 0,
+        totalBudgetUsed: 0,
+        status: 'in_progress',
       })
 
       try {
@@ -688,41 +587,12 @@ const create = async (req, res) => {
   }
 }
 
+// Flat click fee, same for every ad format. Impressions are recorded for
+// analytics but are NOT billed (clicks-only pricing).
+const CLICK_PRICE_AED = 0.3
+
 function getCurrentPrice() {
-  const prices = [0.11, 0.115, 0.12, 0.13]
-
-  const currentTime = new Date()
-  const currentHour = currentTime.getHours()
-  const currentMinute = currentTime.getMinutes()
-  const currentTimeString = `${currentHour}:${currentMinute < 10 ? '0' : ''
-    }${currentMinute}`
-
-  const currentDay = currentTime.getDay()
-
-  let selectedPrice
-
-  if (currentTimeString >= '02:00' && currentTimeString < '08:00') {
-    selectedPrice = prices[0]
-  } else if (currentTimeString >= '08:00' && currentTimeString < '14:00') {
-    selectedPrice = prices[1]
-  } else if (currentTimeString >= '14:00' && currentTimeString < '20:00') {
-    selectedPrice = prices[2]
-  } else if (currentTimeString >= '20:00' || currentTimeString < '02:00') {
-    selectedPrice = prices[3]
-  }
-
-  // Add adjustments for specific days
-  if (currentDay === 0) {
-    // Sunday
-    selectedPrice += 0.025
-  } else if (currentDay === 2 || currentDay === 5) {
-    // Tuesday or Saturday
-    selectedPrice += 0.5
-  }
-
-  return selectedPrice
-  // Flat click fee: $0.3 per click
-  return 0.3
+  return CLICK_PRICE_AED
 }
 
 const updatedClicks = async (req, res) => {
@@ -750,6 +620,9 @@ const updatedClicks = async (req, res) => {
       const obj = {
         country: userData.country || localization?.country || '',
         cities: userData.city || localization?.city || '',
+        states: userData.state || localization?.region || '',
+        userId: userData._id || '', // needed for server-side click de-dup
+        gender: userData.gender || '',
         time: currentTime,
         date: currentDate,
       }
@@ -772,35 +645,62 @@ const updatedClicks = async (req, res) => {
           message: 'User cannot add click to their own advertisement',
         })
       }
-      const currentPrice = getCurrentPrice()
 
-      if (
-        Number(advertisementFound?.totalBudgetUsed) >=
-        Number(advertisementFound?.budget)
-      ) {
-        const wallet = await AdsWallet.findOne({
-          userId: advertisementFound.userId,
-          isDeleted: false,
+      // Server-side de-dup: at most one billable click per user, per creative,
+      // per 24h. The frontend localStorage guard is clearable, so this is the
+      // real protection against draining an advertiser's budget with repeat
+      // clicks. (Legacy clicks with no userId are ignored by the guard.)
+      const clickWindowStart = currentDate.getTime() - 24 * 60 * 60 * 1000
+      const alreadyClicked = (advertisementFound.creatives || []).some(
+        (creative) =>
+          String(creative._id) === String(body.creativeId) &&
+          (creative.clicks || []).some(
+            (click) =>
+              click?.userId &&
+              click.userId.toString() === userIdFromToken.toString() &&
+              new Date(click.date).getTime() > clickWindowStart,
+          ),
+      )
+      if (alreadyClicked) {
+        return res.status(200).json({
+          success: true,
+          message:
+            'Click already counted for this advertisement in the last 24 hours',
         })
-        if (!wallet || wallet.total <= 0) {
+      }
+
+      const currentPrice = getCurrentPrice()
+      const budget = Number(advertisementFound?.budget)
+      const used = Number(advertisementFound?.totalBudgetUsed) || 0
+
+      // Once the prepaid budget is spent, the overage is charged to the
+      // advertiser's wallet. Do it as one conditional atomic decrement so
+      // concurrent clicks can't drive the wallet negative or race each other.
+      if (Number.isFinite(budget) && used >= budget) {
+        const debited = await AdsWallet.findOneAndUpdate(
+          {
+            userId: advertisementFound.userId,
+            isDeleted: false,
+            total: { $gte: currentPrice },
+          },
+          { $inc: { total: -currentPrice } },
+          { new: true },
+        )
+        if (!debited) {
           return res.status(403).json({
             success: false,
             message:
               'Advertisement budget exhausted and no balance left in wallet.',
           })
-        } else {
-          wallet.total = wallet.total - currentPrice
-          await wallet.save()
         }
       }
 
+      // Atomic spend increment + click record — no read-then-write race, so
+      // concurrent clicks each bill exactly once.
       const result = await Advertisement.findByIdAndUpdate(
         body.advertisementId,
-
         {
-          $set: {
-            totalBudgetUsed: advertisementFound.totalBudgetUsed + currentPrice,
-          },
+          $inc: { totalBudgetUsed: currentPrice },
           $push: { 'creatives.$[element].clicks': obj },
         },
         {
@@ -831,42 +731,8 @@ const updatedClicks = async (req, res) => {
   }
 }
 
-function getCurrentPriceForImpression() {
-  const prices = [0.00001, 0.000015, 0.00002, 0.00003]
-
-  const currentTime = new Date()
-  const currentHour = currentTime.getHours()
-  const currentMinute = currentTime.getMinutes()
-  const currentTimeString = `${currentHour}:${currentMinute < 10 ? '0' : ''
-    }${currentMinute}`
-
-  const currentDay = currentTime.getDay()
-
-  let selectedPrice
-
-  if (currentTimeString >= '02:00' && currentTimeString < '08:00') {
-    selectedPrice = prices[0]
-  } else if (currentTimeString >= '08:00' && currentTimeString < '14:00') {
-    selectedPrice = prices[1]
-  } else if (currentTimeString >= '14:00' && currentTimeString < '20:00') {
-    selectedPrice = prices[2]
-  } else if (currentTimeString >= '20:00' || currentTimeString < '02:00') {
-    selectedPrice = prices[3]
-  }
-
-  // Add adjustments for specific days
-  if (currentDay === 0) {
-    // Sunday
-    selectedPrice += 0.000005
-  } else if (currentDay === 2 || currentDay === 5) {
-    // Tuesday or Saturday
-    selectedPrice += 0.00001
-  }
-
-  return selectedPrice
-  // Flat impression fee: $0.1 per 1000 impressions = $0.0001 per impression
-  return 0.0001
-}
+// Impression pricing removed: under clicks-only pricing an impression is
+// recorded for analytics but never charges the budget or wallet.
 
 const updatedImpressions = async (req, res) => {
   const { body, headers } = req
@@ -943,40 +809,11 @@ const updatedImpressions = async (req, res) => {
         })
       }
 
-      // Flat impression fee: $0.1 per 1000 impressions = $0.0001 per impression
-      const currentPriceForImpression = getCurrentPriceForImpression()
-      const amountToAdd = 0
-
-      if (
-        Number(advertisementFound?.totalBudgetUsed) >=
-        Number(advertisementFound?.budget)
-      ) {
-        const wallet = await AdsWallet.findOne({
-          userId: advertisementFound?.userId,
-          isDeleted: false,
-        })
-        if (!wallet || wallet.total <= 0) {
-          return res.status(403).json({
-            success: false,
-            message:
-              'Advertisement budget exhausted and no balance left in wallet.',
-          })
-        } else {
-          wallet.total =
-            wallet.total - (amountToAdd + currentPriceForImpression)
-          await wallet.save()
-        }
-      }
-
+      // Impressions are analytics-only under clicks-only pricing: record the
+      // view, never touch totalBudgetUsed or the wallet.
       const result = await Advertisement.findByIdAndUpdate(
         body.advertisementId,
         {
-          $set: {
-            totalBudgetUsed:
-              advertisementFound.totalBudgetUsed +
-              amountToAdd +
-              currentPriceForImpression,
-          },
           $push: { 'creatives.$[element].impressions': obj },
         },
         {
@@ -1038,19 +875,41 @@ const update = async (req, res) => {
     if (!advertisement)
       return res.status(404).json({ message: 'Advertisement not found' })
 
-    const isOwner = userIdFromToken === advertisement.userId
+    const isOwner = String(advertisement.userId) === String(userIdFromToken)
     const isAdmin = user.role === 'Admin'
-
-    if (isOwner && body?.Approval) delete body?.Approval
-    if (isOwner && body?.RejectedReason) delete body?.RejectedReason
 
     if (!isOwner && !isAdmin)
       return res.status(403).json({ message: 'Unauthorized user' })
 
-    // Update only the specified fields in the body
+    // Field-level whitelist. Owners may only edit their creative + targeting;
+    // admins may only set approval state. Nobody sets paymentStatus, status,
+    // budget or totalBudgetUsed here — payment is confirmed server-side
+    // (payment-confirm endpoint / Stripe webhook) and spend is billed by the
+    // click handler. This closes the self-approve / self-mark-paid / self-credit
+    // holes.
+    const OWNER_FIELDS = ['creatives', 'targetedAudience']
+    const ADMIN_FIELDS = ['Approval', 'RejectedReason']
+    const allowedFields = [
+      ...(isOwner ? OWNER_FIELDS : []),
+      ...(isAdmin ? ADMIN_FIELDS : []),
+    ]
+
+    const updateDoc = {}
+    for (const key of allowedFields) {
+      if (Object.prototype.hasOwnProperty.call(body || {}, key)) {
+        updateDoc[key] = body[key]
+      }
+    }
+
+    if (Object.keys(updateDoc).length === 0) {
+      return res
+        .status(400)
+        .json({ success: false, message: 'No updatable fields provided' })
+    }
+
     const updatedAdvertisement = await Advertisement.findByIdAndUpdate(
       id,
-      { $set: body },
+      { $set: updateDoc },
       { new: true },
     )
 
@@ -1084,6 +943,43 @@ const update = async (req, res) => {
     return res
       .status(500)
       .json({ success: false, message: 'Error updating Advertisement' })
+  }
+}
+
+// Server-to-server payment confirmation. Called by the Stripe webhook and the
+// checkout-return handler AFTER Stripe itself has confirmed the charge — never
+// by the browser or advertiser. Trust comes from a shared internal secret, so
+// paymentStatus can't be forged by a client (the general update endpoint no
+// longer accepts paymentStatus at all).
+const markAdvertisementPaid = async (req, res) => {
+  const provided = req.headers['x-internal-secret']
+  const expected = process.env.INTERNAL_API_SECRET
+  if (!expected || provided !== expected) {
+    return res.status(403).json({ success: false, message: 'Forbidden' })
+  }
+
+  const { id } = req.params
+  try {
+    const ad = await Advertisement.findOneAndUpdate(
+      { _id: id, isDeleted: { $ne: true } },
+      { $set: { paymentStatus: 1, status: 'completed' } },
+      { new: true },
+    )
+    if (!ad) {
+      return res
+        .status(404)
+        .json({ success: false, message: 'Advertisement not found' })
+    }
+    return res.status(200).json({
+      success: true,
+      message: 'Payment confirmed',
+      data: { _id: ad._id, paymentStatus: ad.paymentStatus },
+    })
+  } catch (error) {
+    console.error(error)
+    return res
+      .status(500)
+      .json({ success: false, message: 'Error confirming payment' })
   }
 }
 
@@ -1266,7 +1162,6 @@ const getByUserId = async (req, res) => {
 export {
   getAll,
   getAllSideBanners,
-  getAllLargeBanners,
   getAllFooterBanners,
   getById,
   getUserAdvertisements,
@@ -1275,6 +1170,7 @@ export {
   updatedClicks,
   updatedImpressions,
   update,
+  markAdvertisementPaid,
   deleteAdvertisement,
   getByUserId,
   GetAllAdvertisements,
