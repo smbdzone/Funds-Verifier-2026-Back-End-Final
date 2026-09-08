@@ -85,6 +85,17 @@ export function csrfProtection(req, res, next) {
     return next()
   }
 
+  // Server-to-server calls authenticated by the shared internal secret (e.g.
+  // Stripe payment confirmation from the web app) are not browser requests and
+  // are not subject to CSRF.
+  const internalSecret = process.env.INTERNAL_API_SECRET
+  if (
+    internalSecret &&
+    timingSafeEqual(req.headers['x-internal-secret'], internalSecret)
+  ) {
+    return next()
+  }
+
   if (isClozerServerRoute(req) && hasClozerApiKey(req)) {
     return next()
   }
