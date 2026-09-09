@@ -55,6 +55,9 @@ const userSchema = new Schema(
     maritalStatus: String,
     documentation: [DocumentationSchema],
     userState: { type: String, default: 'inactive' },
+    // Timestamp of the user's last authenticated request. Drives the 30-minute
+    // sliding idle-logout (enforced in authMiddleware + refresh).
+    lastActivityAt: { type: Date },
     uuid: {
       type: String,
       default: () => uuidv4(), // always generated

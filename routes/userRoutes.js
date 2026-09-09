@@ -44,6 +44,8 @@ import {
   passwordResetLimiter,
   userUpdateLimiter,
   financialInfoLimiter,
+  uaePassLoginLimiter,
+  uaePassSignupLimiter,
 } from '../middlewares/rateLimiter.js'
 import { authorize } from '../middlewares/advancedRBAC.js'
 import { authorizeUserByUUID } from '../middlewares/authorizeUser.js'
@@ -230,12 +232,16 @@ router.put(
 // get UAE pass token
 router.post('/get-token', uaePassLogin)
 
-// store UAE pass user info in db (same signup rate limit for public registrations)
+// store UAE pass user info in db. This runs on every UAE Pass login (find-or-
+// create), so it uses a generous login throttle (30/hour) plus a new-account
+// cap that only applies to genuinely new registrations (existing-user logins
+// are skipped). validateEmail runs first so the limiters can key on the email.
 router.post(
   '/store-user',
   validateEmail,
   optionalAuthMiddleware,
-  signupLimiter,
+  uaePassSignupLimiter,
+  uaePassLoginLimiter,
   storeUserThroughUaePass,
 )
 

@@ -1102,6 +1102,24 @@ const handleRefreshToken = asyncHandler(async (req, res) => {
     })
   }
 
+  // 30-minute sliding idle-logout. If the user has been inactive past the
+  // window, refuse to mint a new access token and clear the session cookies so
+  // the client logs out. Fail-open when lastActivityAt is unset.
+  const IDLE_TIMEOUT_MS = 30 * 60 * 1000
+  const lastActive = user.lastActivityAt ? user.lastActivityAt.getTime() : null
+  if (lastActive && Date.now() - lastActive > IDLE_TIMEOUT_MS) {
+    res.clearCookie('accessToken', cookieOptions)
+    res.clearCookie('refreshToken', cookieOptions)
+    res.clearCookie('role', cookieOptions)
+    return res.status(401).json({
+      success: false,
+      message: 'Session expired due to inactivity. Please log in again.',
+    })
+  }
+
+  user.lastActivityAt = new Date()
+  await user.save()
+
   const newAccessToken = generateToken(user._id)
 
   const assignedRole = user.role
