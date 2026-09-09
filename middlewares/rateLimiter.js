@@ -1,4 +1,5 @@
 import rateLimit, { ipKeyGenerator } from 'express-rate-limit'
+import User from '../models/userModel.js'
 
 /**
  * Helper: Generate user key safely for IPv6
@@ -146,6 +147,59 @@ export const signupLimiter = rateLimit({
     success: false,
     message:
       'Too many signup attempts. Only 5 registrations are allowed per day. Please try again later.',
+  },
+})
+
+// UAE Pass login throttle. The /store-user route runs on every UAE Pass login
+// (find-or-create), so it must not use the strict daily signup cap. Allow a
+// generous 30 logins/hour, keyed per email (falling back to IP).
+export const uaePassLoginLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 30,
+  keyGenerator: (req) => {
+    const email = req.body?.email?.toLowerCase()?.trim()
+    return email ? `uaelogin-${email}` : `uaelogin-ip-${ipKeyGenerator(req)}`
+  },
+  skip: (req) => {
+    const role = req.user?.role
+    return role === 'Admin' || role === 'Evaluator'
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    message: 'Too many login attempts. Please try again shortly.',
+  },
+})
+
+// New-account cap for UAE Pass, keyed per IP. Async skip: if the email already
+// belongs to an existing user this request is a LOGIN, not a signup, so it is
+// skipped entirely — only genuinely new account creations count toward the cap.
+export const uaePassSignupLimiter = rateLimit({
+  windowMs: 24 * 60 * 60 * 1000, // 24 hours
+  max: 5, // 5 new UAE Pass registrations per IP per day
+  keyGenerator: (req) => `uaesignup-ip-${ipKeyGenerator(req)}`,
+  skip: async (req) => {
+    const role = req.user?.role
+    if (role === 'Admin' || role === 'Evaluator') return true
+    const email = req.body?.email?.toLowerCase()?.trim()
+    if (!email) return false
+    try {
+      const existing = await User.findOne({
+        email,
+        isDeleted: false,
+      }).select('_id')
+      return Boolean(existing) // existing user => login => don't limit
+    } catch {
+      return false // on lookup error, apply the limit (fail closed for signups)
+    }
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    message:
+      'Too many new registrations from this network today. Please try again later.',
   },
 })
 

@@ -51,11 +51,31 @@ const authMiddleware = asyncHandler(async (req, res, next) => {
     const user = await User.findOne({
       _id: decoded.id,
       isDeleted: false,
-    }).select('_id uuid role email')
+    }).select('_id uuid role email lastActivityAt')
 
     if (!user) {
       await logSuspiciousActivity(req, 'Token user does not exist')
       return res.status(401).json({ success: false, message: 'Invalid token' })
+    }
+
+    // 30-minute sliding idle-logout. Fail-open: a user with no lastActivityAt
+    // (all pre-existing sessions) is never rejected — it's just initialised —
+    // so deploying this never mass-logs-out active users.
+    const IDLE_TIMEOUT_MS = 30 * 60 * 1000
+    const last = user.lastActivityAt ? user.lastActivityAt.getTime() : null
+    const now = Date.now()
+    if (last && now - last > IDLE_TIMEOUT_MS) {
+      return res.status(401).json({
+        success: false,
+        message: 'Session expired due to inactivity. Please log in again.',
+      })
+    }
+    // Slide the window forward, throttled to avoid a write on every request.
+    if (!last || now - last > 60 * 1000) {
+      User.updateOne(
+        { _id: user._id },
+        { $set: { lastActivityAt: new Date() } },
+      ).catch(() => {})
     }
 
     req.user = user
