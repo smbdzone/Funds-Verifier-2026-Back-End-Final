@@ -544,6 +544,9 @@ const storeUserThroughUaePass = asyncHandler(async (req, res) => {
     const refreshToken = generateRefreshToken(user._id)
 
     user.refreshToken = refreshToken
+    // Reset the idle window on login (see issueLoginSession) so a stale
+    // lastActivityAt can't immediately idle-logout a returning UAE Pass user.
+    user.lastActivityAt = new Date()
     await user.save()
 
     res.cookie('refreshToken', refreshToken, cookieOptions)
@@ -814,6 +817,9 @@ const issueLoginSession = async (res, user) => {
   const refreshToken = generateRefreshToken(user._id)
 
   user.refreshToken = refreshToken
+  // Reset the idle window on login so a stale lastActivityAt from a prior
+  // session can't immediately idle-logout the user right after they sign in.
+  user.lastActivityAt = new Date()
   user.loginOtpHash = undefined
   user.loginOtpExpiresAt = undefined
   user.loginOtpAttempts = 0
