@@ -2,6 +2,7 @@ import ImageAsset from '../models/imgModel.js'
 import VideoAsset from '../models/videoModel.js'
 import Thumbnail from '../models/thumbnailModel.js'
 import asyncHandler from 'express-async-handler'
+import mongoose from 'mongoose'
 import EvaluationCertificate from '../models/evaluationCertificateModel.js'
 import DealHunterDoc from '../models/dealHunterDocModel.js'
 import { encryptBuffer } from '../helper/encryption.js'
@@ -10,7 +11,20 @@ import {
   generateCloudFrontSignedUrl,
   cloudFrontUrlForKey,
 } from '../services/cloudFrontSignedUrlService.js'
+import { VIDEO_MAX_COUNT } from '../utils/uploadLimits.js'
 // import validateMongoId from "../utils/validateMongodbId.js";
+
+const findImageAssetByRef = (assetRef) => {
+  const id = String(assetRef || '').trim()
+  if (!id) return null
+  const query = { isDeleted: { $ne: true } }
+  if (mongoose.isValidObjectId(id)) {
+    query.$or = [{ _id: id }, { uuid: id }]
+  } else {
+    query.uuid = id
+  }
+  return ImageAsset.findOne(query)
+}
 
 const uploadImgs = asyncHandler(async (req, res) => {
   try {
@@ -37,12 +51,11 @@ const uploadImgs = asyncHandler(async (req, res) => {
 
     // Append to an existing gallery so the listing's single pictures ref keeps all images.
     if (appendToId) {
-      const existing = await ImageAsset.findOne({
-        _id: appendToId,
-        isDeleted: { $ne: true },
-      })
+      const existing = await findImageAssetByRef(appendToId)
       if (existing) {
-        existing.images = [...(existing.images || []), ...images]
+        const current = (existing.images || []).filter((img) => !img?.isDeleted)
+        existing.images = [...current, ...images]
+        existing.markModified('images')
         await existing.save()
         return res.status(200).json(existing)
       }
@@ -95,6 +108,18 @@ const thumbnailImg = asyncHandler(async (req, res) => {
   }
 })
 
+const findVideoAssetByRef = (assetRef) => {
+  const id = String(assetRef || '').trim()
+  if (!id) return null
+  const query = { isDeleted: { $ne: true } }
+  if (mongoose.isValidObjectId(id)) {
+    query.$or = [{ _id: id }, { uuid: id }]
+  } else {
+    query.uuid = id
+  }
+  return VideoAsset.findOne(query)
+}
+
 const uploadVideoFun = asyncHandler(async (req, res) => {
   try {
     const files = req.files?.length
@@ -107,6 +132,7 @@ const uploadVideoFun = asyncHandler(async (req, res) => {
     }
 
     const userUUID = req.user?.uuid || req.query.userId
+    const appendToId = String(req.body?.assetId || req.query?.assetId || '').trim()
     const SIGNED_URL_EXPIRES_IN_SECONDS = 60 * 60 // 1 hour
 
     const videos = files.map((file) => ({
@@ -120,6 +146,31 @@ const uploadVideoFun = asyncHandler(async (req, res) => {
       uploadedAt: file.uploadedAt,
       url: file.cloudFrontUrl,
     }))
+
+    if (appendToId) {
+      const existing = await findVideoAssetByRef(appendToId)
+      if (existing) {
+        const current = (existing.videos || []).filter((clip) => !clip?.isDeleted)
+        if (current.length + videos.length > VIDEO_MAX_COUNT) {
+          return res.status(400).json({
+            error: `Maximum ${VIDEO_MAX_COUNT} videos allowed.`,
+          })
+        }
+        existing.videos = [...current, ...videos]
+        existing.markModified('videos')
+        await existing.save()
+        const firstKey = existing.videos[0]?.s3Key
+        const signed = firstKey
+          ? generateCloudFrontSignedUrl(firstKey, SIGNED_URL_EXPIRES_IN_SECONDS)
+          : {}
+        return res.json({
+          ...existing.toObject(),
+          signedUrl: signed.signedUrl,
+          expiresAt: signed.expiresAt,
+          expiresInSeconds: signed.expiresInSeconds,
+        })
+      }
+    }
 
     const createVideo = await VideoAsset.create({
       userUUID,
@@ -144,39 +195,191 @@ const uploadVideoFun = asyncHandler(async (req, res) => {
   }
 })
 
+function mediaPathKey(img = {}) {
+  const explicit = String(img?.s3Key || img?.public_id || '').trim()
+  if (explicit) return explicit
+  const raw = String(img?.signedUrl || img?.url || '')
+    .split('?')[0]
+    .trim()
+  if (!raw) return ''
+  try {
+    return decodeURIComponent(new URL(raw).pathname.replace(/^\//, ''))
+  } catch {
+    return raw.replace(/^\//, '')
+  }
+}
+
+function imageFingerprint(img = {}, { includePath = true } = {}) {
+  const name = String(img.originalName || img.public_id || '').trim()
+  const size = img.size == null ? '' : String(img.size)
+  const uploadedAt = img.uploadedAt ? String(img.uploadedAt) : ''
+  if (!includePath) return `${name}|${size}|${uploadedAt}`
+  const pathOnly = mediaPathKey(img)
+  return `${name}|${size}|${uploadedAt}|${pathOnly}`
+}
+
+function findImageIndex(existing, used, item) {
+  const key = mediaPathKey(item)
+  if (key) {
+    const byKey = existing.findIndex((img, i) => {
+      if (used.has(i)) return false
+      const existingKey = mediaPathKey(img)
+      return (
+        existingKey === key ||
+        String(img?.s3Key || '').trim() === key ||
+        String(img?.public_id || '').trim() === key
+      )
+    })
+    if (byKey !== -1) return byKey
+  }
+
+  const wantedExact = imageFingerprint(item, { includePath: true })
+  const exact = existing.findIndex((img, i) => {
+    if (used.has(i)) return false
+    return imageFingerprint(img, { includePath: true }) === wantedExact
+  })
+  if (exact !== -1) return exact
+
+  const wantedLoose = imageFingerprint(item, { includePath: false })
+  if (!wantedLoose || wantedLoose === '||') return -1
+  return existing.findIndex((img, i) => {
+    if (used.has(i)) return false
+    return imageFingerprint(img, { includePath: false }) === wantedLoose
+  })
+}
+
+/** Replace ImageAsset.images with the client's ordered (and possibly reduced) list. */
+const reorderImgs = asyncHandler(async (req, res) => {
+  const { assetId } = req.params
+  const order = Array.isArray(req.body?.order) ? req.body.order : []
+
+  if (!assetId) {
+    return res.status(400).json({ error: 'Missing asset id' })
+  }
+
+  const imageAsset = await findImageAssetByRef(assetId)
+  if (!imageAsset) {
+    return res.status(404).json({ error: 'Image gallery not found' })
+  }
+
+  const existing = Array.isArray(imageAsset.images) ? [...imageAsset.images] : []
+  const used = new Set()
+  const next = []
+
+  for (const item of order) {
+    const matchIndex = findImageIndex(existing, used, item)
+    if (matchIndex === -1) continue
+    used.add(matchIndex)
+    const matched = existing[matchIndex]
+    const plain =
+      typeof matched?.toObject === 'function' ? matched.toObject() : { ...matched }
+    delete plain.isDeleted
+    delete plain.deletedAt
+    next.push(plain)
+  }
+
+  // Never wipe a gallery because fingerprints failed to match.
+  if (order.length && next.length === 0) {
+    return res.status(200).json(imageAsset)
+  }
+
+  // Client list is sanitized (no s3Key). Unmatched rows are NOT deletions —
+  // append remaining stored images so car/jewelry galleries cannot shrink.
+  if (order.length > next.length) {
+    for (let i = 0; i < existing.length; i++) {
+      if (used.has(i)) continue
+      const matched = existing[i]
+      const plain =
+        typeof matched?.toObject === 'function'
+          ? matched.toObject()
+          : { ...matched }
+      delete plain.isDeleted
+      delete plain.deletedAt
+      next.push(plain)
+    }
+  }
+
+  imageAsset.images = next
+  imageAsset.markModified('images')
+  await imageAsset.save()
+  return res.status(200).json(imageAsset)
+})
+
+const imageMatchesDeleteId = (img, id) => {
+  if (!img || !id) return false
+  const s3Key = String(img.s3Key || '').trim()
+  const publicId = String(img.public_id || '').trim()
+  if (s3Key === id || publicId === id) return true
+  // Tolerate encoded/decoded or path-suffix mismatches from older clients.
+  try {
+    const decoded = decodeURIComponent(id)
+    if (s3Key === decoded || publicId === decoded) return true
+  } catch {
+    /* ignore */
+  }
+  // Avoid matching every image when id is tiny/ambiguous.
+  if (id.length >= 8 && (s3Key.endsWith(id) || id.endsWith(s3Key))) return true
+  return false
+}
+
 const deleteImgs = asyncHandler(async (req, res) => {
-  const { id } = req.params
+  const id = String(req.query?.id || req.params?.id || '').trim()
+  const assetId = String(req.query?.assetId || req.body?.assetId || '').trim()
 
   try {
-    // During migration, `id` may be Cloudinary public_id OR an S3 key.
-    const imageAsset = await ImageAsset.findOne({
-      $or: [{ 'images.public_id': id }, { 'images.s3Key': id }],
-    })
+    if (!id) {
+      return res.status(400).json({ error: 'Image id is required.' })
+    }
+
+    let imageAsset = null
+    if (assetId) {
+      imageAsset = await ImageAsset.findOne({
+        _id: assetId,
+        isDeleted: { $ne: true },
+      })
+    }
+    if (!imageAsset) {
+      let decoded = id
+      try {
+        decoded = decodeURIComponent(id)
+      } catch {
+        /* keep id */
+      }
+      imageAsset = await ImageAsset.findOne({
+        $or: [
+          { 'images.public_id': id },
+          { 'images.s3Key': id },
+          { 'images.public_id': decoded },
+          { 'images.s3Key': decoded },
+        ],
+      })
+    }
 
     if (!imageAsset) {
-      throw new Error('Image not found in the database.')
+      return res.status(404).json({ error: 'Image not found in the database.' })
     }
 
-    // Step 2: Find the image inside the array
-    const image = imageAsset.images.find(
-      (img) => img.public_id === id || img.s3Key === id
+    const before = Array.isArray(imageAsset.images) ? imageAsset.images.length : 0
+    const removed = (imageAsset.images || []).filter((img) =>
+      imageMatchesDeleteId(img, id),
+    )
+    imageAsset.images = (imageAsset.images || []).filter(
+      (img) => !imageMatchesDeleteId(img, id),
     )
 
-    if (!image) {
-      throw new Error('Image not found in the images array.')
+    if (imageAsset.images.length === before) {
+      return res.status(404).json({ error: 'Image not found in the images array.' })
     }
 
-    // Step 3: Soft delete the image
-    image.isDeleted = true // Make sure your image schema has this field
-    image.deletedAt = new Date() // optional timestamp
-
-    // Step 4: Save the updated document
+    // Mixed array: must markModified or Mongoose will not write the change.
+    imageAsset.markModified('images')
     await imageAsset.save()
 
     return res.json({
       success: true,
-      message: 'Image soft-deleted successfully.',
-      image,
+      message: 'Image deleted successfully.',
+      removedCount: removed.length,
+      images: imageAsset.images,
     })
   } catch (error) {
     console.error('Error deleting image:', error.message)
@@ -312,6 +515,7 @@ const verificationCertificate = asyncHandler(async (req, res) => {
 
 export {
   uploadImgs,
+  reorderImgs,
   deleteImgs,
   uploadVideoFun,
   thumbnailImg,
