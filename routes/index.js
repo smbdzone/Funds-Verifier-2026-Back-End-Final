@@ -46,6 +46,7 @@ import { createPaymentIntent } from '../controller/createPaymentIntentCtrl.js'
 import { pdfPreviewProxy } from '../controller/pdfPreviewCtrl.js'
 import { listingMediaDownloadProxy } from '../controller/listingMediaDownloadCtrl.js'
 import { issueCsrfToken } from '../middlewares/csrfMiddleware.js'
+import { qrDecode, qrImageProxy } from '../controller/qrScanCtrl.js'
 
 const router = express.Router()
 
@@ -55,6 +56,8 @@ router.get('/pdf-preview', pdfPreviewProxy)
 router.get('/listing-media-download', listingMediaDownloadProxy)
 router.post('/listing-media-download', listingMediaDownloadProxy)
 router.post('/create-payment-intent', createPaymentIntent)
+router.get('/qr-image-proxy', qrImageProxy)
+router.get('/qr-decode', qrDecode)
 
 router.use('/user', userRouter)
 router.use('/public', publicRoutes)
