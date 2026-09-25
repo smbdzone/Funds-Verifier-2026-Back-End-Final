@@ -19,7 +19,9 @@ import {
   uaePassLogin,
   storeUserThroughUaePass,
   GetUsersFinancialInfo,
+  GetUserFinancialInfoById,
   UpdateUsersFinancialInfo,
+  DeleteUserFinancialInfo,
   verifyEmail,
   forgotPassword,
   resetPassword,
@@ -138,11 +140,25 @@ router.get(
   GetUsersFinancialInfo,
 )
 
+router.get(
+  '/financial-statements/:id',
+  ...adminOnly,
+  financialInfoLimiter,
+  GetUserFinancialInfoById,
+)
+
 router.put(
   '/financial-statements/:id',
   ...adminOnly,
   financialInfoLimiter,
   UpdateUsersFinancialInfo,
+)
+
+router.delete(
+  '/financial-statements/:id',
+  ...adminOnly,
+  financialInfoLimiter,
+  DeleteUserFinancialInfo,
 )
 
 // Developer corporate KYC (must be before /:id)

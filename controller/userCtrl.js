@@ -1,4 +1,6 @@
 import asyncHandler from 'express-async-handler'
+import { getDocumentSignedUrl } from '../services/documentUrlService.js'
+import Slot from '../models/Slot.js'
 import User from '../models/userModel.js'
 import generateToken from '../config/jwToken.js'
 import generateRefreshToken from '../config/refreshToken.js'
@@ -1140,6 +1142,55 @@ const handleRefreshToken = asyncHandler(async (req, res) => {
   })
 })
 
+const FINANCE_CERT_SELECT =
+  'Certificate.name Certificate.s3Key Certificate.s3Bucket Certificate.encrypted Certificate.url uuid'
+
+function financeCertificateStreamUrl(uuid) {
+  if (!uuid) return ''
+  const fromEnv = String(
+    process.env.API_PUBLIC_URL || process.env.BASE_URL || '',
+  )
+    .trim()
+    .replace(/\/+$/, '')
+  if (fromEnv) {
+    const base = fromEnv.endsWith('/api') ? fromEnv : `${fromEnv}/api`
+    return `${base}/evaluation-certificate/${encodeURIComponent(uuid)}/pdf`
+  }
+  return `/evaluation-certificate/${encodeURIComponent(uuid)}/pdf`
+}
+
+async function withSignedFinanceCertificate(user) {
+  if (!user) return null
+  const obj = user.toObject ? user.toObject() : { ...user }
+  const cert = obj.financialInfo?.verificationCertificate
+  if (!cert || typeof cert !== 'object') return obj
+
+  const uuid = cert.uuid
+  const name = cert.Certificate?.name || 'certificate.pdf'
+  let url = cert.Certificate?.url || ''
+
+  if (uuid) {
+    url = financeCertificateStreamUrl(uuid)
+  } else {
+    const signed = await getDocumentSignedUrl(cert)
+    if (signed?.url) url = signed.url
+  }
+
+  obj.financialInfo = {
+    ...obj.financialInfo,
+    verificationCertificate: {
+      _id: cert._id,
+      uuid,
+      Certificate: {
+        ...(cert.Certificate || {}),
+        name,
+        url,
+      },
+    },
+  }
+  return obj
+}
+
 const GetUsersFinancialInfo = asyncHandler(async (req, res) => {
   try {
     const users = await User.find({
@@ -1189,6 +1240,58 @@ const UpdateUsersFinancialInfo = asyncHandler(async (req, res) => {
     }
 
     return res.status(200).json({ user: updatedUser, success: true })
+  } catch (error) {
+    return res
+      .status(500)
+      .json({ message: error?.message || 'Something went wrong!' })
+  }
+})
+
+const GetUserFinancialInfoById = asyncHandler(async (req, res) => {
+  try {
+    const { id } = req.params
+    validateMongoId(id)
+
+    const user = await User.findOne({ _id: id, isDeleted: false })
+      .select('name lastname email phone uuid financialInfo')
+      .populate({
+        path: 'financialInfo.verificationCertificate',
+        select: FINANCE_CERT_SELECT,
+      })
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' })
+    }
+
+    const payload = await withSignedFinanceCertificate(user)
+    return res.status(200).json({ user: payload, success: true })
+  } catch (error) {
+    return res
+      .status(500)
+      .json({ message: error?.message || 'Something went wrong!' })
+  }
+})
+
+const DeleteUserFinancialInfo = asyncHandler(async (req, res) => {
+  try {
+    const { id } = req.params
+    validateMongoId(id)
+
+    const updatedUser = await User.findOneAndUpdate(
+      { _id: id, isDeleted: false },
+      { $unset: { financialInfo: 1 } },
+      { new: true },
+    ).select('name email uuid')
+
+    if (!updatedUser) {
+      return res.status(404).json({ success: false, message: 'User not found' })
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: 'Financial statement deleted',
+      user: updatedUser,
+    })
   } catch (error) {
     return res
       .status(500)
@@ -1323,6 +1426,25 @@ const getServiceProvidersByRole = asyncHandler(async (req, res) => {
   const users = await User.find(query)
     .select('uuid name lastname role')
     .lean()
+
+  // Arrange Viewing: only return trustees who currently have open viewing slots.
+  // Legacy/empty trustee accounts (e.g. "Simo" with no slots) stay hidden.
+  if (role === 'Trustee') {
+    const today = new Date()
+    today.setUTCHours(0, 0, 0, 0)
+    const withSlots = []
+    for (const user of users) {
+      const hasSlots = await Slot.exists({
+        userUUID: user.uuid,
+        slotCategory: 'viewing',
+        isDeleted: { $ne: true },
+        date: { $gte: today },
+        'times.isBooked': false,
+      })
+      if (hasSlots) withSlots.push(user)
+    }
+    return res.json(withSlots)
+  }
 
   res.json(users)
 })
@@ -2273,10 +2395,12 @@ export {
   getServiceProvidersByRole,
   switchUser,
   GetUsersFinancialInfo,
+  GetUserFinancialInfoById,
   sendVerificationEmail,
   verifyEmail,
   handleRefreshToken,
   UpdateUsersFinancialInfo,
+  DeleteUserFinancialInfo,
   verifyUserToken,
   logoutUser as handleLogout,
   validateToken,
