@@ -42,6 +42,7 @@ import publicRoutes from './publicToken.js'
 import testRoute from './testRoute.js'
 import developerProjectRoute from './developerProjectRoute.js'
 import locationCatalogRoute from './locationCatalogRoute.js'
+import privateListingViewRequestRoute from './privateListingViewRequestRoute.js'
 import { createPaymentIntent } from '../controller/createPaymentIntentCtrl.js'
 import { pdfPreviewProxy } from '../controller/pdfPreviewCtrl.js'
 import { listingMediaDownloadProxy } from '../controller/listingMediaDownloadCtrl.js'
@@ -101,6 +102,7 @@ router.use('/services', ServicesRoutes)
 router.use('/clozer', clozerRoutes)
 router.use('/developer-projects', developerProjectRoute)
 router.use('/location-catalog', locationCatalogRoute)
+router.use('/listings', privateListingViewRequestRoute)
 router.use('/test', testRoute)
 
 export default router

@@ -43,8 +43,13 @@ import {
   refreshListingPremiumFieldsForEdit,
   sanitizeUnpaidPremiumServicesForClient,
 } from '../utils/listingPremiumSync.js'
+import { sanitizeListingMediaObjectIds, toListingUpdateOps } from '../utils/sanitizeListingMediaIds.js'
 import { buildListingIdQuery } from '../utils/listingIdLookup.js'
 import { isListingPrivilegedUser } from '../utils/parentEvaluator.js'
+import {
+  MARKETPLACE_LISTING_FILTER,
+  sendLockedPrivateListingIfNeeded,
+} from '../utils/listingVisibility.js'
 import {
   blockPriceChangeIfUnderProcess,
   stripUnderProcessFromListingPayload,
@@ -59,7 +64,7 @@ import path from 'path'
 import processQuery from '../utils/priceRange.js'
 import { verifyToken } from '../middlewares/JwtAuth.js'
 import UserModel from '../models/userModel.js'
-import { AssetsListingsPricing } from '../utils/AssetsListingsPricing.js'
+import { AssetsListingsPricing, applyListingVisibility } from '../utils/AssetsListingsPricing.js'
 import { createNotification } from './notifications.controller.js'
 import { notifyEvaluatorsNewListing } from '../helper/notificationHelpers.js'
 import { notifyAssetHolderDocumentRequested } from '../helper/notifyDocumentRequested.js'
@@ -117,7 +122,12 @@ const createProduct = asyncHandler(async (req, res) => {
       price: req.body.price,
     })
 
+    if (req.body.bodyType && !req.body.carType) {
+      req.body.carType = req.body.bodyType
+    }
+
     stripNullPremiumRefs(req.body)
+    sanitizeListingMediaObjectIds(req.body)
 
     const createPdt = await Car.create([req.body], { session })
 
@@ -255,6 +265,10 @@ const getSingleProduct = asyncHandler(async (req, res) => {
 
     await refreshListingMediaSignedUrls(car)
 
+    if (sendLockedPrivateListingIfNeeded(res, req.user, car)) {
+      return
+    }
+
     const isPrivilegedUser = isListingPrivilegedUser(req.user)
 
     if (!isPrivilegedUser) {
@@ -313,7 +327,7 @@ const getAllProduct = asyncHandler(async (req, res) => {
 
   // ---------------- PUBLIC DEFAULT ----------------
   parseData.isDeleted = false
-  parseData.listing = 'Public' // 🔐 DEFAULT SAFE MODE
+  parseData.listing = MARKETPLACE_LISTING_FILTER
 
   // ---------------- FILTERS ----------------
   if (req.query.minPrice || req.query.maxPrice) {
@@ -368,14 +382,7 @@ const getAllProduct = asyncHandler(async (req, res) => {
       user.role === 'DealHunter' &&
       user.financialInfo?.status === 'Approved'
     ) {
-      parseData.$or = [
-        { listing: 'Public' },
-        {
-          listing: 'Private',
-          price: { $lte: Number(user.financialInfo.fundsVerification) },
-        },
-      ]
-      delete parseData.listing
+      parseData.listing = MARKETPLACE_LISTING_FILTER
     }
   }
 
@@ -396,7 +403,7 @@ const getAllProduct = asyncHandler(async (req, res) => {
 
     // 🔐 SAFE POPULATES
     query = query
-      .populate({ path: 'pictures', select: '-_id' })
+      .populate({ path: 'pictures', select: 'images uuid' })
       .populate({ path: 'video', select: '-_id' })
       .populate({ path: 'thumbnailImg', select: '-_id' })
       .populate({ path: 'qrScan', select: '-_id' })
@@ -505,26 +512,8 @@ const getAllProductByFilter = asyncHandler(async (req, res) => {
   const modifiedQuery = processQuery(req.query)
   if (token) {
     userId = verifyToken(token)
-    if (userId) {
-      const GetUser = await UserModel.findById(userId, {
-        isDeleted: false,
-      }).select('_id financialInfo')
-      if (
-        GetUser?.financialInfo &&
-        GetUser?.financialInfo?.status === 'Approved'
-      ) {
-        modifiedQuery.$or = [
-          { listing: 'Public' },
-          {
-            listing: 'Private',
-            price: { $lte: Number(GetUser.financialInfo.fundsVerification) },
-          },
-        ]
-      } else {
-        modifiedQuery.$or = [{ listing: 'Public' }]
-      }
-    }
   }
+  modifiedQuery.listing = MARKETPLACE_LISTING_FILTER
   // Facility filtering (assuming "facilities" is a field in the Property model)
   if (req.query.extras) {
     const desiredExtras = req.query.extras.split(',')
@@ -706,6 +695,10 @@ const updateProduct = asyncHandler(async (req, res) => {
         req.user,
       )
 
+      if (req.body.bodyType && !req.body.carType) {
+        req.body.carType = req.body.bodyType
+      }
+
       // Update slug if title is provided
       if (req.body.title) {
         req.body.slug = slugify(req.body.title)
@@ -741,9 +734,13 @@ const updateProduct = asyncHandler(async (req, res) => {
 
       let updatedProduct
       stripNullPremiumRefs(req.body)
+      sanitizeListingMediaObjectIds(req.body)
+      if (req.body.listing !== undefined || req.body.price !== undefined) {
+        req.body.listing = applyListingVisibility('car', req.body, product)
+      }
       updatedProduct = await Car.findByIdAndUpdate(
         product._id,
-        { $set: req.body },
+        toListingUpdateOps(req.body),
         { new: true }
       ).select('-_id')
 
