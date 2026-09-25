@@ -362,6 +362,46 @@ export async function notifyFvPremiumServiceCompleted({
   })
 }
 
+export async function notifyFvObligationDisagreed({
+  user,
+  context,
+  assetType,
+  listingTitle,
+  listingUuid,
+  amount,
+}) {
+  const name = displayName(user) || 'A user'
+  const email = user?.email || 'N/A'
+  const label = assetLabel(assetType)
+  const title = listingTitle || 'listing'
+  const fee =
+    amount != null && Number.isFinite(Number(amount))
+      ? `AED ${Number(amount).toLocaleString()}`
+      : 'N/A'
+
+  const lines = [
+    `Event: <strong>Seller obligation terms disagreed</strong>`,
+    `Context: <strong>${context || 'N/A'}</strong>`,
+    `User name: <strong>${name}</strong>`,
+    `User email: <strong>${email}</strong>`,
+    user?.uuid ? `User UUID: <strong>${user.uuid}</strong>` : null,
+    user?.role ? `User role: <strong>${user.role}</strong>` : null,
+    `Asset type: <strong>${label}</strong>`,
+    `Title: <strong>${title}</strong>`,
+    listingUuid ? `Listing UUID: <strong>${listingUuid}</strong>` : null,
+    `Obligation amount shown: <strong>${fee}</strong>`,
+    'Status: <strong>Disagreed — please follow up</strong>',
+  ].filter(Boolean)
+
+  return sendFvPortalEmail({
+    subject: `Sale obligation disagreed — ${label} — Funds Verifier`,
+    headline: `${name} disagreed with the seller obligation terms (${context || 'unknown'}).`,
+    bodyLines: lines,
+    ctaLabel: 'Open Site',
+    ctaPath: '/',
+  })
+}
+
 /**
  * Buyer/broker booked a trustee viewing — notify FV.
  */
